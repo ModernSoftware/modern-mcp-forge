@@ -108,6 +108,28 @@ production build
 
 UI-facing changes should additionally receive a manual browser pass.
 
+### Container verification
+
+Every pull request also runs the Docker workflow in verification-only mode:
+
+```text
+production Docker build
+        ↓
+start container
+        ↓
+GET /api/health
+        ↓
+pass / fail
+```
+
+Pull-request runs do not authenticate to GHCR and do not publish an image.
+Publishing is restricted to trusted push, release, or explicitly requested
+manual workflow runs.
+
+The Docker check runs on every pull request so it can be used as a consistent
+required status check for `main`. The image is smoke-tested on `linux/amd64`;
+published release images can target additional architectures.
+
 ## Diagnosing CI-only failures
 
 When a test passes locally but fails in CI, first determine whether the failure

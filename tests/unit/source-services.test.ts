@@ -1,11 +1,12 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { join } from 'node:path';
+
 import {
   existsSync,
   mkdirSync,
   readFileSync,
   writeFileSync
 } from 'node:fs';
-import { join } from 'node:path';
 
 import {
   createStarterPromptTemplate,
@@ -16,10 +17,12 @@ import {
   readPromptTemplateText,
   savePromptTemplate
 } from '$lib/server/project/prompt-source-service';
+
 import {
   clearProjectForProcess,
   selectProjectForProcess
 } from '$lib/server/project/project-selection';
+
 import {
   createStarterResourceSource,
   getResourceSourceInfo,
@@ -29,6 +32,7 @@ import {
   ResourceSourceError,
   saveResourceSource
 } from '$lib/server/project/resource-source-service';
+
 import {
   createStarterSource,
   getToolSourceInfo,
@@ -37,6 +41,7 @@ import {
   ToolSourceConflictError,
   ToolSourceError
 } from '$lib/server/project/source-service';
+
 import type {
   PromptDefinition,
   ResourceDefinition,

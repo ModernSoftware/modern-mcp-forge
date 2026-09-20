@@ -1,5 +1,4 @@
 import { describe, expect, test } from 'bun:test';
-
 import { renderPromptTemplate } from '$lib/server/project/prompt-source-service';
 
 describe('renderPromptTemplate', () => {

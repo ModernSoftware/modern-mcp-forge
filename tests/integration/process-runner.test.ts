@@ -1,13 +1,14 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { mkdirSync, realpathSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-
 import { ToolProcessError } from '$lib/server/execution/errors';
 import { executeExternalTool } from '$lib/server/execution/process-runner';
+
 import {
   clearProjectForProcess,
   selectProjectForProcess
 } from '$lib/server/project/project-selection';
+
 import type { ToolDefinition } from '$lib/server/project/schema';
 
 import {

@@ -5,6 +5,8 @@
 ### Build, test, and run MCP servers visually — without locking your tools to one language.
 
 [![CI](https://github.com/ModernSoftware/modern-mcp-forge/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ModernSoftware/modern-mcp-forge/actions/workflows/ci.yml)
+[![Docker](https://github.com/ModernSoftware/modern-mcp-forge/actions/workflows/docker.yml/badge.svg?branch=main)](https://github.com/ModernSoftware/modern-mcp-forge/actions/workflows/docker.yml)
+[![GHCR](https://img.shields.io/badge/GHCR-modern--mcp--forge-2496ED?logo=docker&logoColor=white)](https://github.com/ModernSoftware/modern-mcp-forge/pkgs/container/modern-mcp-forge)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 ![Platforms](https://img.shields.io/badge/CI-Windows%20%7C%20macOS%20%7C%20Linux-2ea44f)
 ![Bun](https://img.shields.io/badge/runtime-Bun%201.4.2-000000?logo=bun&logoColor=white)
@@ -15,7 +17,8 @@
 </div>
 
 > [!NOTE]
-> Modern MCP Forge is currently being stabilized for the **0.9.0 public beta**.
+> Modern MCP Forge **0.9.0** is the first public beta. Feedback, bug reports,
+> ideas, and contributions are welcome as the project moves toward 1.0.
 
 Modern MCP Forge is a local-first visual workbench for authoring and testing
 [Model Context Protocol](https://modelcontextprotocol.io/) servers. It keeps the
@@ -89,6 +92,17 @@ Run the complete local release gate:
 ```bash
 bun run test:all
 ```
+
+### 🐳 Docker
+
+Docker is also available as an optional distribution:
+
+```bash
+docker pull ghcr.io/modernsoftware/modern-mcp-forge:0.9.0
+```
+
+For a persistent setup with host project folders mounted into Forge, use the
+included `compose.yaml`. See the [Docker guide](docs/docker.md).
 
 ## 📦 Project model
 
@@ -176,6 +190,7 @@ desktop operating-system families.
 ## 📚 Documentation
 
 - 🗃️ [Application data](docs/app-data.md)
+- 🐳 [Docker and GHCR](docs/docker.md)
 - 🖥️ [MCP stdio transport](docs/mcp-stdio.md)
 - 🧪 [Testing](docs/testing.md)
 - 🔄 [Continuous integration](docs/ci.md)
@@ -183,8 +198,8 @@ desktop operating-system families.
 - 🤖 [Agent example](examples/agent/README.md)
 - 📖 [Documentation index](docs/README.md)
 
-More release documentation — architecture, Tool ABI, security,
-troubleshooting, and contribution guidance — is planned before the 0.9.0
+Additional documentation for architecture, the Tool ABI, security,
+troubleshooting, and contribution guidance will continue to grow during the
 public beta.
 
 ## 🔐 Security note
@@ -223,6 +238,6 @@ modification, and distribution while also providing an explicit patent grant.
 **Built by [Modern Software](https://github.com/ModernSoftware)**
 
 If Modern MCP Forge is useful to you, consider starring the repository and
-sharing feedback as the project approaches 0.9.0.
+sharing feedback during the 0.9 public beta.
 
 </div>

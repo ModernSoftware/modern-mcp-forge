@@ -12,10 +12,12 @@ import {
   setDefinitionEnabled,
   updateDefinitionInManifest
 } from '$lib/server/project/manifest-service';
+
 import {
   clearProjectForProcess,
   selectProjectForProcess
 } from '$lib/server/project/project-selection';
+
 import type {
   PromptDefinition,
   ResourceDefinition,

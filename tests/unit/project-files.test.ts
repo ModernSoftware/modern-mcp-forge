@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-
 import { listProjectSourceFiles } from '$lib/server/project/project-files';
 import { listProjectPromptFiles } from '$lib/server/project/prompt-files';
 import { listProjectResourceFiles } from '$lib/server/project/resource-files';
+
 import {
   clearProjectForProcess,
   selectProjectForProcess

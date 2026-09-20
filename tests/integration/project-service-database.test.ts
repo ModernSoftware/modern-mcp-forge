@@ -1,11 +1,12 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { join } from 'node:path';
+
 import {
   existsSync,
   readFileSync,
   renameSync,
   writeFileSync
 } from 'node:fs';
-import { join } from 'node:path';
 
 import {
   checkDatabase,
@@ -13,6 +14,7 @@ import {
   getDatabase,
   resolveDatabasePath
 } from '$lib/server/database';
+
 import {
   activateProject,
   closeActiveProject,

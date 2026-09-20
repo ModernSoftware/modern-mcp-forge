@@ -1,13 +1,13 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { join } from 'node:path';
-
 import { executeExternalTool } from '$lib/server/execution/process-runner';
+import type { ToolDefinition } from '$lib/server/project/schema';
+import { createStarterSource } from '$lib/server/project/source-service';
+
 import {
   clearProjectForProcess,
   selectProjectForProcess
 } from '$lib/server/project/project-selection';
-import type { ToolDefinition } from '$lib/server/project/schema';
-import { createStarterSource } from '$lib/server/project/source-service';
 
 import {
   createManifest,

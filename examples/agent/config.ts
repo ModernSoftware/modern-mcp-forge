@@ -92,23 +92,23 @@ export function parseCliOptions(argv: string[]): CliOptions {
 
 export function printHelp(): void {
   console.log(`
-Modern MCP Forge Agent Demo
+    Modern MCP Forge Agent Demo
 
-Usage:
-  bun run agent:demo -- [options]
+    Usage:
+      bun run agent:demo -- [options]
 
-Options:
-  --profile <name>     Select a model profile
-  --prompt <text>      Run one prompt without interactive input
-  --config <path>      Use another agent configuration file
-  --list-profiles      Print configured profiles
-  --help               Show this help
+    Options:
+      --profile <name>     Select a model profile
+      --prompt <text>      Run one prompt without interactive input
+      --config <path>      Use another agent configuration file
+      --list-profiles      Print configured profiles
+      --help               Show this help
 
-Examples:
-  bun run agent:demo -- --profile anthropic
-  bun run agent:demo -- --profile ollama-local
-  bun run agent:demo -- --profile anthropic --prompt "Hash Modern Software and count its characters."
-`);
+    Examples:
+      bun run agent:demo -- --profile anthropic
+      bun run agent:demo -- --profile ollama-local
+      bun run agent:demo -- --profile anthropic --prompt "Hash Modern Software and count its characters."
+    `);
 }
 
 export function loadAgentConfig(
@@ -124,10 +124,7 @@ export function loadAgentConfig(
   return AgentConfigSchema.parse(parsed);
 }
 
-export function getProfile(
-  config: AgentConfig,
-  requestedProfile?: string
-): {
+export function getProfile(config: AgentConfig, requestedProfile?: string): {
   name: string;
   profile: AgentProfile;
 } {
@@ -148,9 +145,7 @@ export function getProfile(
   };
 }
 
-export function resolveOptionalSecret(
-  environmentVariable?: string
-): string | undefined {
+export function resolveOptionalSecret(environmentVariable?: string): string | undefined {
   if (!environmentVariable) {
     return undefined;
   }
