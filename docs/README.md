@@ -7,6 +7,7 @@ Forge.
 ## Current documents
 
 - [Application data](app-data.md) — where Forge stores machine-local state
+- [Docker and GHCR](docker.md) — container usage, project mounts, and publishing
 - [MCP stdio transport](mcp-stdio.md) — stdio architecture, usage, and rules
 - [Testing](testing.md) — automated test layers and local commands
 - [Continuous integration](ci.md) — GitHub Actions and cross-platform CI

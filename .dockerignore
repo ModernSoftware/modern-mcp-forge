@@ -1,0 +1,17 @@
+.git
+.github
+node_modules
+.bun
+.svelte-kit
+build
+dist
+coverage
+test-results
+data
+docs
+examples
+tests
+.env
+.env.*
+.DS_Store
+Thumbs.db
