@@ -1,5 +1,4 @@
 import { describe, expect, test } from 'bun:test';
-
 import { validateLocalRequest } from '$lib/server/local-request-guard';
 
 async function responseBody(response: Response | null) {

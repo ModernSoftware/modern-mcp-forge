@@ -143,27 +143,3 @@ linux/arm64
 
 The workflow also publishes a GitHub artifact provenance attestation for the
 image digest.
-
-### Publishing the existing 0.9.0 beta
-
-The v0.9.0 GitHub Release existed before the Docker workflow, so merging this
-change will not replay its `release: published` event.
-
-After this PR is merged:
-
-1. open **Actions → Docker → Run workflow**
-2. select `main`
-3. enter `0.9.0` as the image tag
-4. run the workflow
-
-That publishes:
-
-```text
-ghcr.io/modernsoftware/modern-mcp-forge:0.9.0
-ghcr.io/modernsoftware/modern-mcp-forge:0.9
-```
-
-Because 0.9.0 is a prerelease, do not publish `latest` for it.
-
-After the first package is published, verify the GHCR package visibility is
-**Public** in the package settings so users can pull it without authentication.

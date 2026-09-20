@@ -5,15 +5,18 @@ import {
   closeDatabase,
   getDatabase
 } from '$lib/server/database';
+
 import {
   completeToolExecution,
   failToolExecution,
   startToolExecution
 } from '$lib/server/mcp/execution-log';
+
 import {
   clearProjectForProcess,
   selectProjectForProcess
 } from '$lib/server/project/project-selection';
+
 import {
   getExecution,
   getExecutionStats,

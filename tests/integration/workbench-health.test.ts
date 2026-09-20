@@ -1,26 +1,30 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { join } from 'node:path';
-
 import { closeDatabase } from '$lib/server/database';
 import { getHealthStatus } from '$lib/server/health';
 import { getMcpRuntimeSummary } from '$lib/server/mcp/runtime-summary';
+
 import {
   clearProjectForProcess,
   selectProjectForProcess
 } from '$lib/server/project/project-selection';
+
 import type {
   PromptDefinition,
   ResourceDefinition,
   ToolDefinition
 } from '$lib/server/project/schema';
+
 import {
   getWorkbenchPrompt,
   getWorkbenchPrompts
 } from '$lib/server/workbench/prompts';
+
 import {
   getWorkbenchResource,
   getWorkbenchResources
 } from '$lib/server/workbench/resources';
+
 import {
   getWorkbenchTool,
   getWorkbenchTools

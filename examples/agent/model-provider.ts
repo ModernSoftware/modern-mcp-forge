@@ -14,9 +14,7 @@ export function createAgentModel(profile: AgentProfile): VercelModel {
 
   switch (profile.provider) {
     case 'anthropic': {
-      const apiKey = resolveOptionalSecret(
-        profile.apiKeyEnv ?? 'ANTHROPIC_API_KEY'
-      );
+      const apiKey = resolveOptionalSecret(profile.apiKeyEnv ?? 'ANTHROPIC_API_KEY');
 
       const anthropic = createAnthropic({
         apiKey,

@@ -2,10 +2,12 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { join } from 'node:path';
 
 import { closeDatabase } from '$lib/server/database';
+
 import {
   clearProjectForProcess,
   selectProjectForProcess
 } from '$lib/server/project/project-selection';
+
 import { handle } from '../../src/hooks.server';
 
 import {

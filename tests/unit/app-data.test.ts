@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, test } from 'bun:test';
 import { basename, resolve } from 'node:path';
+import { resolveDatabasePath } from '$lib/server/database';
 
 import {
   resolveDefaultDatabasePath,
   resolveForgeDataDirectory
 } from '$lib/server/app-data';
-import { resolveDatabasePath } from '$lib/server/database';
 
 const originalDataDir = process.env.MCP_FORGE_DATA_DIR;
 const originalDbPath = process.env.MCP_FORGE_DB_PATH;

@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test';
+import { createManifest } from '../helpers/project';
 
 import {
   ForgeProjectManifestSchema,
@@ -6,8 +7,6 @@ import {
   ResourceDefinitionSchema,
   ToolDefinitionSchema
 } from '$lib/server/project/schema';
-
-import { createManifest } from '../helpers/project';
 
 describe('project schema', () => {
   test('accepts a minimal valid project manifest', () => {

@@ -1,24 +1,10 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-
-import {
-  Client,
-  StreamableHTTPClientTransport
-} from '@modelcontextprotocol/client';
-import {
-  createServer,
-  type ViteDevServer
-} from 'vite';
-
-import {
-  createTempDirectory,
-  removeTempDirectory
-} from '../helpers/project';
-import {
-  getAvailablePort,
-  waitForHttp
-} from '../helpers/network';
+import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
+import { createServer, type ViteDevServer } from 'vite';
+import { createTempDirectory, removeTempDirectory } from '../helpers/project';
+import { getAvailablePort, waitForHttp } from '../helpers/network';
 
 let sandbox: string;
 let port: number;

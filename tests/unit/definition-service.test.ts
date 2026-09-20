@@ -4,10 +4,12 @@ import {
   getDefinition,
   listDefinitions
 } from '$lib/server/project/definition-service';
+
 import {
   clearProjectForProcess,
   selectProjectForProcess
 } from '$lib/server/project/project-selection';
+
 import type {
   PromptDefinition,
   ResourceDefinition,

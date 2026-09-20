@@ -1,5 +1,4 @@
 import { describe, expect, test } from 'bun:test';
-
 import { buildToolInputSchema } from '$lib/server/mcp/input-schema';
 import { buildPromptArgsSchema } from '$lib/server/mcp/prompt-schema';
 import type { PromptDefinition, ToolDefinition } from '$lib/server/project/schema';
