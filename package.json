@@ -1,0 +1,65 @@
+{
+  "name": "modern-mcp-forge",
+  "version": "0.9.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --bun vite dev",
+    "build": "bun --bun vite build",
+    "preview": "bun --bun vite preview",
+    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+    "test": "svelte-kit sync && bun test --max-concurrency=1 tests/unit tests/integration",
+    "test:unit": "svelte-kit sync && bun test --max-concurrency=1 tests/unit",
+    "test:integration": "svelte-kit sync && bun test --max-concurrency=1 tests/integration",
+    "test:e2e": "svelte-kit sync && bun test --max-concurrency=1 tests/e2e",
+    "test:coverage": "svelte-kit sync && bun test --max-concurrency=1 tests/unit tests/integration --coverage",
+    "test:all": "bun run check && bun run test && bun run test:e2e && bun run build",
+    "mcp:smoke": "bun run scripts/mcp-smoke.ts",
+    "runtime:check": "bun run scripts/runtime-check.ts",
+    "agent:demo": "bun run examples/agent/index.ts",
+    "agent:profiles": "bun run examples/agent/index.ts --list-profiles",
+    "agent:ollama:up": "docker compose -f examples/agent/docker-compose.ollama.yml up -d",
+    "agent:ollama:down": "docker compose -f examples/agent/docker-compose.ollama.yml down",
+    "mcp:stdio:smoke": "bun run scripts/mcp-stdio-smoke.ts"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "^4.0.53",
+    "@modelcontextprotocol/server": "^2.0.0",
+    "@strands-agents/sdk": "^1.17.0",
+    "ai": "^7.0.99",
+    "ai-sdk-ollama": "^4.2.0",
+    "monaco-editor": "^0.56.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/client": "^2.0.0",
+    "@sveltejs/adapter-node": "^5.5.7",
+    "@sveltejs/kit": "^2.70.3",
+    "@sveltejs/vite-plugin-svelte": "^7.3.0",
+    "@types/bun": "latest",
+    "@typescript/native": "npm:typescript@7",
+    "svelte": "^5.57.0",
+    "svelte-check": "latest",
+    "typescript": "~6",
+    "vite": "^8.2.2"
+  },
+  "packageManager": "bun@1.4.2",
+  "description": "Local-first visual workbench for building and testing Model Context Protocol servers with language-neutral Tool execution.",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ModernSoftware/modern-mcp-forge.git"
+  },
+  "homepage": "https://github.com/ModernSoftware/modern-mcp-forge#readme",
+  "bugs": {
+    "url": "https://github.com/ModernSoftware/modern-mcp-forge/issues"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "developer-tools",
+    "bun",
+    "svelte",
+    "ai-agents"
+  ]
+}

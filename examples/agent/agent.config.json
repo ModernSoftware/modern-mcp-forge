@@ -1,0 +1,27 @@
+{
+  "defaultProfile": "anthropic",
+  "mcp": {
+    "url": "http://localhost:5173/mcp"
+  },
+  "systemPrompt": "You are the Modern MCP Forge demonstration agent. The MCP server exposes real tools. Prefer using an available MCP tool whenever it can answer the user's request more reliably than doing the operation yourself. In particular, do not manually calculate hashes or text statistics when corresponding tools are available. After using tools, explain the final result concisely.",
+  "limits": {
+    "turns": 8,
+    "outputTokens": 4096
+  },
+  "profiles": {
+    "anthropic": {
+      "provider": "anthropic",
+      "model": "claude-sonnet-4-6",
+      "apiKeyEnv": "ANTHROPIC_API_KEY",
+      "temperature": 0.1,
+      "maxTokens": 4096
+    },
+    "ollama-local": {
+      "provider": "ollama",
+      "model": "llama3.1",
+      "baseUrl": "http://localhost:11434",
+      "temperature": 0.1,
+      "maxTokens": 4096
+    }
+  }
+}
