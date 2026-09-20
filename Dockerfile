@@ -15,6 +15,12 @@ COPY . .
 RUN bun run build
 
 FROM base AS runtime
+LABEL org.opencontainers.image.title="Modern MCP Forge" \
+    org.opencontainers.image.description="Local-first visual workbench for building and testing Model Context Protocol servers." \
+    org.opencontainers.image.source="https://github.com/ModernSoftware/modern-mcp-forge" \
+    org.opencontainers.image.url="https://github.com/ModernSoftware/modern-mcp-forge" \
+    org.opencontainers.image.licenses="Apache-2.0"
+
 ENV NODE_ENV=production \
     HOST=0.0.0.0 \
     PORT=3000 \

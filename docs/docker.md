@@ -10,6 +10,9 @@ The published image is:
 ghcr.io/modernsoftware/modern-mcp-forge
 ```
 
+The examples below use the `edge` tag, which tracks successful Docker-relevant
+changes on `main`. Versioned image tags are published from GitHub Releases.
+
 ## Image contents
 
 The standard image includes:
@@ -83,7 +86,7 @@ docker run --rm \
   -p 127.0.0.1:5173:3000 \
   -v modern-mcp-forge-data:/data \
   -v /absolute/path/to/projects:/workspace \
-  ghcr.io/modernsoftware/modern-mcp-forge:0.9.0
+  ghcr.io/modernsoftware/modern-mcp-forge:edge
 ```
 
 ## Tool dependencies

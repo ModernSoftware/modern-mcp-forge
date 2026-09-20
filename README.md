@@ -98,7 +98,7 @@ bun run test:all
 Docker is also available as an optional distribution:
 
 ```bash
-docker pull ghcr.io/modernsoftware/modern-mcp-forge:0.9.0
+docker pull ghcr.io/modernsoftware/modern-mcp-forge:edge
 ```
 
 For a persistent setup with host project folders mounted into Forge, use the
