@@ -42,3 +42,5 @@ The same applies to one-off migration notes for behavior that no longer exists.
 - contribution guide
 
 Once those exist, this file can act as the permanent documentation index.
+
+- [Native MCPack preview](mcpack.md): local package setup, editing, testing, and standalone parity.

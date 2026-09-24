@@ -241,3 +241,7 @@ If Modern MCP Forge is useful to you, consider starring the repository and
 sharing feedback during the 0.9 public beta.
 
 </div>
+
+## v0.10.0 native MCPack preview
+
+Open, edit, restart, and test native MCPack projects with the same files used for standalone deployment. See [the setup and integration guide](docs/mcpack.md). MCPack can be installed locally from its private checkout; no package publication is required.
