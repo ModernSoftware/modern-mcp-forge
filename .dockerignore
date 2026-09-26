@@ -15,3 +15,5 @@ tests
 .env.*
 .DS_Store
 Thumbs.db
+
+.mcpack-runtime

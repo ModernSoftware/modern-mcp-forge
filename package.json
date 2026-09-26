@@ -1,6 +1,6 @@
 {
   "name": "modern-mcp-forge",
-  "version": "0.9.0",
+  "version": "0.10.0-alpha.1",
   "private": true,
   "type": "module",
   "scripts": {
@@ -20,11 +20,15 @@
     "agent:profiles": "bun run examples/agent/index.ts --list-profiles",
     "agent:ollama:up": "docker compose -f examples/agent/docker-compose.ollama.yml up -d",
     "agent:ollama:down": "docker compose -f examples/agent/docker-compose.ollama.yml down",
-    "mcp:stdio:smoke": "bun run scripts/mcp-stdio-smoke.ts"
+    "mcp:stdio:smoke": "bun run scripts/mcp-stdio-smoke.ts",
+    "mcpack:setup": "bun run scripts/setup-mcpack.ts",
+    "test:mcpack": "svelte-kit sync && bun run scripts/test-mcpack.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.53",
+    "@modelcontextprotocol/client": "^2.0.0",
     "@modelcontextprotocol/server": "^2.0.0",
+    "@modern-software/mcpack": "0.1.0-alpha.1",
     "@strands-agents/sdk": "^1.17.0",
     "ai": "^7.0.99",
     "ai-sdk-ollama": "^4.2.0",
@@ -32,7 +36,6 @@
     "zod": "^4.0.0"
   },
   "devDependencies": {
-    "@modelcontextprotocol/client": "^2.0.0",
     "@sveltejs/adapter-node": "^5.5.7",
     "@sveltejs/kit": "^2.70.3",
     "@sveltejs/vite-plugin-svelte": "^7.3.0",

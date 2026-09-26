@@ -5,6 +5,8 @@ import {
 
 import { hasActiveProject } from '$lib/server/project/loader';
 
+import { nativeProjects } from '$lib/server/mcpack/session';
+
 const projectPagePrefixes = [
   '/tools',
   '/resources',
@@ -19,6 +21,10 @@ const projectApiPrefixes = [
 
 export const handle: Handle = async ({ event, resolve }) => {
   const pathname = event.url.pathname;
+
+  if (pathname === '/mcp' && nativeProjects.selected()) {
+    return resolve(event);
+  }
 
   if (hasActiveProject()) {
     return resolve(event);

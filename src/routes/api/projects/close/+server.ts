@@ -1,3 +1,5 @@
+import { nativeProjects } from '$lib/server/mcpack/session';
+import { projectTransition } from '$lib/server/mcpack/project-transition';
 import {
   json
 } from '@sveltejs/kit';
@@ -28,7 +30,10 @@ export const POST:
       return rejection;
     }
 
-    closeActiveProject();
+    await projectTransition(async () => {
+      closeActiveProject();
+      await nativeProjects.close();
+    });
 
     return json({
       ok: true

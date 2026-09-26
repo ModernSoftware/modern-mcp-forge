@@ -81,6 +81,8 @@
           <span>Projects</span>
         </a>
 
+        <a class:active={isActive('/mcpack')} class="nav-item" href="/mcpack"><span class="nav-icon">◇</span><span>Native MCPack</span></a>
+
         {#if data.activeProject}
           <a
             class:active={isActive('/')}
@@ -200,8 +202,8 @@
             Active project
           </small>
         {:else}
-          <strong>No project</strong>
-          <small>Open or create one</small>
+          <strong>{data.nativeProject ? data.nativeProject.name : 'No project'}</strong>
+          <small>{data.nativeProject ? 'Native MCPack · ' + data.nativeProject.status : 'Open or create one'}</small>
         {/if}
       </span>
     </div>
@@ -230,7 +232,7 @@
           </button>
         {:else}
           <span class="topbar-idle">
-            Project workspace
+            {data.nativeProject ? 'Native MCPack: ' + data.nativeProject.name : 'Project workspace'}
           </span>
         {/if}
       </div>

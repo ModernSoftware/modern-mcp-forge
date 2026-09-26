@@ -1,3 +1,5 @@
+import { nativeProjects } from '$lib/server/mcpack/session';
+import { projectTransition } from '$lib/server/mcpack/project-transition';
 import {
   json
 } from '@sveltejs/kit';
@@ -66,10 +68,14 @@ export const POST:
     }
 
     try {
-      const project =
-        activateProject(
-          payload.projectId
+      const selectedValue = payload.projectId;
+      const project = await projectTransition(async () => {
+        const project = activateProject(
+          selectedValue
         );
+        await nativeProjects.close();
+        return project;
+      });
 
       return json({
         project

@@ -1,3 +1,5 @@
+import { nativeProjects } from '$lib/server/mcpack/session';
+import { projectTransition } from '$lib/server/mcpack/project-transition';
 import {
   json
 } from '@sveltejs/kit';
@@ -81,13 +83,17 @@ export const POST:
         : undefined;
 
     try {
-      const project =
-        createProject({
+      const selectedValue = payload.folderPath;
+      const project = await projectTransition(async () => {
+        const project = createProject({
           folderPath:
-            payload.folderPath,
+            selectedValue,
           name,
           description
         });
+        await nativeProjects.close();
+        return project;
+      });
 
       return json(
         {
