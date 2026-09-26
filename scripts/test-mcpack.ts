@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 const cli = resolve(
-  process.env.FORGE_MCPACK_CLI || '.mcpack-runtime/node_modules/@modernsoftware/mcpack/dist/cli.js'
+  process.env.FORGE_MCPACK_CLI || '.mcpack-runtime/node_modules/@modern-software/mcpack/dist/cli.js'
 );
 if (!existsSync(cli))
   throw new Error(

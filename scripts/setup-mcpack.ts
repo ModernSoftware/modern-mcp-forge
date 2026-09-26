@@ -2,7 +2,7 @@ import { mkdtemp, mkdir, readFile, realpath, rm, writeFile } from 'node:fs/promi
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 
-// A private, development-only installation. Nothing is published or vendored.
+// A local, development-only installation. Nothing is published or vendored.
 const source = process.argv[2];
 if (!source) throw new Error('Usage: bun run mcpack:setup -- <local-mcpack-checkout>');
 const sourceRoot = resolve(source === '--' ? process.argv[3] : source);
@@ -25,7 +25,7 @@ async function run(args: string[], cwd: string) {
 
 try {
   const pkg = JSON.parse(await readFile(join(sourceRoot, 'package.json'), 'utf8'));
-  if (pkg.name !== '@modernsoftware/mcpack') throw new Error('Select the MCPack repository.');
+  if (pkg.name !== '@modern-software/mcpack') throw new Error('Select the MCPack repository.');
   await run(['ci'], sourceRoot);
   const packed = await run(['pack', '--json', '--pack-destination', temporary], sourceRoot);
   const start = packed.search(/\[\r?\n/);

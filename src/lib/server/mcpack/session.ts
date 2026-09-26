@@ -45,7 +45,7 @@ interface NativeSession {
 export function installedMCPackCli(): string {
   return resolve(
     process.env.FORGE_MCPACK_CLI ||
-      '.mcpack-runtime/node_modules/@modernsoftware/mcpack/dist/cli.js'
+      '.mcpack-runtime/node_modules/@modern-software/mcpack/dist/cli.js'
   );
 }
 const digest = (text: string) => createHash('sha256').update(text).digest('hex');
