@@ -13,6 +13,6 @@ const child = Bun.spawn(
     'tests/integration/mcpack-session.test.ts',
     'tests/e2e/mcpack-http.test.ts'
   ],
-  { stdout: 'inherit', stderr: 'inherit', env: { ...process.env, FORGE_MCPACK_CLI: cli } }
+  { stdout: 'inherit', stderr: 'inherit', env: { ...process.env } }
 );
 process.exit(await child.exited);
