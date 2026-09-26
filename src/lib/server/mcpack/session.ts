@@ -1,3 +1,5 @@
+import { installedMCPackCli } from './cli-path';
+export { installedMCPackCli } from './cli-path';
 import { Client } from '@modelcontextprotocol/client';
 import { NativeNodeTransport } from './node-transport';
 import { createHash } from 'node:crypto';
@@ -42,12 +44,6 @@ interface NativeSession {
   error?: string;
 }
 
-export function installedMCPackCli(): string {
-  return resolve(
-    process.env.FORGE_MCPACK_CLI ||
-      '.mcpack-runtime/node_modules/@modern-software/mcpack/dist/cli.js'
-  );
-}
 const digest = (text: string) => createHash('sha256').update(text).digest('hex');
 
 /** One native project per Forge process. Lifecycle mutations are serialized. */
@@ -139,7 +135,7 @@ export class NativeProjectManager {
       }
       const cli = await realpath(this.cli()).catch(() => {
         throw new NativeProjectError(
-          'MCPack is not installed. Run bun run mcpack:setup -- <mcpack-checkout> first.'
+          'MCPack is not installed. Run bun install --frozen-lockfile, or check FORGE_MCPACK_CLI if set.'
         );
       });
       const node = resolveNodeCommand();

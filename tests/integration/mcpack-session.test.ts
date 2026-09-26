@@ -162,7 +162,7 @@ test('missing MCPack installation leaves the manifest editable', async () => {
     );
     const opened = await manager.open(path);
     expect(opened?.status).toBe('failed');
-    expect(opened?.error).toContain('mcpack:setup');
+    expect(opened?.error).toContain('bun install --frozen-lockfile');
     expect((await manager.readSource(opened!.manifestPath, path)).content).toContain('missing');
   } finally {
     await manager.close();

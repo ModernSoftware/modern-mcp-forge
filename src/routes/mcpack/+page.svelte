@@ -259,8 +259,8 @@
     </section>
   {:else}
     <p>
-      First install the local runtime with <code>bun run mcpack:setup -- ../mcpack</code>. Then open
-      an existing native manifest, for example MCPack's <code>examples/hello/mcpack.json</code>.
+      MCPack is included with Forge. Open an existing native manifest, or copy the example from
+      <code>node_modules/@modern-software/mcpack/examples/hello</code> into your own project folder.
     </p>
   {/if}
 </section>
