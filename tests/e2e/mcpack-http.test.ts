@@ -44,7 +44,11 @@ test.skipIf(!existsSync(cli))(
         manifestPath: join(projectRoot, 'mcpack.json')
       });
       expect(opened.status).toBe(200);
-      expect(opened.body.project.status).toBe('ready');
+      expect({
+        status: opened.body.project.status,
+        error: opened.body.project.error,
+        diagnostics: opened.body.project.diagnostics
+      }).toMatchObject({ status: 'ready' });
       const project = opened.body.project.manifestPath;
       client = new Client(
         { name: 'native-http', version: '1' },

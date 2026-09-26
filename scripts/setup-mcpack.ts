@@ -49,7 +49,7 @@ try {
     )
   );
   console.log(
-    `Installed MCPack ${pkg.version}. Start Forge, then open Native MCPack in the sidebar.`
+    `Installed local MCPack ${pkg.version}. Set FORGE_MCPACK_CLI to ${join(destination, "node_modules", "@modern-software", "mcpack", "dist", "cli.js")} to use it instead of the registry dependency.`
   );
 } finally {
   await rm(temporary, { recursive: true, force: true, maxRetries: 5 });

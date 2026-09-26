@@ -1,11 +1,9 @@
 import { existsSync } from 'node:fs';
-import { resolve } from 'node:path';
-const cli = resolve(
-  process.env.FORGE_MCPACK_CLI || '.mcpack-runtime/node_modules/@modern-software/mcpack/dist/cli.js'
-);
+import { installedMCPackCli } from '../src/lib/server/mcpack/cli-path';
+const cli = installedMCPackCli();
 if (!existsSync(cli))
   throw new Error(
-    'Install MCPack with bun run mcpack:setup -- <checkout> before running native tests.'
+    'Run bun install --frozen-lockfile before native tests; check FORGE_MCPACK_CLI if set.'
   );
 const child = Bun.spawn(
   [
@@ -15,6 +13,6 @@ const child = Bun.spawn(
     'tests/integration/mcpack-session.test.ts',
     'tests/e2e/mcpack-http.test.ts'
   ],
-  { stdout: 'inherit', stderr: 'inherit', env: { ...process.env, FORGE_MCPACK_CLI: cli } }
+  { stdout: 'inherit', stderr: 'inherit', env: { ...process.env } }
 );
 process.exit(await child.exited);
