@@ -4,7 +4,7 @@ Forge can open an existing native MCPack project, edit its manifest and worker m
 
 ## Install the published dependency
 
-Forge pins `@modern-software/mcpack@0.1.0-alpha.1` in package.json and bun.lock.
+Forge pins `@modern-software/mcpack@0.9.0` in package.json and bun.lock.
 Install Forge normally; no MCPack checkout, npm token, or separate setup step is needed:
 
 ```sh

@@ -244,4 +244,4 @@ sharing feedback during the 0.9 public beta.
 
 ## v0.10.0 native MCPack preview
 
-Open, edit, restart, and test native MCPack projects with the same files used for standalone deployment. See [the setup and integration guide](docs/mcpack.md). MCPack can be installed locally from its private checkout; no package publication is required.
+Open, edit, restart, and test native MCPack projects with the same files used for standalone deployment. See [the setup and integration guide](docs/mcpack.md). Forge includes the published MCPack 0.9.0 package from npm. A local checkout override remains available for maintainer testing.

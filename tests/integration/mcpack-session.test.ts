@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import { mkdtemp, writeFile, readFile, rm } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { mkdtemp, writeFile, readFile, rm, cp } from 'node:fs/promises';
+import { dirname, join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { existsSync } from 'node:fs';
 import { Client } from '@modelcontextprotocol/client';
@@ -19,8 +19,8 @@ const source = `export function createWorker() {
   };
 }`;
 
-// Required in the opt-in native integration command. The public CI can run
-// without access to the private MCPack repository.
+// The dedicated native command requires the installed package. Maintainers may
+// explicitly select a locally packed candidate through FORGE_MCPACK_CLI.
 describe.skipIf(!hasMCPack)('native MCPack integration (installed package)', () => {
   test('persistent calls, protocol parity, source editing, restart, stale sessions and recovery', async () => {
     const root = await mkdtemp(join(tmpdir(), 'forge-native-'));
@@ -205,4 +205,46 @@ export function createWorker() { return { async close() {
     }
   },
   15_000
+);
+
+
+test.skipIf(!hasMCPack)(
+  'installed mixed project exposes persistent Node/Python capabilities and editable Python source',
+  async () => {
+    const root = await mkdtemp(join(tmpdir(), 'forge-native-mixed-'));
+    const manager = new NativeProjectManager();
+    try {
+      const example = resolve(dirname(installedMCPackCli()), '../examples/mixed');
+      await cp(example, root, { recursive: true });
+      const manifest = join(root, 'mcpack.json');
+      const opened = await manager.open(manifest);
+      expect(opened?.status).toBe('ready');
+      const project = opened!.manifestPath;
+      const greeting: any = await manager.invoke(project, 'tool', 'greet', { name: 'Forge' });
+      expect(greeting.content[0].text).toBe('Hello, Forge!');
+      const first: any = await manager.invoke(project, 'tool', 'summarize', { values: [2, 3] });
+      const second: any = await manager.invoke(project, 'tool', 'summarize', { values: [4] });
+      expect(first.structuredContent.total).toBe(5);
+      expect(second.structuredContent.calls).toBe(2);
+      expect(second.structuredContent.pid).toBe(first.structuredContent.pid);
+      const source = await manager.readSource(project, join(root, 'python_handlers.py'));
+      await manager.saveSource(
+        project,
+        source.path,
+        source.content.replace('total = sum(values)', 'total = sum(values) + 10'),
+        source.revision
+      );
+      const edited: any = await manager.invoke(project, 'tool', 'summarize', { values: [2, 3] });
+      expect(edited.structuredContent.total).toBe(15);
+      expect(edited.structuredContent.calls).toBe(1);
+      const resource: any = await manager.invoke(project, 'resource', 'mcpack://mixed/guide', {});
+      expect(resource.contents[0].text).toContain('Python');
+      const prompt: any = await manager.invoke(project, 'prompt', 'review', { summary: '15' });
+      expect(prompt.messages[0].content.text).toContain('15');
+    } finally {
+      await manager.close();
+      await rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+    }
+  },
+  30_000
 );
