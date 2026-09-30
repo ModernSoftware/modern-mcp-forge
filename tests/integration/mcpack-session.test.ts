@@ -217,8 +217,9 @@ test.skipIf(!hasMCPack)(
       const example = resolve(dirname(installedMCPackCli()), '../examples/mixed');
       await cp(example, root, { recursive: true });
       const manifest = join(root, 'mcpack.json');
-      expect((await manager.open(manifest))?.status).toBe('ready');
-      const project = (await manager.readSource(manifest, manifest)).path;
+      const opened = await manager.open(manifest);
+      expect(opened?.status).toBe('ready');
+      const project = opened!.manifestPath;
       const greeting: any = await manager.invoke(project, 'tool', 'greet', { name: 'Forge' });
       expect(greeting.content[0].text).toBe('Hello, Forge!');
       const first: any = await manager.invoke(project, 'tool', 'summarize', { values: [2, 3] });
