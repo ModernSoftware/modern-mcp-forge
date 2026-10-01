@@ -1,3 +1,4 @@
+import { startProjectSources } from '$lib/server/sources/project';
 import { nativeProjects } from '$lib/server/mcpack/session';
 import { projectTransition } from '$lib/server/mcpack/project-transition';
 import {
@@ -74,6 +75,7 @@ export const POST:
           selectedValue
         );
         await nativeProjects.close();
+        await startProjectSources(project);
         return project;
       });
 

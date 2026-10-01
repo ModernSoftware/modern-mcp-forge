@@ -1,3 +1,4 @@
+import { projectSources } from '$lib/server/sources/manager';
 import { nativeProjects } from '$lib/server/mcpack/session';
 import { projectTransition } from '$lib/server/mcpack/project-transition';
 import {
@@ -31,6 +32,7 @@ export const POST:
     }
 
     await projectTransition(async () => {
+      await projectSources.close();
       closeActiveProject();
       await nativeProjects.close();
     });

@@ -1,3 +1,6 @@
+import { projectSources } from '$lib/server/sources/manager';
+import { projectTransition } from '$lib/server/mcpack/project-transition';
+import { getActiveProjectRecord } from '$lib/server/projects/project-service';
 import {
   json
 } from '@sveltejs/kit';
@@ -61,9 +64,11 @@ export const POST:
       );
     }
 
-    forgetProject(
-      payload.projectId
-    );
+    const projectId = payload.projectId;
+    await projectTransition(async () => {
+      if (getActiveProjectRecord()?.id === projectId) await projectSources.close();
+      forgetProject(projectId);
+    });
 
     return json({
       ok: true
