@@ -1,3 +1,4 @@
+import { projectSources } from '$lib/server/sources/manager';
 import { json } from '@sveltejs/kit';
 import { z } from 'zod';
 import type { RequestHandler } from './$types';
@@ -45,6 +46,7 @@ export const POST: RequestHandler = async ({ request }) => {
       case 'open':
         return json(
           await projectTransition(async () => {
+            await projectSources.close();
             const project = await nativeProjects.open(action.manifestPath);
             closeActiveProject();
             return { project };
