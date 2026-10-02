@@ -1,3 +1,4 @@
+import { registerNativeSources } from '$lib/server/sources/register';
 import { McpServer } from '@modelcontextprotocol/server';
 
 import { executeToolDefinition } from '$lib/server/execution/tool-execution-service';
@@ -100,5 +101,6 @@ export function createForgeMcpServer(): McpServer {
     );
   }
 
+  registerNativeSources(server, manifest);
   return server;
 }
