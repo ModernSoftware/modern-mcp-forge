@@ -1,9 +1,9 @@
 # Project sources: lifecycle foundation
 
-Step 2 of the v0.10.0 integration adds persisted source definitions and runtime
-ownership to regular Forge projects. It does not yet add source authoring controls,
-merge source catalogs into `/mcp`, or replace classic handlers. The native preview
-continues to work. Native UI and combined-endpoint integration are subsequent steps.
+Project sources provide persisted definitions and runtime ownership for regular
+Forge projects. Native authoring and combined classic/native HTTP exposure are
+available; see [Native authoring](native-authoring.md). The standalone preview
+continues to work.
 
 ## Configuration
 
@@ -13,7 +13,12 @@ their existing behavior. Classic manifest authoring preserves source definitions
 ```json
 {
   "sources": [
-    { "id": "orders", "kind": "native", "manifest": "native/mcpack.json", "enabled": true }
+    {
+      "id": "orders",
+      "kind": "native",
+      "manifest": "native/mcpack.json",
+      "enabled": true
+    }
   ]
 }
 ```
@@ -36,7 +41,12 @@ Reserved descriptors for later adapters:
     "entrypoint": "bridges/custom.py",
     "enabled": false
   },
-  { "id": "remote", "kind": "external", "url": "https://example.com/mcp", "enabled": false }
+  {
+    "id": "remote",
+    "kind": "external",
+    "url": "https://example.com/mcp",
+    "enabled": false
+  }
 ]
 ```
 
@@ -49,7 +59,8 @@ credentials, query strings and fragments are rejected at this stage.
 
 Each enabled native source owns a separate MCPack CLI process and worker set.
 Catalogs remain keyed by source ID, so identical upstream names can coexist
-internally. Public collision and alias rules belong to the combined endpoint slice.
+internally. The combined endpoint rejects duplicate tool/prompt names, resource names and URIs.
+Explicit aliases are future work.
 
 The adapter contract covers start, discovery, invocation with cancellation, health,
 and close. The project owner serializes open/close/reload. Reload is a full restart
@@ -79,9 +90,9 @@ The local management API uses Forge's Host/Origin checks and active-project guar
   409; source startup failures return 503 with status details.
 
 The normal project-selection response remains unchanged. Inspect source status
-separately when activating a project whose handlers may fail. There is no source
-invocation or source-editing HTTP endpoint in this slice. Edit the Forge manifest
-on disk and reload until the native authoring UI is implemented.
+separately when activating a project whose handlers may fail. The guarded `POST /api/project/native` endpoint supports create/attach,
+enable/disable/detach, file read/save and source-specific invocation. Mutations and
+calls include project identity and generation; saves also require a file revision.
 
 ## Validation
 

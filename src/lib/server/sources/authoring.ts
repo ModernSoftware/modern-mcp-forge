@@ -1,5 +1,14 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  renameSync,
+  rmSync,
+  statSync,
+  writeFileSync
+} from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { ManifestSchema } from '@modern-software/mcpack';
 import { ForgeProjectManifestSchema } from '../project/schema';
@@ -9,19 +18,28 @@ import { ProjectSourceSchema, ProjectSourcesSchema } from './schema';
 import { nativeStarter } from './starter';
 
 const MAX_BYTES = 256 * 1024;
-const digest = (content: string) => createHash('sha256').update(content).digest('hex');
+const digest = (content: string) =>
+  createHash('sha256').update(content).digest('hex');
 
 function read(path: string) {
-  if (statSync(path).size > MAX_BYTES) throw new NativeProjectError('File exceeds the 256 KiB editor limit.');
+  if (statSync(path).size > MAX_BYTES)
+    throw new NativeProjectError('File exceeds the 256 KiB editor limit.');
   return readFileSync(path, 'utf8');
 }
 
 export function containedFile(root: string, filename: string) {
-  if (/^(?:[A-Za-z]:|[\\/])/.test(filename) || filename.split(/[\\/]/).includes('..')) {
-    throw new NativeProjectError('Use a relative path inside the source folder.');
+  if (
+    /^(?:[A-Za-z]:|[\\/])/.test(filename) ||
+    filename.split(/[\\/]/).includes('..')
+  ) {
+    throw new NativeProjectError(
+      'Use a relative path inside the source folder.'
+    );
   }
   const canonicalRoot = realpathSync(root);
-  const path = realpathSync(resolve(canonicalRoot, filename.replaceAll('\\', '/')));
+  const path = realpathSync(
+    resolve(canonicalRoot, filename.replaceAll('\\', '/'))
+  );
   const rel = relative(canonicalRoot, path);
   if (isAbsolute(rel) || rel === '..' || rel.startsWith(`..${sep}`)) {
     throw new NativeProjectError('File resolves outside the source folder.');
@@ -44,12 +62,15 @@ function projectFile(project: RegisteredProject) {
 }
 
 function configuration(project: RegisteredProject) {
-  return ForgeProjectManifestSchema.parse(JSON.parse(read(projectFile(project))));
+  return ForgeProjectManifestSchema.parse(
+    JSON.parse(read(projectFile(project)))
+  );
 }
 
 export function nativeDocument(project: RegisteredProject, id: string) {
   const source = configuration(project).sources?.find((item) => item.id === id);
-  if (!source || source.kind !== 'native') throw new NativeProjectError('Native source not found.');
+  if (!source || source.kind !== 'native')
+    throw new NativeProjectError('Native source not found.');
   const manifestPath = containedFile(project.path, source.manifest);
   const content = read(manifestPath);
   const files = [relative(project.path, manifestPath).replaceAll('\\', '/')];
@@ -68,53 +89,103 @@ export function nativeDocument(project: RegisteredProject, id: string) {
   return { source, files, error, manifestPath };
 }
 
-export function readNativeFile(project: RegisteredProject, id: string, filename: string) {
+export function readNativeFile(
+  project: RegisteredProject,
+  id: string,
+  filename: string
+) {
   const document = nativeDocument(project, id);
   const path = containedFile(project.path, filename);
-  if (!document.files.some((file) => containedFile(project.path, file) === path)) {
-    throw new NativeProjectError('Only the manifest and declared worker modules can be edited.');
+  if (
+    !document.files.some((file) => containedFile(project.path, file) === path)
+  ) {
+    throw new NativeProjectError(
+      'Only the manifest and declared worker modules can be edited.'
+    );
   }
   const content = read(path);
-  return { path: relative(project.path, path).replaceAll('\\', '/'), content, revision: digest(content) };
+  return {
+    path: relative(project.path, path).replaceAll('\\', '/'),
+    content,
+    revision: digest(content)
+  };
 }
 
-export function saveNativeFile(project: RegisteredProject, id: string, filename: string, content: string, revision: string) {
+export function saveNativeFile(
+  project: RegisteredProject,
+  id: string,
+  filename: string,
+  content: string,
+  revision: string
+) {
   const current = readNativeFile(project, id, filename);
-  if (current.revision !== revision) throw new NativeProjectError('File changed on disk. Reload before saving.', 409);
-  if (Buffer.byteLength(content) > MAX_BYTES) throw new NativeProjectError('File exceeds the 256 KiB editor limit.');
+  if (current.revision !== revision)
+    throw new NativeProjectError(
+      'File changed on disk. Reload before saving.',
+      409
+    );
+  if (Buffer.byteLength(content) > MAX_BYTES)
+    throw new NativeProjectError('File exceeds the 256 KiB editor limit.');
   const path = containedFile(project.path, filename);
   const document = nativeDocument(project, id);
   if (path === document.manifestPath) {
     const manifest = ManifestSchema.parse(JSON.parse(content));
-    for (const worker of Object.values(manifest.workers)) containedFile(dirname(path), worker.module);
+    for (const worker of Object.values(manifest.workers))
+      containedFile(dirname(path), worker.module);
   }
   atomicWrite(path, content);
   return readNativeFile(project, id, filename);
 }
 
 // Synchronous fresh read + atomic write preserves concurrent classic authoring changes.
-export function changeNativeSource(project: RegisteredProject, id: string, change: 'remove' | 'enable' | 'disable') {
+export function changeNativeSource(
+  project: RegisteredProject,
+  id: string,
+  change: 'remove' | 'enable' | 'disable'
+) {
   const manifest = configuration(project);
   const source = manifest.sources?.find((item) => item.id === id);
-  if (!source || source.kind !== 'native') throw new NativeProjectError('Native source not found.');
-  if (change === 'remove') manifest.sources = manifest.sources!.filter((item) => item.id !== id);
+  if (!source || source.kind !== 'native')
+    throw new NativeProjectError('Native source not found.');
+  if (change === 'remove')
+    manifest.sources = manifest.sources!.filter((item) => item.id !== id);
   else source.enabled = change === 'enable';
   atomicWrite(projectFile(project), `${JSON.stringify(manifest, null, 2)}\n`);
 }
 
-export function attachNativeSource(project: RegisteredProject, id: string, filename: string) {
-  const source = ProjectSourceSchema.parse({ id, kind: 'native', manifest: filename, enabled: true });
+export function attachNativeSource(
+  project: RegisteredProject,
+  id: string,
+  filename: string
+) {
+  const source = ProjectSourceSchema.parse({
+    id,
+    kind: 'native',
+    manifest: filename,
+    enabled: true
+  });
   const path = containedFile(project.path, filename);
   const native = ManifestSchema.parse(JSON.parse(read(path)));
-  for (const worker of Object.values(native.workers)) containedFile(dirname(path), worker.module);
+  for (const worker of Object.values(native.workers))
+    containedFile(dirname(path), worker.module);
   const manifest = configuration(project);
-  manifest.sources = ProjectSourcesSchema.parse([...(manifest.sources ?? []), source]);
+  manifest.sources = ProjectSourcesSchema.parse([
+    ...(manifest.sources ?? []),
+    source
+  ]);
   atomicWrite(projectFile(project), `${JSON.stringify(manifest, null, 2)}\n`);
 }
 
-export function createNativeSource(project: RegisteredProject, id: string, runtime: 'node' | 'python') {
+export function createNativeSource(
+  project: RegisteredProject,
+  id: string,
+  runtime: 'node' | 'python'
+) {
   const existing = configuration(project).sources ?? [];
-  ProjectSourcesSchema.parse([...existing, { id, kind: 'native', manifest: `native/${id}/mcpack.json` }]);
+  ProjectSourcesSchema.parse([
+    ...existing,
+    { id, kind: 'native', manifest: `native/${id}/mcpack.json` }
+  ]);
   const root = realpathSync(project.path);
   if (!existsSync(join(root, 'native'))) mkdirSync(join(root, 'native'));
   const folder = join(containedFile(root, 'native'), id);
@@ -123,7 +194,11 @@ export function createNativeSource(project: RegisteredProject, id: string, runti
   try {
     const starter = nativeStarter(id, runtime);
     writeFileSync(join(folder, starter.module), starter.code, { flag: 'wx' });
-    writeFileSync(join(folder, 'mcpack.json'), `${JSON.stringify(starter.manifest, null, 2)}\n`, { flag: 'wx' });
+    writeFileSync(
+      join(folder, 'mcpack.json'),
+      `${JSON.stringify(starter.manifest, null, 2)}\n`,
+      { flag: 'wx' }
+    );
     attachNativeSource(project, id, `native/${id}/mcpack.json`);
   } catch (error) {
     rmSync(folder, { recursive: true, force: true });
