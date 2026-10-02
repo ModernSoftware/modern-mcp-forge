@@ -4,20 +4,26 @@
 </script>
 
 <svelte:head>
-  <title>Modern MCP Forge · Prompts</title>
+  <title>
+    Modern MCP Forge · Prompts
+  </title>
 </svelte:head>
 
 <section class="page-heading">
   <div>
-    <div class="eyebrow">MCP</div>
+    <div class="eyebrow">
+      MCP
+    </div>
     <h1>Prompts</h1>
     <p>
-      Author reusable parameterized prompt templates and expose them through
-      MCP.
+      Author reusable parameterized prompt templates and expose them through MCP.
     </p>
   </div>
 
-  <a class="primary-button" href="/prompts/new">
+  <a
+    class="primary-button"
+    href="/prompts/new"
+  >
     <span>＋</span>
     Add prompt
   </a>
@@ -25,15 +31,24 @@
 
 <NativeCapabilities sources={data.nativeSources} kind="prompts" />
 
+
 {#if data.prompts.length === 0}
   <section class="glass-card empty-state">
-    <div class="empty-icon">✦</div>
-    <h2>No prompts yet</h2>
+    <div class="empty-icon">
+      ✦
+    </div>
+    <h2>
+      No prompts yet
+    </h2>
     <p>
-      Create a reusable template and Forge will expose it through prompts/list
-      and prompts/get.
+      Create a reusable template and Forge will expose it through prompts/list and prompts/get.
     </p>
-    <a class="primary-button" href="/prompts/new"> Add first prompt </a>
+    <a
+      class="primary-button"
+      href="/prompts/new"
+    >
+      Add first prompt
+    </a>
   </section>
 {:else}
   <div class="prompt-grid">
@@ -42,7 +57,8 @@
         <header>
           <div>
             <h2>
-              {prompt.title ?? prompt.name}
+              {prompt.title ??
+                prompt.name}
             </h2>
             <code>
               {prompt.name}
@@ -60,7 +76,8 @@
         </header>
 
         <p>
-          {prompt.description || 'No description.'}
+          {prompt.description ||
+            'No description.'}
         </p>
 
         <div class="template-path">
@@ -74,22 +91,36 @@
           </span>
 
           <span
-            class:status-ready={prompt.sourceInfo.exists}
-            class:status-failed={!prompt.sourceInfo.exists}
+            class:status-ready={
+              prompt.sourceInfo.exists
+            }
+            class:status-failed={
+              !prompt.sourceInfo.exists
+            }
           >
             <span class="status-dot"></span>
-            {prompt.sourceInfo.exists ? 'Template ready' : 'Missing template'}
+            {prompt.sourceInfo.exists
+              ? 'Template ready'
+              : 'Missing template'}
           </span>
         </div>
 
         <footer>
           {#if prompt.sourceInfo.external}
-            <span class="external"> External template </span>
+            <span class="external">
+              External template
+            </span>
           {:else}
-            <span> Project prompt </span>
+            <span>
+              Project prompt
+            </span>
           {/if}
 
-          <a href={`/prompts/${encodeURIComponent(prompt.name)}`}> Open → </a>
+          <a
+            href={`/prompts/${encodeURIComponent(prompt.name)}`}
+          >
+            Open →
+          </a>
         </footer>
       </article>
     {/each}
@@ -99,7 +130,8 @@
 <style>
   .prompt-grid {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
     gap: 15px;
   }
 
@@ -144,7 +176,8 @@
     padding: 6px 8px;
     border-radius: 999px;
     color: var(--lavender);
-    background: var(--lavender-soft);
+    background:
+      var(--lavender-soft);
     font-size: 0.6rem;
     font-weight: 900;
     text-transform: uppercase;
@@ -165,7 +198,10 @@
     border-radius: 9px;
     color: var(--accent);
     background: var(--accent-soft);
-    font-family: 'Cascadia Code', Consolas, monospace;
+    font-family:
+      "Cascadia Code",
+      Consolas,
+      monospace;
     font-size: 0.67rem;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -188,7 +224,8 @@
     gap: 14px;
     margin-top: 17px;
     padding-top: 13px;
-    border-top: 1px solid var(--border);
+    border-top:
+      1px solid var(--border);
     color: var(--muted);
     font-size: 0.67rem;
   }
@@ -236,7 +273,9 @@
     font-size: 1.25rem;
   }
 
-  @media (max-width: 840px) {
+  @media (
+    max-width: 840px
+  ) {
     .prompt-grid {
       grid-template-columns: 1fr;
     }

@@ -49,23 +49,19 @@
   </div>
 </section>
 
-<ProjectSources
-  projectId={data.manifest.project.id}
-  sources={data.manifest.sources ?? []}
-  snapshot={data.sources}
-  catalogError={data.catalogError}
-/>
+<ProjectSources projectId={data.manifest.project.id} sources={data.manifest.sources ?? []} snapshot={data.sources} catalogError={data.catalogError} />
 
 <div class="lifecycle-note">
   <strong>Definition lifecycle</strong>
   <span>
-    Disable keeps a definition in Git but removes it from new MCP server
-    instances. Delete removes only the declaration; Forge never deletes the
-    underlying source/template/resource file here.
+    Disable keeps a definition in Git but removes it from new MCP server instances. Delete removes only the declaration; Forge never deletes the underlying source/template/resource file here.
   </span>
 </div>
 
-<nav class="definition-tabs glass-card" aria-label="Definition types">
+<nav
+  class="definition-tabs glass-card"
+  aria-label="Definition types"
+>
   <button
     class:active={section === 'tools'}
     type="button"
@@ -102,7 +98,9 @@
         <h2>Tool definitions</h2>
       </div>
 
-      <a class="primary-button" href="/tools/new"> ＋ Add tool </a>
+      <a class="primary-button" href="/tools/new">
+        ＋ Add tool
+      </a>
     </div>
 
     {#if data.definitions.tools.length === 0}
@@ -110,10 +108,14 @@
     {:else}
       <div class="definition-list">
         {#each data.definitions.tools as definition (definition.name)}
-          <DefinitionLifecycle kind="tool" {definition} />
+          <DefinitionLifecycle
+            kind="tool"
+            definition={definition}
+          />
         {/each}
       </div>
     {/if}
+
   {:else if section === 'resources'}
     <div class="section-heading">
       <div>
@@ -121,7 +123,9 @@
         <h2>Resource definitions</h2>
       </div>
 
-      <a class="primary-button" href="/resources/new"> ＋ Add resource </a>
+      <a class="primary-button" href="/resources/new">
+        ＋ Add resource
+      </a>
     </div>
 
     {#if data.definitions.resources.length === 0}
@@ -129,10 +133,14 @@
     {:else}
       <div class="definition-list">
         {#each data.definitions.resources as definition (definition.name)}
-          <DefinitionLifecycle kind="resource" {definition} />
+          <DefinitionLifecycle
+            kind="resource"
+            definition={definition}
+          />
         {/each}
       </div>
     {/if}
+
   {:else}
     <div class="section-heading">
       <div>
@@ -140,7 +148,9 @@
         <h2>Prompt definitions</h2>
       </div>
 
-      <a class="primary-button" href="/prompts/new"> ＋ Add prompt </a>
+      <a class="primary-button" href="/prompts/new">
+        ＋ Add prompt
+      </a>
     </div>
 
     {#if data.definitions.prompts.length === 0}
@@ -148,7 +158,10 @@
     {:else}
       <div class="definition-list">
         {#each data.definitions.prompts as definition (definition.name)}
-          <DefinitionLifecycle kind="prompt" {definition} />
+          <DefinitionLifecycle
+            kind="prompt"
+            definition={definition}
+          />
         {/each}
       </div>
     {/if}
@@ -169,7 +182,12 @@
   .project-summary > div {
     min-width: 0;
     padding: 13px;
-    background: color-mix(in srgb, var(--surface-solid) 62%, var(--surface));
+    background:
+      color-mix(
+        in srgb,
+        var(--surface-solid) 62%,
+        var(--surface)
+      );
   }
 
   .project-summary span,
@@ -199,9 +217,19 @@
     gap: 10px;
     margin-bottom: 15px;
     padding: 11px 13px;
-    border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--border));
+    border: 1px solid
+      color-mix(
+        in srgb,
+        var(--accent) 22%,
+        var(--border)
+      );
     border-radius: 11px;
-    background: color-mix(in srgb, var(--accent) 5%, transparent);
+    background:
+      color-mix(
+        in srgb,
+        var(--accent) 5%,
+        transparent
+      );
     font-size: 0.69rem;
   }
 
@@ -248,7 +276,12 @@
     min-width: 20px;
     padding: 2px 5px;
     border-radius: 999px;
-    background: color-mix(in srgb, currentColor 8%, transparent);
+    background:
+      color-mix(
+        in srgb,
+        currentColor 8%,
+        transparent
+      );
     font-size: 0.58rem;
   }
 

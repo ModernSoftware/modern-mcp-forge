@@ -35,13 +35,12 @@ export function createForgeMcpServer(): McpServer {
         description: definition.description,
         inputSchema: buildToolInputSchema(definition)
       },
-      async (args) =>
-        (
-          await executeToolDefinition(
-            definition,
-            args as Record<string, unknown>
-          )
-        ).result
+      async (args) => (
+        await executeToolDefinition(
+          definition,
+          args as Record<string, unknown>
+        )
+      ).result
     );
   }
 

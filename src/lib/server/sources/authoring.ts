@@ -73,14 +73,19 @@ export function nativeDocument(project: RegisteredProject, id: string) {
     throw new NativeProjectError('Native source not found.');
   const manifestPath = containedFile(project.path, source.manifest);
   const content = read(manifestPath);
-  const files = [relative(project.path, manifestPath).replaceAll('\\', '/')];
+  const files = [
+    relative(realpathSync(project.path), manifestPath).replaceAll('\\', '/')
+  ];
   let error: string | undefined;
   // A malformed manifest remains editable after failed startup or an external edit.
   try {
     const manifest = ManifestSchema.parse(JSON.parse(content));
     for (const worker of Object.values(manifest.workers)) {
       const path = containedFile(dirname(manifestPath), worker.module);
-      const name = relative(project.path, path).replaceAll('\\', '/');
+      const name = relative(realpathSync(project.path), path).replaceAll(
+        '\\',
+        '/'
+      );
       if (!files.includes(name)) files.push(name);
     }
   } catch (failure) {
@@ -105,7 +110,7 @@ export function readNativeFile(
   }
   const content = read(path);
   return {
-    path: relative(project.path, path).replaceAll('\\', '/'),
+    path: relative(realpathSync(project.path), path).replaceAll('\\', '/'),
     content,
     revision: digest(content)
   };

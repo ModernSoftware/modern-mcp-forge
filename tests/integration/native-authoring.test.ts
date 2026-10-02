@@ -180,3 +180,37 @@ test('project catalog rejects collisions and configuration drift', async () => {
     await manager.close();
   }
 });
+
+test('editor paths stay relative when the project root is a symlink alias', () => {
+  const project = fixture();
+  const alias = fixture();
+  try {
+    const linked = join(alias.root, 'linked');
+    symlinkSync(
+      project.root,
+      linked,
+      process.platform === 'win32' ? 'junction' : 'dir'
+    );
+    const selected = { ...project.project, path: linked };
+    createNativeSource(selected, 'support', 'node');
+    const document = nativeDocument(selected, 'support');
+    expect(document.files).toEqual([
+      'native/support/mcpack.json',
+      'native/support/handlers.mjs'
+    ]);
+    const file = readNativeFile(selected, 'support', document.files[1]);
+    expect(file.path).toBe('native/support/handlers.mjs');
+    expect(
+      saveNativeFile(
+        selected,
+        'support',
+        file.path,
+        file.content + '\n',
+        file.revision
+      ).path
+    ).toBe(file.path);
+  } finally {
+    alias.close();
+    project.close();
+  }
+});
