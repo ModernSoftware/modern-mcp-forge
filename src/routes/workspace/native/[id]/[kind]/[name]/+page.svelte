@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import {
     registerProjectLeaveGuard,
     canLeaveProject
@@ -70,7 +70,29 @@
     if (!canLeaveProject()) navigation.cancel();
   });
 
+  async function reload() {
+    if (
+      busy ||
+      (dirty &&
+        !window.confirm('Discard your draft and reload the definition?'))
+    )
+      return;
+    busy = true;
+    try {
+      await invalidateAll();
+      await tick();
+      content = original = JSON.stringify(data.definition, null, 2);
+      revision = data.revision;
+      error = '';
+    } catch (failure) {
+      error = failure instanceof Error ? failure.message : String(failure);
+    } finally {
+      busy = false;
+    }
+  }
+
   async function save() {
+    if (busy || !dirty) return;
     busy = true;
     error = '';
     let destination = '';
@@ -231,19 +253,8 @@
       class="secondary-button"
       disabled={busy || !dirty}
       onclick={() => (content = original)}>Discard changes</button
-    ><button
-      class="secondary-button"
-      disabled={busy}
-      onclick={() => {
-        if (
-          dirty &&
-          !window.confirm('Discard your draft and reload the definition?')
-        )
-          return;
-        content = original = JSON.stringify(data.definition, null, 2);
-        revision = data.revision;
-        error = '';
-      }}>Reload definition</button
+    ><button class="secondary-button" disabled={busy} onclick={reload}
+      >Reload definition</button
     >
     <span>{busy ? 'Saving…' : dirty ? 'Unsaved changes' : 'Saved'}</span>
   </div>

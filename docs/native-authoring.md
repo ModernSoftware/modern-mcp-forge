@@ -71,7 +71,7 @@ not silently rename or shadow names. Source-specific testing remains available.
 
 Existing classic handlers keep their ABI and are not automatically converted. The
 workspace explicitly identifies legacy definitions and links to their older views.
-New authoring starts with native MCPack; old routes remain for deliberate migration.
+New authoring starts with native MCPack; old creation URLs redirect to the new form. Legacy detail routes remain for deliberate migration.
 Execution history currently records classic runs only; native test results remain
 in the source test panel. Worker listings are configuration, not live telemetry.
 To migrate deliberately, create a native definition, port its handler signature and

@@ -72,9 +72,9 @@ Forge remains a Bun application. It launches the MCPack CLI explicitly with Node
 
 The package runs the same native runtime in both standalone and Forge use. Forge uses the CLI's MCP interface for this first integration rather than importing the Node runtime directly into Bun. This is a native project adapter, not the general external-server/bridge feature planned for later.
 
-Only one native project is selected per Forge process. Opening it closes the classic Forge project selection; opening/creating/activating a classic project closes native workers. Native selection is intentionally session-only: it is not restored automatically after restarting Forge and does not yet appear in the recent-project database.
+One Forge project is active at a time. It owns one or more native sources, each with its own MCPack process and workers. Source descriptors persist in forge.project.json and the project appears in the recent list. Switching or closing projects stops the old sources. After restarting Forge, reopen the project or explicitly reload sources to start trusted code.
 
-Save and restart stops the old MCPack process, writes the actual file, starts a fresh server, and discovers the new catalog. It does not retain application state or retry in-flight writes. A failed startup remains visible and editable for recovery. The **Restart** button reloads edits made in your own IDE. The connection deadline includes MCPack's configured worker startup budget and time for cleanup. Forge waits for configured worker shutdown deadlines before force-stopping an unresponsive host.
+Save and restart stops the old MCPack process, writes the actual file, starts a fresh server, and discovers the new catalog. It does not retain application state or retry in-flight writes. A failed startup remains visible and editable for recovery. The **Reload sources** button reloads edits made in your own IDE. The connection deadline includes MCPack's configured worker startup budget and time for cleanup. Forge waits for configured worker shutdown deadlines before force-stopping an unresponsive host.
 
 Worker diagnostics show the last 16 KiB of stderr. Native operations currently display results in the workbench but are not added to the classic execution-history database. Diagnostics may contain application secrets; only use trusted local code.
 

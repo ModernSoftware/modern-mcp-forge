@@ -11,7 +11,8 @@ const child = Bun.spawn(
     'test',
     '--max-concurrency=1',
     'tests/integration/mcpack-session.test.ts',
-    'tests/e2e/mcpack-http.test.ts'
+    'tests/e2e/mcpack-http.test.ts',
+    'tests/e2e/native-authoring.test.ts'
   ],
   { stdout: 'inherit', stderr: 'inherit', env: { ...process.env } }
 );

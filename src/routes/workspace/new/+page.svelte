@@ -1,7 +1,8 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import { goto } from '$app/navigation';
   let { data } = $props();
-  let kind = $state('tools');
+  let kind = $state(untrack(() => data.initialKind));
   let sourceId = $state('');
   let sourceChoice = $state('new');
   let workerChoice = $state('new');
@@ -73,14 +74,14 @@
 >
   {#if error}<p role="alert" class="workflow-error">{error}</p>{/if}
   <label
-    >Implementation<select disabled={busy}
+    >Implementation<select aria-label="Implementation" disabled={busy}
       ><option>Native MCPack</option><option disabled
         >Bridge · Coming next</option
       ></select
     ></label
   >
   <label
-    >Capability<select bind:value={kind} disabled={busy}
+    >Capability<select aria-label="Capability" bind:value={kind} disabled={busy}
       ><option value="tools">Tool</option><option value="resources"
         >Resource</option
       ><option value="prompts">Prompt</option></select
@@ -104,6 +105,7 @@
   >
   <label
     >Source<select
+      aria-label="Source"
       bind:value={sourceChoice}
       disabled={busy}
       onchange={() => (workerChoice = 'new')}
@@ -123,7 +125,10 @@
       /></label
     >{:else}
     <label
-      >Worker<select bind:value={workerChoice} disabled={busy}
+      >Worker<select
+        aria-label="Worker"
+        bind:value={workerChoice}
+        disabled={busy}
         ><option value="new">Create a worker</option
         >{#each Object.entries(existing?.manifest?.workers ?? {}) as [id, worker]}<option
             value={id}>{id} · {worker.runtime}</option
@@ -150,7 +155,10 @@
       </p>{/if}
   {/if}
   {#if sourceChoice === 'new' || workerChoice === 'new'}<label
-      >Worker runtime<select bind:value={runtime} disabled={busy}
+      >Worker runtime<select
+        aria-label="Worker runtime"
+        bind:value={runtime}
+        disabled={busy}
         ><option value="node">Node</option><option value="python">Python</option
         ></select
       ></label

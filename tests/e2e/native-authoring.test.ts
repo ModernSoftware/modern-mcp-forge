@@ -310,6 +310,14 @@ test('project native authoring exposes Node and Python over HTTP and recovers af
     ]) {
       expect((await fetch(base + path)).status).toBe(200);
     }
+    for (const kind of ['tools', 'resources', 'prompts']) {
+      const redirected = await fetch(`${base}/${kind}/new`, {
+        redirect: 'manual'
+      });
+      expect(redirected.headers.get('location')).toBe(
+        `/workspace/new?kind=${kind}`
+      );
+    }
     const workspace = await (await fetch(base + '/workspace')).text();
     expect(workspace).toContain('lookup_order');
     expect(workspace).toContain('legacy definitions');

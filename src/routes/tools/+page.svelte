@@ -1,5 +1,4 @@
 <script lang="ts">
-  import NativeCapabilities from '$lib/components/NativeCapabilities.svelte';
   let { data } = $props();
 </script>
 
@@ -10,9 +9,10 @@
 <section class="page-heading">
   <div>
     <div class="eyebrow">WORKBENCH</div>
-    <h1>Tools</h1>
+    <h1>Legacy tools</h1>
     <p>
-      Inspect, test, and author capabilities exposed by the Forge project manifest.
+      Inspect, test, and author capabilities exposed by the Forge project
+      manifest.
     </p>
   </div>
 
@@ -22,8 +22,10 @@
   </a>
 </section>
 
-<NativeCapabilities sources={data.nativeSources} kind="tools" />
-
+<p class="workflow-notice">
+  Legacy definitions retain their original execution format. New capabilities
+  use native MCPack. <a href="/workspace">Return to the project workspace</a>.
+</p>
 
 <div class="tool-grid">
   {#each data.tools as tool}
@@ -78,9 +80,7 @@
               : 'Runtime unavailable'}
         </span>
 
-        <a href={`/tools/${encodeURIComponent(tool.name)}`}>
-          View / Test →
-        </a>
+        <a href={`/tools/${encodeURIComponent(tool.name)}`}> View / Test → </a>
       </footer>
     </article>
   {/each}
@@ -103,11 +103,7 @@
 
   .tool-card:hover {
     transform: translateY(-2px);
-    border-color: color-mix(
-      in srgb,
-      var(--accent) 28%,
-      var(--border)
-    );
+    border-color: color-mix(in srgb, var(--accent) 28%, var(--border));
   }
 
   .tool-header {
@@ -160,12 +156,8 @@
     border: 1px solid var(--border);
     border-radius: 9px;
     color: var(--muted);
-    background: color-mix(
-      in srgb,
-      var(--surface-solid) 55%,
-      transparent
-    );
-    font-family: "Cascadia Code", Consolas, monospace;
+    background: color-mix(in srgb, var(--surface-solid) 55%, transparent);
+    font-family: 'Cascadia Code', Consolas, monospace;
     font-size: 0.69rem;
     text-overflow: ellipsis;
     white-space: nowrap;
