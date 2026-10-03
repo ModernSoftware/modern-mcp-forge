@@ -1,6 +1,6 @@
 # Project workflow and continuation guide
 
-Target branch: `v0.10.0`. Follow-up to PR #14; tracked in issue #15.
+Target branch: `v0.10.0`. Unified workspace merged in PR #16; external source integration tracked in issue #17.
 
 ## Product decisions
 
@@ -24,7 +24,7 @@ Target branch: `v0.10.0`. Follow-up to PR #14; tracked in issue #15.
 ## Continue in a fresh chat
 
 Use ModernSoftware/modern-mcp-forge, base v0.10.0, working branch
-feat/unified-project-workflow and issue #15. Inspect the linked PR and current CI
+feat/external-mcp-sources and issue #17. Inspect the linked PR and current CI
 before editing. Do not merge or publish without the user's instruction. Keep
 changes in this branch. Read this document and the PR's test results; do not
 assume future items above are implemented.
@@ -50,3 +50,11 @@ errors should occur when editing JSON.
 
 Source controls restart all sources after configuration edits. Individual worker
 stop/restart and native execution-history persistence are not implemented yet.
+
+## External sources slice
+
+The next PR adds trusted Streamable HTTP connections, environment-reference bearer
+authentication, discovery and namespaced routing alongside native capabilities.
+See [External sources](external-sources.md) for supported behavior and limits.
+Bridge implementation, external metadata overrides, OAuth login, and native-only
+export remain subsequent work. Do not treat their UI placeholders as implemented.

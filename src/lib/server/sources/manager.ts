@@ -4,10 +4,12 @@ import type {
   SourceCatalog,
   SourceFactory
 } from './contracts';
+import { ExternalSourceAdapter } from './external';
 import { NativeSourceAdapter } from './native';
 import { ProjectSourcesSchema, type ProjectSource } from './schema';
 
 const nativeFactory: SourceFactory = (root, source) => {
+  if (source.kind === 'external') return new ExternalSourceAdapter(source);
   if (source.kind !== 'native')
     throw new Error(`${source.kind} sources are not implemented.`);
   return new NativeSourceAdapter(root, source.manifest);
