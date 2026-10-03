@@ -1,4 +1,5 @@
 <script lang="ts">
+  import NativeCapabilities from '$lib/components/NativeCapabilities.svelte';
   let { data } = $props();
 </script>
 
@@ -27,6 +28,9 @@
     Add resource
   </a>
 </section>
+
+<NativeCapabilities sources={data.nativeSources} kind="resources" />
+
 
 {#if data.resources.length === 0}
   <section class="glass-card empty-state">

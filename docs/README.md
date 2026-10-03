@@ -46,3 +46,5 @@ Once those exist, this file can act as the permanent documentation index.
 - [Native MCPack preview](mcpack.md): published package setup, editing, testing, and standalone parity.
 
 - [Project source foundation](project-sources.md): source definitions, native lifecycle, status and reload API.
+
+- [Native authoring](native-authoring.md) — create, edit and test project MCPack sources.

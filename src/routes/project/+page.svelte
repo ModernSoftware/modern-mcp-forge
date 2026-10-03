@@ -1,4 +1,5 @@
 <script lang="ts">
+  import ProjectSources from '$lib/components/ProjectSources.svelte';
   import DefinitionLifecycle from '$lib/components/DefinitionLifecycle.svelte';
 
   let { data } = $props();
@@ -47,6 +48,8 @@
     </code>
   </div>
 </section>
+
+<ProjectSources projectId={data.manifest.project.id} sources={data.manifest.sources ?? []} snapshot={data.sources} catalogError={data.catalogError} />
 
 <div class="lifecycle-note">
   <strong>Definition lifecycle</strong>

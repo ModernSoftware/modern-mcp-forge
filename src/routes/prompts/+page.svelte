@@ -1,4 +1,5 @@
 <script lang="ts">
+  import NativeCapabilities from '$lib/components/NativeCapabilities.svelte';
   let { data } = $props();
 </script>
 
@@ -27,6 +28,9 @@
     Add prompt
   </a>
 </section>
+
+<NativeCapabilities sources={data.nativeSources} kind="prompts" />
+
 
 {#if data.prompts.length === 0}
   <section class="glass-card empty-state">

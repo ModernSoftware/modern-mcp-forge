@@ -1,4 +1,5 @@
 <script lang="ts">
+  import NativeCapabilities from '$lib/components/NativeCapabilities.svelte';
   let { data } = $props();
 </script>
 
@@ -20,6 +21,9 @@
     Add tool
   </a>
 </section>
+
+<NativeCapabilities sources={data.nativeSources} kind="tools" />
+
 
 <div class="tool-grid">
   {#each data.tools as tool}
