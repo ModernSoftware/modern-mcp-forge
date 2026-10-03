@@ -42,3 +42,11 @@ The same applies to one-off migration notes for behavior that no longer exists.
 - contribution guide
 
 Once those exist, this file can act as the permanent documentation index.
+
+- [Native MCPack integration](mcpack.md): published package setup, editing, testing, and standalone parity.
+
+- [Project source foundation](project-sources.md): source definitions, native lifecycle, status and reload API.
+
+- [Native authoring](native-authoring.md) — create, edit and test project MCPack sources.
+
+- [Project workflow and continuation guide](project-workflow.md): UX decisions, current scope and next steps.

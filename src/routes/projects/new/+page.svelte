@@ -1,24 +1,15 @@
 <script lang="ts">
-  import {
-    goto
-  } from '$app/navigation';
+  import { goto } from '$app/navigation';
 
-  import DirectoryPicker
-    from '$lib/components/DirectoryPicker.svelte';
+  import DirectoryPicker from '$lib/components/DirectoryPicker.svelte';
 
-  let folderPath =
-    $state('');
-  let name =
-    $state('');
-  let description =
-    $state('');
+  let folderPath = $state('');
+  let name = $state('');
+  let description = $state('');
 
-  let browseOpen =
-    $state(false);
-  let saving =
-    $state(false);
-  let errorMessage =
-    $state('');
+  let browseOpen = $state(false);
+  let saving = $state(false);
+  let errorMessage = $state('');
 
   async function createProject() {
     if (saving) {
@@ -28,57 +19,38 @@
     errorMessage = '';
 
     if (!folderPath.trim()) {
-      errorMessage =
-        'Project folder is required.';
+      errorMessage = 'Project folder is required.';
       return;
     }
 
     saving = true;
 
     try {
-      const response =
-        await fetch(
-          '/api/projects/create',
-          {
-            method: 'POST',
-            headers: {
-              'content-type':
-                'application/json'
-            },
-            body: JSON.stringify({
-              folderPath:
-                folderPath.trim(),
-              name:
-                name.trim() ||
-                undefined,
-              description:
-                description.trim() ||
-                undefined
-            })
-          }
-        );
+      const response = await fetch('/api/projects/create', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json'
+        },
+        body: JSON.stringify({
+          folderPath: folderPath.trim(),
+          name: name.trim() || undefined,
+          description: description.trim() || undefined
+        })
+      });
 
-      const payload =
-        await response.json();
+      const payload = await response.json();
 
       if (!response.ok) {
         throw new Error(
-          payload.error ??
-            `Could not create project (${response.status}).`
+          payload.error ?? `Could not create project (${response.status}).`
         );
       }
 
-      await goto(
-        '/',
-        {
-          invalidateAll: true
-        }
-      );
+      await goto('/workspace', {
+        invalidateAll: true
+      });
     } catch (error) {
-      errorMessage =
-        error instanceof Error
-          ? error.message
-          : String(error);
+      errorMessage = error instanceof Error ? error.message : String(error);
     } finally {
       saving = false;
     }
@@ -86,42 +58,28 @@
 </script>
 
 <svelte:head>
-  <title>
-    Modern MCP Forge · New Project
-  </title>
+  <title>Modern MCP Forge · New Project</title>
 </svelte:head>
 
 <section class="page-heading">
   <div>
-    <div class="eyebrow">
-      PROJECT WORKSPACE
-    </div>
-    <h1>
-      New project
-    </h1>
+    <div class="eyebrow">PROJECT WORKSPACE</div>
+    <h1>New project</h1>
     <p>
-      Bootstrap Forge into a new folder or an existing repository that does not already contain forge.project.json.
+      Bootstrap Forge into a new folder or an existing repository that does not
+      already contain forge.project.json.
     </p>
   </div>
 </section>
 
 <div class="form-toolbar glass-card">
   <div>
-    <strong>
-      Create Forge project
-    </strong>
-    <span>
-      The project becomes active immediately after creation.
-    </span>
+    <strong> Create Forge project </strong>
+    <span> The project becomes active immediately after creation. </span>
   </div>
 
   <div class="toolbar-actions">
-    <a
-      class="secondary-button"
-      href="/projects"
-    >
-      Cancel
-    </a>
+    <a class="secondary-button" href="/projects"> Cancel </a>
 
     <button
       class="primary-button"
@@ -129,9 +87,7 @@
       form="new-project-form"
       disabled={saving}
     >
-      {saving
-        ? 'Creating…'
-        : 'Create project →'}
+      {saving ? 'Creating…' : 'Create project →'}
     </button>
   </div>
 </div>
@@ -150,7 +106,8 @@
     </span>
 
     <small>
-      Enter the exact local folder. Forge creates it if necessary and adds tools/, resources/, prompts/, and forge.project.json.
+      Enter the exact local folder. Forge creates it if necessary and adds
+      forge.project.json. Native code stays in this project folder.
     </small>
 
     <div class="folder-row">
@@ -164,8 +121,7 @@
       <button
         class="secondary-button"
         type="button"
-        onclick={() =>
-          (browseOpen = true)}
+        onclick={() => (browseOpen = true)}
       >
         Browse…
       </button>
@@ -174,45 +130,26 @@
 
   <div class="field-grid two">
     <label>
-      <span>
-        Project name
-      </span>
+      <span> Project name </span>
 
-      <small>
-        Optional. Defaults to the selected folder name.
-      </small>
+      <small> Optional. Defaults to the selected folder name. </small>
 
-      <input
-        bind:value={name}
-        autocomplete="off"
-        placeholder="Customer MCP"
-      />
+      <input bind:value={name} autocomplete="off" placeholder="Customer MCP" />
     </label>
 
     <label>
-      <span>
-        Initial server version
-      </span>
+      <span> Initial server version </span>
 
-      <small>
-        New projects begin with version 0.1.0.
-      </small>
+      <small> New projects begin with version 0.1.0. </small>
 
-      <input
-        value="0.1.0"
-        disabled
-      />
+      <input value="0.1.0" disabled />
     </label>
   </div>
 
   <label>
-    <span>
-      Description
-    </span>
+    <span> Description </span>
 
-    <small>
-      Optional project description stored in forge.project.json.
-    </small>
+    <small> Optional project description stored in forge.project.json. </small>
 
     <textarea
       bind:value={description}
@@ -222,17 +159,14 @@
   </label>
 
   <div class="bootstrap-preview">
-    <div class="eyebrow">
-      BOOTSTRAP
-    </div>
+    <div class="eyebrow">BOOTSTRAP</div>
 
     <pre>forge.project.json
-tools/
-resources/
-prompts/</pre>
+native/  (created when you add native capabilities)</pre>
 
     <p>
-      New projects intentionally start empty. Example capabilities can be added explicitly rather than silently exposed to MCP clients.
+      New projects intentionally start empty. Example capabilities can be added
+      explicitly rather than silently exposed to MCP clients.
     </p>
   </div>
 
@@ -251,8 +185,7 @@ prompts/</pre>
       folderPath = path;
       browseOpen = false;
     }}
-    onClose={() =>
-      (browseOpen = false)}
+    onClose={() => (browseOpen = false)}
   />
 {/if}
 
@@ -263,8 +196,7 @@ prompts/</pre>
     z-index: 6;
     display: flex;
     align-items: center;
-    justify-content:
-      space-between;
+    justify-content: space-between;
     gap: 18px;
     margin-bottom: 16px;
     padding: 12px 14px;
@@ -334,12 +266,7 @@ prompts/</pre>
     border-radius: 10px;
     outline: none;
     color: var(--text);
-    background:
-      color-mix(
-        in srgb,
-        var(--surface-solid) 68%,
-        transparent
-      );
+    background: color-mix(in srgb, var(--surface-solid) 68%, transparent);
   }
 
   input {
@@ -354,19 +281,8 @@ prompts/</pre>
 
   input:focus,
   textarea:focus {
-    border-color:
-      color-mix(
-        in srgb,
-        var(--accent) 55%,
-        var(--border)
-      );
-    box-shadow:
-      0 0 0 3px
-      color-mix(
-        in srgb,
-        var(--accent) 12%,
-        transparent
-      );
+    border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent);
   }
 
   input:disabled {
@@ -376,8 +292,7 @@ prompts/</pre>
 
   .folder-row {
     display: grid;
-    grid-template-columns:
-      minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) auto;
     gap: 8px;
   }
 
@@ -387,8 +302,7 @@ prompts/</pre>
   }
 
   .field-grid.two {
-    grid-template-columns:
-      1fr 1fr;
+    grid-template-columns: 1fr 1fr;
   }
 
   .bootstrap-preview {
@@ -396,12 +310,7 @@ prompts/</pre>
     padding: 16px;
     border: 1px solid var(--border);
     border-radius: 12px;
-    background:
-      color-mix(
-        in srgb,
-        var(--surface-solid) 48%,
-        transparent
-      );
+    background: color-mix(in srgb, var(--surface-solid) 48%, transparent);
   }
 
   .bootstrap-preview pre {
@@ -421,22 +330,14 @@ prompts/</pre>
   .error-panel {
     margin-top: 15px;
     padding: 11px 12px;
-    border: 1px solid
-      color-mix(
-        in srgb,
-        var(--danger) 32%,
-        var(--border)
-      );
+    border: 1px solid color-mix(in srgb, var(--danger) 32%, var(--border));
     border-radius: 10px;
     color: var(--danger);
-    background:
-      var(--danger-soft);
+    background: var(--danger-soft);
     font-size: 0.72rem;
   }
 
-  @media (
-    max-width: 650px
-  ) {
+  @media (max-width: 650px) {
     .form-toolbar {
       align-items: stretch;
       flex-direction: column;

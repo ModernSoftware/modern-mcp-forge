@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { afterConfirmingProjectLeave } from '$lib/navigation/project-leave';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
 
@@ -6,10 +7,7 @@
 
   import ThemeSwitch from '$lib/components/ThemeSwitch.svelte';
 
-  let {
-    data,
-    children
-  } = $props();
+  let { data, children } = $props();
 
   let closingProject = $state(false);
 
@@ -18,33 +16,33 @@
       ? page.url.pathname === '/'
       : page.url.pathname.startsWith(path);
 
+  let closeError = $state('');
   async function closeProject() {
+    await afterConfirmingProjectLeave(closeConfirmedProject);
+  }
+
+  async function closeConfirmedProject() {
     if (closingProject || !data.activeProject) {
       return;
     }
 
     closingProject = true;
+    closeError = '';
 
     try {
-      const response = await fetch(
-        '/api/projects/close',
-        {
-          method: 'POST'
-        }
-      );
+      const response = await fetch('/api/projects/close', {
+        method: 'POST'
+      });
 
       if (!response.ok) {
-        throw new Error(
-          `Could not close project (${response.status}).`
-        );
+        throw new Error(`Could not close project (${response.status}).`);
       }
 
-      await goto(
-        '/projects',
-        {
-          invalidateAll: true
-        }
-      );
+      await goto('/projects', {
+        invalidateAll: true
+      });
+    } catch (error) {
+      closeError = error instanceof Error ? error.message : String(error);
     } finally {
       closingProject = false;
     }
@@ -71,119 +69,28 @@
     <nav>
       <div class="nav-group">
         <div class="nav-title">WORKSPACE</div>
-
         <a
           class:active={isActive('/projects')}
           class="nav-item"
           href="/projects"
+          ><span class="nav-icon">▦</span><span>Projects</span></a
         >
-          <span class="nav-icon">▦</span>
-          <span>Projects</span>
-        </a>
-
-        {#if data.activeProject}
-          <a
-            class:active={isActive('/')}
-            class="nav-item"
-            href="/"
-          >
-            <span class="nav-icon">⌂</span>
-            <span>Dashboard</span>
-          </a>
-
-          <a
-            class:active={isActive('/tools')}
-            class="nav-item"
-            href="/tools"
-          >
-            <span class="nav-icon">◇</span>
-            <span>Tools</span>
-          </a>
-
-          <a
-            class:active={isActive('/executions')}
-            class="nav-item"
-            href="/executions"
-          >
-            <span class="nav-icon">↯</span>
-            <span>Executions</span>
-          </a>
-        {:else}
-          <span class="nav-item disabled">
-            <span class="nav-icon">⌂</span>
-            <span>Dashboard</span>
-          </span>
-
-          <span class="nav-item disabled">
-            <span class="nav-icon">◇</span>
-            <span>Tools</span>
-          </span>
-
-          <span class="nav-item disabled">
-            <span class="nav-icon">↯</span>
-            <span>Executions</span>
-          </span>
-        {/if}
-      </div>
-
-      <div class="nav-group">
-        <div class="nav-title">MCP</div>
-
-        {#if data.activeProject}
-          <a
-            class:active={isActive('/resources')}
-            class="nav-item"
-            href="/resources"
-          >
-            <span class="nav-icon">○</span>
-            <span>Resources</span>
-          </a>
-
-          <a
-            class:active={isActive('/prompts')}
-            class="nav-item"
-            href="/prompts"
-          >
-            <span class="nav-icon">✦</span>
-            <span>Prompts</span>
-          </a>
-        {:else}
-          <span class="nav-item disabled">
-            <span class="nav-icon">○</span>
-            <span>Resources</span>
-          </span>
-
-          <span class="nav-item disabled">
-            <span class="nav-icon">✦</span>
-            <span>Prompts</span>
-          </span>
-        {/if}
-      </div>
-
-      <div class="nav-group">
-        <div class="nav-title">CONFIGURATION</div>
-
-        {#if data.activeProject}
-          <a
-            class:active={isActive('/project')}
-            class="nav-item"
-            href="/project"
-          >
-            <span class="nav-icon">⚙</span>
-            <span>Project</span>
-          </a>
-        {:else}
-          <span class="nav-item disabled">
-            <span class="nav-icon">⚙</span>
-            <span>Project</span>
-          </span>
-        {/if}
-
-        <span class="nav-item disabled">
-          <span class="nav-icon">◫</span>
-          <span>Environment</span>
-          <small>Later</small>
-        </span>
+        {#each [{ path: '/workspace', title: 'Project workspace', icon: '◇' }, { path: '/project', title: 'Configuration', icon: '⚙' }, { path: '/executions', title: 'Execution history', icon: '↯' }] as item}
+          {#if data.activeProject}<a
+              class:active={item.path === '/project'
+                ? page.url.pathname === '/project' ||
+                  page.url.pathname.startsWith('/project/')
+                : isActive(item.path)}
+              class="nav-item"
+              href={item.path}
+              ><span class="nav-icon">{item.icon}</span><span>{item.title}</span
+              ></a
+            >
+          {:else}<span class="nav-item disabled" aria-disabled="true"
+              ><span class="nav-icon">{item.icon}</span><span>{item.title}</span
+              ></span
+            >{/if}
+        {/each}
       </div>
     </nav>
 
@@ -196,9 +103,7 @@
       <span class="runtime-copy">
         {#if data.activeProject}
           <strong>{data.activeProject.name}</strong>
-          <small title={data.activeProject.path}>
-            Active project
-          </small>
+          <small title={data.activeProject.path}> Active project </small>
         {:else}
           <strong>No project</strong>
           <small>Open or create one</small>
@@ -229,9 +134,7 @@
             {closingProject ? 'Closing…' : 'Close'}
           </button>
         {:else}
-          <span class="topbar-idle">
-            Project workspace
-          </span>
+          <span class="topbar-idle"> Project workspace </span>
         {/if}
       </div>
 
@@ -239,6 +142,9 @@
     </header>
 
     <main class="content">
+      {#if closeError}<p class="workflow-error" role="alert">
+          {closeError}
+        </p>{/if}
       {@render children()}
     </main>
   </div>
@@ -254,12 +160,7 @@
     overflow: hidden;
     border: 1px solid var(--border);
     border-radius: 24px;
-    background:
-      color-mix(
-        in srgb,
-        var(--surface) 82%,
-        transparent
-      );
+    background: color-mix(in srgb, var(--surface) 82%, transparent);
     backdrop-filter: blur(26px);
     box-shadow: var(--shadow);
   }
@@ -270,12 +171,7 @@
     flex-direction: column;
     padding: 21px 15px;
     border-right: 1px solid var(--border);
-    background:
-      color-mix(
-        in srgb,
-        var(--surface) 56%,
-        transparent
-      );
+    background: color-mix(in srgb, var(--surface) 56%, transparent);
   }
 
   .brand {
@@ -293,12 +189,7 @@
     place-items: center;
     border-radius: 10px;
     color: white;
-    background:
-      linear-gradient(
-        135deg,
-        var(--accent),
-        var(--teal)
-      );
+    background: linear-gradient(135deg, var(--accent), var(--teal));
     box-shadow: var(--shadow-soft);
     font-weight: 950;
   }
@@ -354,22 +245,12 @@
 
   .nav-item:not(.disabled):hover {
     color: var(--text);
-    background:
-      color-mix(
-        in srgb,
-        var(--surface-solid) 58%,
-        transparent
-      );
+    background: color-mix(in srgb, var(--surface-solid) 58%, transparent);
   }
 
   .nav-item.disabled {
     opacity: 0.5;
     cursor: default;
-  }
-
-  .nav-item small {
-    font-size: 0.58rem;
-    text-transform: uppercase;
   }
 
   .nav-icon {
