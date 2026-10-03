@@ -68,126 +68,13 @@
       </span>
     </a>
 
-    <nav>
-      <div class="nav-group">
-        <div class="nav-title">WORKSPACE</div>
-
-        <a
-          class:active={isActive('/projects')}
-          class="nav-item"
-          href="/projects"
-        >
-          <span class="nav-icon">▦</span>
-          <span>Projects</span>
-        </a>
-
-        <a class:active={isActive('/mcpack')} class="nav-item" href="/mcpack"><span class="nav-icon">◇</span><span>Native MCPack</span></a>
-
-        {#if data.activeProject}
-          <a
-            class:active={isActive('/')}
-            class="nav-item"
-            href="/"
-          >
-            <span class="nav-icon">⌂</span>
-            <span>Dashboard</span>
-          </a>
-
-          <a
-            class:active={isActive('/tools')}
-            class="nav-item"
-            href="/tools"
-          >
-            <span class="nav-icon">◇</span>
-            <span>Tools</span>
-          </a>
-
-          <a
-            class:active={isActive('/executions')}
-            class="nav-item"
-            href="/executions"
-          >
-            <span class="nav-icon">↯</span>
-            <span>Executions</span>
-          </a>
-        {:else}
-          <span class="nav-item disabled">
-            <span class="nav-icon">⌂</span>
-            <span>Dashboard</span>
-          </span>
-
-          <span class="nav-item disabled">
-            <span class="nav-icon">◇</span>
-            <span>Tools</span>
-          </span>
-
-          <span class="nav-item disabled">
-            <span class="nav-icon">↯</span>
-            <span>Executions</span>
-          </span>
-        {/if}
-      </div>
-
-      <div class="nav-group">
-        <div class="nav-title">MCP</div>
-
-        {#if data.activeProject}
-          <a
-            class:active={isActive('/resources')}
-            class="nav-item"
-            href="/resources"
-          >
-            <span class="nav-icon">○</span>
-            <span>Resources</span>
-          </a>
-
-          <a
-            class:active={isActive('/prompts')}
-            class="nav-item"
-            href="/prompts"
-          >
-            <span class="nav-icon">✦</span>
-            <span>Prompts</span>
-          </a>
-        {:else}
-          <span class="nav-item disabled">
-            <span class="nav-icon">○</span>
-            <span>Resources</span>
-          </span>
-
-          <span class="nav-item disabled">
-            <span class="nav-icon">✦</span>
-            <span>Prompts</span>
-          </span>
-        {/if}
-      </div>
-
-      <div class="nav-group">
-        <div class="nav-title">CONFIGURATION</div>
-
-        {#if data.activeProject}
-          <a
-            class:active={isActive('/project')}
-            class="nav-item"
-            href="/project"
-          >
-            <span class="nav-icon">⚙</span>
-            <span>Project</span>
-          </a>
-        {:else}
-          <span class="nav-item disabled">
-            <span class="nav-icon">⚙</span>
-            <span>Project</span>
-          </span>
-        {/if}
-
-        <span class="nav-item disabled">
-          <span class="nav-icon">◫</span>
-          <span>Environment</span>
-          <small>Later</small>
-        </span>
-      </div>
-    </nav>
+    <nav><div class="nav-group"><div class="nav-title">WORKSPACE</div>
+      <a class:active={isActive('/projects')} class="nav-item" href="/projects"><span class="nav-icon">▦</span><span>Projects</span></a>
+      {#each [{ path: '/workspace', title: 'Project workspace', icon: '◇' }, { path: '/project', title: 'Configuration', icon: '⚙' }, { path: '/executions', title: 'Execution history', icon: '↯' }] as item}
+        {#if data.activeProject}<a class:active={item.path === '/project' ? page.url.pathname === '/project' || page.url.pathname.startsWith('/project/') : isActive(item.path)} class="nav-item" href={item.path}><span class="nav-icon">{item.icon}</span><span>{item.title}</span></a>
+        {:else}<span class="nav-item disabled" aria-disabled="true"><span class="nav-icon">{item.icon}</span><span>{item.title}</span></span>{/if}
+      {/each}
+    </div></nav>
 
     <div class="runtime-card">
       <span
@@ -369,10 +256,7 @@
     cursor: default;
   }
 
-  .nav-item small {
-    font-size: 0.58rem;
-    text-transform: uppercase;
-  }
+
 
   .nav-icon {
     text-align: center;

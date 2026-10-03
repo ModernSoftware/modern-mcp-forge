@@ -69,7 +69,7 @@
       }
 
       await goto(
-        '/',
+        '/workspace',
         {
           invalidateAll: true
         }

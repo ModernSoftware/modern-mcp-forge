@@ -9,7 +9,7 @@
     catalogError?: string;
   }>();
   let id = $state('');
-  let mode = $state('create');
+  let mode = $state('attach');
   let runtime = $state('node');
   let manifest = $state('');
   let busy = $state(false);
@@ -65,7 +65,7 @@
   <div class="heading">
     <div>
       <div class="eyebrow">PROJECT SOURCES</div>
-      <h2>Native MCPack</h2>
+      <h2>Sources</h2>
     </div>
     <button disabled={busy} onclick={reload}>Reload sources</button>
   </div>
@@ -125,7 +125,8 @@
       );
     }}
   >
-    <h3>Add native source</h3>
+    <h3>Attach an existing native source</h3>
+    <p>To create new capabilities, use <a href="/workspace/new">Add capability</a> in the workspace.</p>
     <div class="fields">
       <label
         >Source ID<input
@@ -138,7 +139,7 @@
       >
       <label
         >Source<select bind:value={mode} disabled={busy}
-          ><option value="create">Create starter</option><option value="attach"
+          ><option value="attach"
             >Attach existing manifest</option
           ></select
         ></label
@@ -164,9 +165,7 @@
       <button disabled={busy}>{busy ? 'Working…' : 'Add source'}</button>
     </div>
     <p class="note">
-      Creating adds one tool, resource and prompt under
-      native/&lt;source-id&gt;. Attaching uses a project-relative manifest. Both
-      start trusted local code.
+      Use a project-relative manifest. Attaching starts trusted local code. Disabling a source stops its workers and removes its capabilities from discovery.
     </p>
   </form>
 </section>

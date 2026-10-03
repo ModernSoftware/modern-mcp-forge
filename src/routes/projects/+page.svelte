@@ -4,6 +4,8 @@
   } from '$app/navigation';
 
   let { data } = $props();
+  let search = $state('');
+  let matchingProjects = $derived(data.projects.filter((project) => `${project.name} ${project.path}`.toLowerCase().includes(search.toLowerCase())));
 
   let openingId =
     $state<string | null>(
@@ -56,7 +58,7 @@
       }
 
       await goto(
-        '/',
+        '/workspace',
         {
           invalidateAll: true
         }
@@ -180,7 +182,7 @@
       Portable project
     </strong>
     <code>
-      forge.project.json · tools/ · resources/ · prompts/
+      forge.project.json · native sources · handler files
     </code>
   </div>
 
@@ -227,8 +229,10 @@
     </div>
   </section>
 {:else}
+  <label class="workflow-search">Search recent projects<input bind:value={search} placeholder="Project name or folder" /></label>
+  {#if !matchingProjects.length}<p>No matching projects.</p>{/if}
   <div class="projects-grid">
-    {#each data.projects as project}
+    {#each matchingProjects as project}
       <article
         class="glass-card project-card"
         class:active-project={
@@ -245,7 +249,7 @@
 
               {#if data.activeProject?.id === project.id}
                 <span class="active-badge">
-                  ACTIVE
+                  ● ACTIVE
                 </span>
               {/if}
             </div>
@@ -305,7 +309,7 @@
             {#if data.activeProject?.id === project.id}
               <a
                 class="secondary-button compact"
-                href="/"
+                href="/workspace"
               >
                 Continue
               </a>
@@ -381,10 +385,7 @@
   .projects-grid {
     display: grid;
     grid-template-columns:
-      repeat(
-        2,
-        minmax(0, 1fr)
-      );
+      minmax(0, 1fr);
     gap: 15px;
   }
 

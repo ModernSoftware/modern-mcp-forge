@@ -11,7 +11,9 @@ const projectPagePrefixes = [
   '/tools',
   '/resources',
   '/prompts',
-  '/executions'
+  '/executions',
+  '/workspace',
+  '/project/'
 ];
 
 const projectApiPrefixes = [
@@ -60,7 +62,7 @@ export const handle: Handle = async ({ event, resolve }) => {
     );
   }
 
-  if (projectPagePrefixes.some((prefix) => pathname.startsWith(prefix))) {
+  if (pathname === '/project' || projectPagePrefixes.some((prefix) => pathname.startsWith(prefix))) {
     throw redirect(
       303,
       '/projects'

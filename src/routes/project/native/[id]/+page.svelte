@@ -183,8 +183,7 @@
         >
       </div>
     {:else}<p>
-        Select a manifest or worker module. New sources include editable
-        examples of all three capability types.
+        Select a manifest or worker module. Definitions and handler files remain editable even when a source cannot start.
       </p>{/if}
     <p class="note">
       Compile TypeScript before reloading. Configure extra workers in the
