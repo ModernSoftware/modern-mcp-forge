@@ -28,3 +28,25 @@ feat/unified-project-workflow and issue #15. Inspect the linked PR and current C
 before editing. Do not merge or publish without the user's instruction. Keep
 changes in this branch. Read this document and the PR's test results; do not
 assume future items above are implemented.
+
+## Implemented in the workspace PR
+
+- Search recent projects; open into the unified workspace.
+- Create one native capability in a new source, a new worker in an existing source,
+  or bind an existing worker handler. Node and Python use MCPack 0.9.0.
+- Edit metadata and full definitions; tool schemas also have an explicit simple-field builder.
+- Filter/search capabilities and disable them without removing their code.
+- Configuration links to the same editors, shows configured workers, and manages sources.
+- Retire standalone preview selection. Close protects dirty drafts, stops sources and disables MCP.
+- Legacy data remains labeled and accessible through older views for deliberate migration.
+
+## Manual browser regression
+
+Create project → Add capability (tool/Node) → edit description → Save definition →
+Workspace → Disable/Enable → Edit details → change description → Close and decline
+(confirm project remains active) → Close and accept → Projects. Verify `/mcp` returns 503. Repeat creation for a Python resource and reuse a worker for a prompt. Try
+searching recent projects, dark theme and a narrow viewport. No browser console
+errors should occur when editing JSON.
+
+Source controls restart all sources after configuration edits. Individual worker
+stop/restart and native execution-history persistence are not implemented yet.

@@ -212,7 +212,6 @@ export function createNativeSource(
   }
 }
 
-
 export type CapabilityKind = 'tools' | 'resources' | 'prompts';
 
 /** Authoring reads disk, not discovery, so stopped/broken sources remain editable. */
@@ -220,14 +219,51 @@ export function nativeWorkspace(project: RegisteredProject) {
   const manifest = configuration(project);
   return {
     project,
-    legacyCount: manifest.tools.length + manifest.resources.length + manifest.prompts.length,
+    legacyCount:
+      manifest.tools.length +
+      manifest.resources.length +
+      manifest.prompts.length,
     sources: (manifest.sources ?? []).map((source) => {
-      if (source.kind !== 'native') return { source, manifest: null, error: undefined as string | undefined };
+      if (source.kind !== 'native')
+        return {
+          source,
+          manifest: null,
+          revision: '',
+          error: undefined as string | undefined
+        };
       try {
         const document = nativeDocument(project, source.id);
-        return { source, manifest: ManifestSchema.parse(JSON.parse(read(document.manifestPath))), error: document.error };
+        const parsed = ManifestSchema.parse(
+          JSON.parse(read(document.manifestPath))
+        );
+        const manifest = {
+          tools: parsed.tools,
+          resources: parsed.resources,
+          prompts: parsed.prompts,
+          workers: Object.fromEntries(
+            Object.entries(parsed.workers).map(([id, worker]) => [
+              id,
+              {
+                runtime: worker.runtime,
+                module: worker.module,
+                maxConcurrent: worker.maxConcurrent
+              }
+            ])
+          )
+        };
+        return {
+          source,
+          manifest,
+          revision: digest(read(document.manifestPath)),
+          error: document.error
+        };
       } catch (error) {
-        return { source, manifest: null, error: error instanceof Error ? error.message : String(error) };
+        return {
+          source,
+          manifest: null,
+          revision: '',
+          error: error instanceof Error ? error.message : String(error)
+        };
       }
     })
   };
@@ -240,34 +276,183 @@ export function createNativeCapability(
   runtime: 'node' | 'python',
   kind: CapabilityKind,
   name: string,
-  description: string
+  description: string,
+  options?: {
+    worker: string;
+    handler?: string;
+    revision: string;
+    newWorker: boolean;
+  }
 ) {
   if (!/^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(name))
-    throw new NativeProjectError('Use a capability name starting with a letter and up to 64 letters, numbers, underscores or hyphens.');
+    throw new NativeProjectError(
+      'Use a capability name starting with a letter and up to 64 letters, numbers, underscores or hyphens.'
+    );
   const workspace = nativeWorkspace(project);
-  if (workspace.sources.some((entry) => entry.manifest?.[kind].some((item) => item.name === name)))
-    throw new NativeProjectError('This capability name already exists in the project.');
+  if (
+    workspace.sources.some((entry) =>
+      entry.manifest?.[kind].some((item) => item.name === name)
+    )
+  )
+    throw new NativeProjectError(
+      'This capability name already exists in the project.'
+    );
   const starter = nativeStarter(id, runtime);
   const definition = { ...starter.manifest[kind][0], name, description };
-  const manifest = { ...starter.manifest, tools: [], resources: [], prompts: [], [kind]: [definition] };
+  if (kind === 'resources')
+    Object.assign(definition, { uri: `mcpack://${id}/${name}` });
+  if (options) {
+    if (!/^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(options.worker))
+      throw new NativeProjectError('Invalid worker ID.');
+    const document = nativeDocument(project, id);
+    const file = readNativeFile(project, id, document.files[0]);
+    if (file.revision !== options.revision)
+      throw new NativeProjectError(
+        'File changed on disk. Reload before saving.',
+        409
+      );
+    const existing = JSON.parse(file.content) as Manifest;
+    const module = `${options.worker}.${runtime === 'node' ? 'mjs' : 'py'}`;
+    const modulePath = join(dirname(document.manifestPath), module);
+    let created = false;
+    try {
+      if (options.newWorker) {
+        if (Object.hasOwn(existing.workers, options.worker))
+          throw new NativeProjectError('Worker ID already exists.');
+        writeFileSync(modulePath, starter.code, { flag: 'wx' });
+        created = true;
+        Object.defineProperty(existing.workers, options.worker, {
+          value: { runtime, module: `./${module}` },
+          enumerable: true
+        });
+      } else {
+        if (
+          !Object.hasOwn(existing.workers, options.worker) ||
+          !options.handler?.trim()
+        )
+          throw new NativeProjectError(
+            'Select an existing worker and its handler.'
+          );
+        definition.handler = options.handler;
+      }
+      definition.worker = options.worker;
+      const updated = { ...existing, [kind]: [...existing[kind], definition] };
+      saveNativeFile(
+        project,
+        id,
+        file.path,
+        JSON.stringify(updated, null, 2) + '\n',
+        file.revision
+      );
+    } catch (error) {
+      if (created) rmSync(modulePath, { force: true });
+      throw error;
+    }
+    return;
+  }
+  const manifest = {
+    ...starter.manifest,
+    tools: [],
+    resources: [],
+    prompts: [],
+    [kind]: [definition]
+  };
   ManifestSchema.parse(manifest);
   // Keep the factory's internal handlers; only the requested definition is exposed.
-  createNativeSource(project, id, runtime, { ...starter, manifest } as ReturnType<typeof nativeStarter>);
+  createNativeSource(project, id, runtime, {
+    ...starter,
+    manifest
+  } as ReturnType<typeof nativeStarter>);
 }
 
 export function updateNativeDefinition(
-  project: RegisteredProject, id: string, kind: CapabilityKind,
-  originalName: string, definition: unknown, revision: string
+  project: RegisteredProject,
+  id: string,
+  kind: CapabilityKind,
+  originalName: string,
+  definition: unknown,
+  revision: string
 ) {
   const document = nativeDocument(project, id);
   const file = readNativeFile(project, id, document.files[0]);
-  if (file.revision !== revision) throw new NativeProjectError('File changed on disk. Reload before saving.', 409);
+  if (file.revision !== revision)
+    throw new NativeProjectError(
+      'File changed on disk. Reload before saving.',
+      409
+    );
   const manifest = JSON.parse(file.content) as Manifest;
   const index = manifest[kind].findIndex((item) => item.name === originalName);
   if (index < 0) throw new NativeProjectError('Capability not found.');
   const definitions: unknown[] = [...manifest[kind]];
   definitions[index] = definition;
   const updated = { ...manifest, [kind]: definitions };
-  ManifestSchema.parse(updated);
-  return saveNativeFile(project, id, file.path, JSON.stringify(updated, null, 2) + '\n', revision);
+  const parsed = ManifestSchema.parse(updated);
+  const names = parsed[kind].map((item) => item.name);
+  if (new Set(names).size !== names.length)
+    throw new NativeProjectError('Capability name already exists.');
+  const replacement = parsed[kind][index];
+  if (
+    replacement.name !== originalName &&
+    document.source.disabledCapabilities?.some(
+      (item) => item.kind === kind && item.name === originalName
+    )
+  )
+    throw new NativeProjectError(
+      'Enable this capability before renaming it, or keep its current name.'
+    );
+  const workspace = nativeWorkspace(project);
+  if (
+    workspace.sources.some(
+      (entry) =>
+        entry.source.id !== id &&
+        entry.manifest?.[kind].some((item) => item.name === replacement.name)
+    )
+  )
+    throw new NativeProjectError(
+      'Capability name already exists in another source.'
+    );
+  if (kind === 'resources') {
+    const uris = parsed.resources.map((item) => item.uri);
+    if (
+      new Set(uris).size !== uris.length ||
+      workspace.sources.some(
+        (entry) =>
+          entry.source.id !== id &&
+          entry.manifest?.resources.some(
+            (item) => item.uri === parsed.resources[index].uri
+          )
+      )
+    )
+      throw new NativeProjectError('Resource URI already exists.');
+  }
+  return saveNativeFile(
+    project,
+    id,
+    file.path,
+    JSON.stringify(updated, null, 2) + '\n',
+    revision
+  );
+}
+
+export function setCapabilityEnabled(
+  project: RegisteredProject,
+  id: string,
+  kind: CapabilityKind,
+  name: string,
+  enabled: boolean
+) {
+  const manifest = configuration(project);
+  const source = manifest.sources?.find((item) => item.id === id);
+  if (!source || source.kind !== 'native')
+    throw new NativeProjectError('Native source not found.');
+  const native = nativeWorkspace(project).sources.find(
+    (entry) => entry.source.id === id
+  )?.manifest;
+  if (!native?.[kind].some((item) => item.name === name))
+    throw new NativeProjectError('Capability not found.');
+  source.disabledCapabilities = (source.disabledCapabilities ?? []).filter(
+    (entry) => entry.kind !== kind || entry.name !== name
+  );
+  if (!enabled) source.disabledCapabilities.push({ kind, name });
+  atomicWrite(projectFile(project), JSON.stringify(manifest, null, 2) + '\n');
 }

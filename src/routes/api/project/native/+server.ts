@@ -8,6 +8,7 @@ import { NativeProjectError } from '$lib/server/mcpack/session';
 import { projectSources } from '$lib/server/sources/manager';
 import { startProjectSources } from '$lib/server/sources/project';
 import {
+  setCapabilityEnabled,
   createNativeCapability,
   updateNativeDefinition,
   attachNativeSource,
@@ -20,8 +21,47 @@ import {
 const identity = { projectId: z.string(), id: z.string().min(1) };
 const generation = { generation: z.number().int().nonnegative() };
 const Input = z.discriminatedUnion('action', [
-  z.object({ ...identity, ...generation, action: z.literal('create-capability'), runtime: z.enum(['node', 'python']), kind: z.enum(['tools', 'resources', 'prompts']), name: z.string(), description: z.string().max(4096) }).strict(),
-  z.object({ ...identity, ...generation, action: z.literal('update-definition'), kind: z.enum(['tools', 'resources', 'prompts']), originalName: z.string(), definition: z.unknown(), revision: z.string() }).strict(),
+  z
+    .object({
+      ...identity,
+      ...generation,
+      action: z.literal('set-capability-enabled'),
+      kind: z.enum(['tools', 'resources', 'prompts']),
+      name: z.string(),
+      enabled: z.boolean()
+    })
+    .strict(),
+  z
+    .object({
+      ...identity,
+      ...generation,
+      action: z.literal('create-capability'),
+      runtime: z.enum(['node', 'python']),
+      kind: z.enum(['tools', 'resources', 'prompts']),
+      name: z.string(),
+      description: z.string().max(4096),
+      options: z
+        .object({
+          worker: z.string(),
+          handler: z.string().optional(),
+          revision: z.string(),
+          newWorker: z.boolean()
+        })
+        .strict()
+        .optional()
+    })
+    .strict(),
+  z
+    .object({
+      ...identity,
+      ...generation,
+      action: z.literal('update-definition'),
+      kind: z.enum(['tools', 'resources', 'prompts']),
+      originalName: z.string(),
+      definition: z.unknown(),
+      revision: z.string()
+    })
+    .strict(),
   z
     .object({
       ...identity,
@@ -113,14 +153,40 @@ export const POST: RequestHandler = async ({ request }) => {
       if (input.action === 'read')
         return json({ file: readNativeFile(project, input.id, input.path) });
       let file;
-      if (input.action === 'create-capability')
-        createNativeCapability(project, input.id, input.runtime, input.kind, input.name, input.description);
+      if (input.action === 'set-capability-enabled')
+        setCapabilityEnabled(
+          project,
+          input.id,
+          input.kind,
+          input.name,
+          input.enabled
+        );
+      else if (input.action === 'create-capability')
+        createNativeCapability(
+          project,
+          input.id,
+          input.runtime,
+          input.kind,
+          input.name,
+          input.description,
+          input.options
+        );
       else if (input.action === 'update-definition') {
         await projectSources.close();
-        try { file = updateNativeDefinition(project, input.id, input.kind, input.originalName, input.definition, input.revision); }
-        catch (error) { await startProjectSources(project); throw error; }
-      }
-      else if (input.action === 'create')
+        try {
+          file = updateNativeDefinition(
+            project,
+            input.id,
+            input.kind,
+            input.originalName,
+            input.definition,
+            input.revision
+          );
+        } catch (error) {
+          await startProjectSources(project);
+          throw error;
+        }
+      } else if (input.action === 'create')
         createNativeSource(project, input.id, input.runtime);
       else if (input.action === 'attach')
         attachNativeSource(project, input.id, input.manifest);

@@ -4,7 +4,9 @@ const projectPath = z
   .string()
   .min(1)
   .refine(
-    (value) => !/^(?:[A-Za-z]:|[\\/])/.test(value) && !value.split(/[\\/]/).includes('..'),
+    (value) =>
+      !/^(?:[A-Za-z]:|[\\/])/.test(value) &&
+      !value.split(/[\\/]/).includes('..'),
     'Use a project-relative path without parent traversal.'
   );
 const identity = { id: z.string().regex(/^[A-Za-z][A-Za-z0-9_-]{0,63}$/) };
@@ -15,7 +17,17 @@ export const ProjectSourceSchema = z.discriminatedUnion('kind', [
       ...identity,
       kind: z.literal('native'),
       enabled: z.boolean().default(true),
-      manifest: projectPath
+      manifest: projectPath,
+      disabledCapabilities: z
+        .array(
+          z
+            .object({
+              kind: z.enum(['tools', 'resources', 'prompts']),
+              name: z.string().min(1)
+            })
+            .strict()
+        )
+        .optional()
     })
     .strict(),
   // Reserved configuration only. These adapters are intentionally not executable yet.

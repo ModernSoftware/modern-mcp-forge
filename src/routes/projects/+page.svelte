@@ -1,82 +1,60 @@
 <script lang="ts">
-  import {
-    goto
-  } from '$app/navigation';
+  import { goto } from '$app/navigation';
 
   let { data } = $props();
   let search = $state('');
-  let matchingProjects = $derived(data.projects.filter((project) => `${project.name} ${project.path}`.toLowerCase().includes(search.toLowerCase())));
+  let matchingProjects = $derived(
+    data.projects.filter((project) =>
+      `${project.name} ${project.path}`
+        .toLowerCase()
+        .includes(search.toLowerCase())
+    )
+  );
 
-  let openingId =
-    $state<string | null>(
-      null
-    );
+  let openingId = $state<string | null>(null);
 
-  let errorMessage =
-    $state('');
+  let errorMessage = $state('');
 
-  let forgettingId =
-    $state<string | null>(
-      null
-    );
+  let forgettingId = $state<string | null>(null);
 
-  async function openRecent(
-    projectId: string
-  ) {
+  async function openRecent(projectId: string) {
     if (openingId) {
       return;
     }
 
-    openingId =
-      projectId;
+    openingId = projectId;
     errorMessage = '';
 
     try {
-      const response =
-        await fetch(
-          '/api/projects/activate',
-          {
-            method: 'POST',
-            headers: {
-              'content-type':
-                'application/json'
-            },
-            body: JSON.stringify({
-              projectId
-            })
-          }
-        );
+      const response = await fetch('/api/projects/activate', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json'
+        },
+        body: JSON.stringify({
+          projectId
+        })
+      });
 
-      const payload =
-        await response.json();
+      const payload = await response.json();
 
       if (!response.ok) {
         throw new Error(
-          payload.error ??
-            `Could not open project (${response.status}).`
+          payload.error ?? `Could not open project (${response.status}).`
         );
       }
 
-      await goto(
-        '/workspace',
-        {
-          invalidateAll: true
-        }
-      );
+      await goto('/workspace', {
+        invalidateAll: true
+      });
     } catch (error) {
-      errorMessage =
-        error instanceof Error
-          ? error.message
-          : String(error);
+      errorMessage = error instanceof Error ? error.message : String(error);
     } finally {
       openingId = null;
     }
   }
 
-  async function forgetRecent(
-    projectId: string,
-    projectName: string
-  ) {
+  async function forgetRecent(projectId: string, projectName: string) {
     if (forgettingId) {
       return;
     }
@@ -93,80 +71,53 @@
     errorMessage = '';
 
     try {
-      const response =
-        await fetch(
-          '/api/projects/forget',
-          {
-            method: 'POST',
-            headers: {
-              'content-type':
-                'application/json'
-            },
-            body: JSON.stringify({
-              projectId
-            })
-          }
-        );
+      const response = await fetch('/api/projects/forget', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json'
+        },
+        body: JSON.stringify({
+          projectId
+        })
+      });
 
-      const payload =
-        await response.json();
+      const payload = await response.json();
 
       if (!response.ok) {
         throw new Error(
-          payload.error ??
-            `Could not forget project (${response.status}).`
+          payload.error ?? `Could not forget project (${response.status}).`
         );
       }
 
-      await goto(
-        '/projects',
-        {
-          invalidateAll: true
-        }
-      );
+      await goto('/projects', {
+        invalidateAll: true
+      });
     } catch (error) {
-      errorMessage =
-        error instanceof Error
-          ? error.message
-          : String(error);
+      errorMessage = error instanceof Error ? error.message : String(error);
     } finally {
       forgettingId = null;
     }
   }
-
 </script>
 
 <svelte:head>
-  <title>
-    Modern MCP Forge · Projects
-  </title>
+  <title>Modern MCP Forge · Projects</title>
 </svelte:head>
 
 <section class="page-heading">
   <div>
-    <div class="eyebrow">
-      WORKSPACE
-    </div>
+    <div class="eyebrow">WORKSPACE</div>
     <h1>Projects</h1>
     <p>
-      Forge projects are portable folders. This machine keeps only local registration and execution history in SQLite.
+      Forge projects are portable folders. This machine keeps only local
+      registration and execution history in SQLite.
     </p>
   </div>
 
   <div class="page-actions">
-    <a
-      class="secondary-button"
-      href="/projects/open"
-    >
-      Open existing
-    </a>
+    <a class="secondary-button" href="/projects/open"> Open existing </a>
 
-    <a
-      class="primary-button"
-      href="/projects/new"
-    >
-      ＋ New project
-    </a>
+    <a class="primary-button" href="/projects/new"> ＋ New project </a>
   </div>
 </section>
 
@@ -178,67 +129,48 @@
 
 <section class="glass-card architecture-note">
   <div>
-    <strong>
-      Portable project
-    </strong>
-    <code>
-      forge.project.json · native sources · handler files
-    </code>
+    <strong> Portable project </strong>
+    <code> forge.project.json · native sources · handler files </code>
   </div>
 
   <span>↔</span>
 
   <div>
-    <strong>
-      Machine-local Forge state
-    </strong>
-    <code title={data.databasePath}>
-      SQLite registry · execution history
-    </code>
+    <strong> Machine-local Forge state </strong>
+    <code title={data.databasePath}> SQLite registry · execution history </code>
   </div>
 </section>
 
 {#if data.projects.length === 0}
   <section class="glass-card empty-projects">
-    <div class="empty-icon">
-      ▦
-    </div>
+    <div class="empty-icon">▦</div>
 
-    <h2>
-      Create or open your first project
-    </h2>
+    <h2>Create or open your first project</h2>
 
     <p>
-      A new project can use an empty folder or add Forge to an existing repository that does not yet contain forge.project.json.
+      A new project can use an empty folder or add Forge to an existing
+      repository that does not yet contain forge.project.json.
     </p>
 
     <div>
-      <a
-        class="primary-button"
-        href="/projects/new"
-      >
-        New project
-      </a>
+      <a class="primary-button" href="/projects/new"> New project </a>
 
-      <a
-        class="secondary-button"
-        href="/projects/open"
-      >
-        Open existing
-      </a>
+      <a class="secondary-button" href="/projects/open"> Open existing </a>
     </div>
   </section>
 {:else}
-  <label class="workflow-search">Search recent projects<input bind:value={search} placeholder="Project name or folder" /></label>
+  <label class="workflow-search"
+    >Search recent projects<input
+      bind:value={search}
+      placeholder="Project name or folder"
+    /></label
+  >
   {#if !matchingProjects.length}<p>No matching projects.</p>{/if}
   <div class="projects-grid">
     {#each matchingProjects as project}
       <article
         class="glass-card project-card"
-        class:active-project={
-          data.activeProject?.id ===
-            project.id
-        }
+        class:active-project={data.activeProject?.id === project.id}
       >
         <header>
           <div>
@@ -248,9 +180,7 @@
               </h2>
 
               {#if data.activeProject?.id === project.id}
-                <span class="active-badge">
-                  ● ACTIVE
-                </span>
+                <span class="active-badge"> ● ACTIVE </span>
               {/if}
             </div>
 
@@ -260,25 +190,17 @@
           </div>
 
           <span
-            class:available={
-              project.available
-            }
-            class:missing={
-              !project.available
-            }
+            class:available={project.available}
+            class:missing={!project.available}
             class="availability"
           >
             <span class="status-dot"></span>
-            {project.available
-              ? 'Available'
-              : 'Missing'}
+            {project.available ? 'Available' : 'Missing'}
           </span>
         </header>
 
         <div class="project-id">
-          <span>
-            Project ID
-          </span>
+          <span> Project ID </span>
           <code>
             {project.id}
           </code>
@@ -295,41 +217,25 @@
               class="forget-button compact"
               type="button"
               disabled={forgettingId !== null}
-              onclick={() =>
-                forgetRecent(
-                  project.id,
-                  project.name
-                )}
+              onclick={() => forgetRecent(project.id, project.name)}
             >
-              {forgettingId === project.id
-                ? 'Forgetting…'
-                : 'Forget'}
+              {forgettingId === project.id ? 'Forgetting…' : 'Forget'}
             </button>
 
             {#if data.activeProject?.id === project.id}
-              <a
-                class="secondary-button compact"
-                href="/workspace"
-              >
+              <a class="secondary-button compact" href="/workspace">
                 Continue
               </a>
             {:else}
               <button
                 class="primary-button compact"
                 type="button"
-                disabled={
-                  !project.available ||
+                disabled={!project.available ||
                   openingId !== null ||
-                  forgettingId !== null
-                }
-                onclick={() =>
-                  openRecent(
-                    project.id
-                  )}
+                  forgettingId !== null}
+                onclick={() => openRecent(project.id)}
               >
-                {openingId === project.id
-                  ? 'Opening…'
-                  : 'Open'}
+                {openingId === project.id ? 'Opening…' : 'Open'}
               </button>
             {/if}
           </div>
@@ -347,8 +253,7 @@
 
   .architecture-note {
     display: grid;
-    grid-template-columns:
-      1fr auto 1fr;
+    grid-template-columns: 1fr auto 1fr;
     align-items: center;
     gap: 18px;
     margin-bottom: 18px;
@@ -384,8 +289,7 @@
 
   .projects-grid {
     display: grid;
-    grid-template-columns:
-      minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
     gap: 15px;
   }
 
@@ -395,19 +299,13 @@
   }
 
   .project-card.active-project {
-    border-color:
-      color-mix(
-        in srgb,
-        var(--success) 30%,
-        var(--border)
-      );
+    border-color: color-mix(in srgb, var(--success) 30%, var(--border));
   }
 
   .project-card header {
     display: flex;
     align-items: flex-start;
-    justify-content:
-      space-between;
+    justify-content: space-between;
     gap: 14px;
   }
 
@@ -436,8 +334,7 @@
     padding: 4px 6px;
     border-radius: 999px;
     color: var(--success);
-    background:
-      var(--success-soft);
+    background: var(--success-soft);
     font-size: 0.56rem;
     font-weight: 900;
   }
@@ -464,12 +361,7 @@
     padding: 10px 11px;
     border: 1px solid var(--border);
     border-radius: 9px;
-    background:
-      color-mix(
-        in srgb,
-        var(--surface-solid) 48%,
-        transparent
-      );
+    background: color-mix(in srgb, var(--surface-solid) 48%, transparent);
   }
 
   .project-id span,
@@ -496,8 +388,7 @@
   .project-card footer {
     display: flex;
     align-items: center;
-    justify-content:
-      space-between;
+    justify-content: space-between;
     gap: 13px;
     margin-top: 15px;
   }
@@ -579,22 +470,14 @@
   .error-panel {
     margin-bottom: 15px;
     padding: 11px 12px;
-    border: 1px solid
-      color-mix(
-        in srgb,
-        var(--danger) 32%,
-        var(--border)
-      );
+    border: 1px solid color-mix(in srgb, var(--danger) 32%, var(--border));
     border-radius: 10px;
     color: var(--danger);
-    background:
-      var(--danger-soft);
+    background: var(--danger-soft);
     font-size: 0.72rem;
   }
 
-  @media (
-    max-width: 860px
-  ) {
+  @media (max-width: 860px) {
     .projects-grid {
       grid-template-columns: 1fr;
     }
@@ -609,9 +492,7 @@
     }
   }
 
-  @media (
-    max-width: 620px
-  ) {
+  @media (max-width: 620px) {
     .page-actions,
     .project-card footer {
       align-items: stretch;

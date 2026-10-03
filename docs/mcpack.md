@@ -1,4 +1,4 @@
-# Native MCPack integration (v0.10.0 preview)
+# Native MCPack integration (v0.10.0)
 
 Forge can open an existing native MCPack project, edit its manifest and worker modules in Monaco, test its tools/resources/prompts, and expose them to an agent through Forge's `/mcp` endpoint. The same files run independently with the MCPack CLI.
 
@@ -50,14 +50,14 @@ No browser request can change the CLI override.
 
 ## Try the workflow
 
-1. Open **Native MCPack** in Forge's sidebar (`/mcpack`).
-2. Enter the absolute path to a native manifest, for example `C:/repos/my-native-project/mcpack.json`.
-3. Click **Open project**. Forge starts MCPack with Node, discovers its capabilities, and selects the native project for `/mcp`.
-4. Select `greet` under Tools. Enter `{"name":"Diego"}` and click **Run**. Repeat: the count increases and the worker PID stays the same.
-5. Test the guide resource and welcome prompt. **Source definition** shows the metadata and schemas discovered from MCPack unchanged.
-6. Select `mcpack.json`, change the greeting in `workers.main.config`, and click **Save and restart**. Test again: the new greeting appears, with fresh worker state.
-7. Connect an MCP agent to `http://localhost:5173/mcp`. Reconnect after changing capabilities or restarting.
-8. Close the native project and run that **same manifest** independently:
+Use **Projects** to create a Forge project around your native project folder. In
+**Configuration**, attach `mcpack.json` using a source ID. Open the capability in
+**Project workspace** to edit its definition, or choose **Edit code & test** for
+its worker module and test panel. See [Native authoring](native-authoring.md).
+
+The standalone preview route has been retired; MCP is served only while a Forge
+project is open. Close stops its sources. The same manifest can still run outside
+Forge:
 
 ```sh
 node node_modules/@modern-software/mcpack/dist/cli.js serve ../my-native-project/mcpack.json

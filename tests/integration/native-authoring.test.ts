@@ -214,3 +214,139 @@ test('editor paths stay relative when the project root is a symlink alias', () =
     project.close();
   }
 });
+
+test('workspace creates one capability, reuses workers, and preserves disabled definitions', async () => {
+  const {
+    createNativeCapability,
+    nativeWorkspace,
+    updateNativeDefinition,
+    setCapabilityEnabled
+  } = await import('../../src/lib/server/sources/authoring');
+  const { project, root, close } = fixture();
+  const manager = new ProjectSourceManager();
+  try {
+    createNativeCapability(
+      project,
+      'support',
+      'node',
+      'tools',
+      'lookup',
+      'Lookup example'
+    );
+    let workspace = nativeWorkspace(project);
+    expect(
+      workspace.sources[0].manifest?.tools.map((item) => item.name)
+    ).toEqual(['lookup']);
+    expect(workspace.sources[0].manifest?.resources).toEqual([]);
+    expect(workspace.sources[0].manifest?.prompts).toEqual([]);
+    expect(workspace.sources[0].manifest?.workers.main).not.toHaveProperty(
+      'env'
+    );
+    expect(() =>
+      createNativeCapability(
+        project,
+        'duplicate',
+        'python',
+        'tools',
+        'lookup',
+        ''
+      )
+    ).toThrow('already exists');
+    createNativeCapability(
+      project,
+      'support',
+      'node',
+      'prompts',
+      'welcome',
+      '',
+      {
+        worker: 'main',
+        handler: 'welcome',
+        revision: workspace.sources[0].revision,
+        newWorker: false
+      }
+    );
+    workspace = nativeWorkspace(project);
+    createNativeCapability(
+      project,
+      'support',
+      'python',
+      'resources',
+      'guide',
+      '',
+      {
+        worker: 'documents',
+        revision: workspace.sources[0].revision,
+        newWorker: true
+      }
+    );
+    workspace = nativeWorkspace(project);
+    expect(Object.keys(workspace.sources[0].manifest!.workers)).toEqual([
+      'main',
+      'documents'
+    ]);
+    const document = nativeDocument(project, 'support');
+    const file = readNativeFile(project, 'support', document.files[0]);
+    const definition = workspace.sources[0].manifest!.tools[0];
+    expect(() =>
+      updateNativeDefinition(
+        project,
+        'support',
+        'tools',
+        'lookup',
+        { ...definition, description: 'stale' },
+        'wrong'
+      )
+    ).toThrow('changed on disk');
+    const updated = updateNativeDefinition(
+      project,
+      'support',
+      'tools',
+      'lookup',
+      { ...definition, description: 'Updated' },
+      file.revision
+    );
+    expect(JSON.parse(updated.content).tools[0].description).toBe('Updated');
+    setCapabilityEnabled(project, 'support', 'tools', 'lookup', false);
+    expect(() =>
+      updateNativeDefinition(
+        project,
+        'support',
+        'tools',
+        'lookup',
+        { ...definition, name: 'renamed' },
+        updated.revision
+      )
+    ).toThrow('Enable this capability');
+    const config = JSON.parse(
+      readFileSync(join(root, 'forge.project.json'), 'utf8')
+    );
+    const opened = await manager.open(project.id, root, config.sources);
+    expect(opened.status).toBe('ready');
+    expect(opened.sources[0].catalog.tools).toEqual([]);
+    expect(
+      opened.sources[0].catalog.resources.map((item) => item.name)
+    ).toEqual(['guide']);
+    await expect(
+      manager.invoke(project.id, opened.generation, 'support', {
+        kind: 'tool',
+        name: 'lookup',
+        arguments: { name: 'Test' }
+      })
+    ).rejects.toThrow('disabled or not exposed');
+    const prompt = (await manager.invoke(
+      project.id,
+      opened.generation,
+      'support',
+      { kind: 'prompt', name: 'welcome', arguments: { name: 'Test' } }
+    )) as any;
+    expect(prompt.messages[0].content.text).toBe('Welcome Test');
+    setCapabilityEnabled(project, 'support', 'tools', 'lookup', true);
+    expect(nativeWorkspace(project).sources[0].source).toMatchObject({
+      disabledCapabilities: []
+    });
+  } finally {
+    await manager.close();
+    close();
+  }
+}, 30_000);

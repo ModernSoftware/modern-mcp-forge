@@ -31,19 +31,19 @@ same runtime.
 
 ## ✨ Highlights
 
-| | Capability |
-| --- | --- |
-| 🗂️ | **Multi-project workspace** with portable, Git-friendly `forge.project.json` manifests |
-| 🧰 | **Visual authoring** for MCP Tools, Resources, and Prompts |
-| 🟨 | **Bun Tool execution** through the Forge Tool ABI |
-| 🟩 | **Node.js Tool execution** using the same ABI |
-| 🐍 | **Python Tool execution** using the same ABI |
-| 🧠 | **Monaco-powered editing** for Tool source, Resources, Prompts, and advanced JSON Schema |
-| 🧪 | **Execution history and diagnostics** stored locally in SQLite |
-| 🌐 | **Streamable HTTP MCP transport** at `/mcp` |
-| 🖥️ | **stdio MCP transport** with explicit project selection |
-| 🌗 | **Light and dark themes** with a local-first desktop-style workflow |
-| ✅ | **Automated verification** across Windows, macOS, and Linux |
+|     | Capability                                                                               |
+| --- | ---------------------------------------------------------------------------------------- |
+| 🗂️  | **Multi-project workspace** with portable, Git-friendly `forge.project.json` manifests   |
+| 🧰  | **Visual authoring** for MCP Tools, Resources, and Prompts                               |
+| 🟨  | **Bun Tool execution** through the Forge Tool ABI                                        |
+| 🟩  | **Node.js Tool execution** using the same ABI                                            |
+| 🐍  | **Python Tool execution** using the same ABI                                             |
+| 🧠  | **Monaco-powered editing** for Tool source, Resources, Prompts, and advanced JSON Schema |
+| 🧪  | **Execution history and diagnostics** stored locally in SQLite                           |
+| 🌐  | **Streamable HTTP MCP transport** at `/mcp`                                              |
+| 🖥️  | **stdio MCP transport** with explicit project selection                                  |
+| 🌗  | **Light and dark themes** with a local-first desktop-style workflow                      |
+| ✅  | **Automated verification** across Windows, macOS, and Linux                              |
 
 ## 🧭 How it fits together
 
@@ -242,6 +242,6 @@ sharing feedback during the 0.9 public beta.
 
 </div>
 
-## v0.10.0 native MCPack preview
+## v0.10.0 project workspace
 
-Open, edit, restart, and test native MCPack projects with the same files used for standalone deployment. See [the setup and integration guide](docs/mcpack.md). Forge includes the published MCPack 0.9.0 package from npm. A local checkout override remains available for maintainer testing.
+Open a recent project, choose **Add capability**, then create a native Node or Python tool, resource or prompt. Edit its definition and handler, test it, and manage sources from Configuration. The same native files run with standalone MCPack. See [native authoring](docs/native-authoring.md) and [the setup guide](docs/mcpack.md). Forge includes the published MCPack 0.9.0 package from npm. A local checkout override remains available for maintainer testing.

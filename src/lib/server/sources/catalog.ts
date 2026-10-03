@@ -25,7 +25,9 @@ export function projectCatalog(
         const running = snapshot.sources[index];
         return Object.entries(definition).every(
           ([key, value]) =>
-            (running as unknown as Record<string, unknown>)[key] === value
+            JSON.stringify(
+              (running as unknown as Record<string, unknown>)[key]
+            ) === JSON.stringify(value)
         );
       });
     if (!same)
