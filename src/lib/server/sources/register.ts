@@ -32,7 +32,18 @@ export function registerNativeSources(
       server.registerTool(
         tool.name,
         {
+          title: tool.title,
           description: tool.description,
+          annotations: tool.annotations,
+          icons: tool.icons,
+          _meta: tool._meta,
+          ...(tool.outputSchema
+            ? {
+                outputSchema: fromJsonSchema<Record<string, unknown>>(
+                  tool.outputSchema as Parameters<typeof fromJsonSchema>[0]
+                )
+              }
+            : {}),
           inputSchema: fromJsonSchema<Record<string, unknown>>(
             tool.inputSchema as Parameters<typeof fromJsonSchema>[0]
           )
@@ -51,6 +62,7 @@ export function registerNativeSources(
         resource.name,
         resource.uri,
         {
+          title: resource.title,
           description: resource.description,
           mimeType: resource.mimeType
         },
@@ -74,7 +86,11 @@ export function registerNativeSources(
       }
       server.registerPrompt(
         prompt.name,
-        { description: prompt.description, argsSchema: z.object(shape) },
+        {
+          title: prompt.title,
+          description: prompt.description,
+          argsSchema: z.object(shape)
+        },
         async (args, context) =>
           (await invoke(
             'prompt',

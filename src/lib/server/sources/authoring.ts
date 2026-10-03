@@ -456,3 +456,39 @@ export function setCapabilityEnabled(
   if (!enabled) source.disabledCapabilities.push({ kind, name });
   atomicWrite(projectFile(project), JSON.stringify(manifest, null, 2) + '\n');
 }
+
+export function saveExternalSource(
+  project: RegisteredProject,
+  input: unknown,
+  create: boolean
+) {
+  const source = ProjectSourceSchema.parse(input);
+  if (source.kind !== 'external')
+    throw new NativeProjectError('Expected an external source.');
+  const manifest = configuration(project);
+  const sources = manifest.sources ?? [];
+  const index = sources.findIndex((entry) => entry.id === source.id);
+  if (create && index !== -1)
+    throw new NativeProjectError('Source ID already exists.');
+  if (!create && (index === -1 || sources[index].kind !== 'external'))
+    throw new NativeProjectError('External source not found.');
+  if (create) sources.push(source);
+  else sources[index] = source;
+  manifest.sources = ProjectSourcesSchema.parse(sources);
+  atomicWrite(projectFile(project), JSON.stringify(manifest, null, 2) + '\n');
+}
+
+export function changeExternalSource(
+  project: RegisteredProject,
+  id: string,
+  action: 'enable' | 'disable' | 'remove'
+) {
+  const manifest = configuration(project);
+  const source = manifest.sources?.find((entry) => entry.id === id);
+  if (!source || source.kind !== 'external')
+    throw new NativeProjectError('External source not found.');
+  if (action === 'remove')
+    manifest.sources = manifest.sources!.filter((entry) => entry.id !== id);
+  else source.enabled = action === 'enable';
+  atomicWrite(projectFile(project), JSON.stringify(manifest, null, 2) + '\n');
+}

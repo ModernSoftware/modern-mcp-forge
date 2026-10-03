@@ -39,7 +39,12 @@
   let rows = $derived(
     data.sources.flatMap((entry) =>
       (['tools', 'resources', 'prompts'] as const).flatMap((category) =>
-        (entry.manifest?.[category] ?? []).map((definition) => ({
+        (entry.source.kind === 'external'
+          ? (data.snapshot.sources.find(
+              (source) => source.id === entry.source.id
+            )?.catalog[category] ?? [])
+          : (entry.manifest?.[category] ?? [])
+        ).map((definition) => ({
           definition,
           category,
           source: entry.source
@@ -83,8 +88,8 @@
       ></select
     ></label
   >
-  <button disabled title="External server connections are a subsequent step"
-    >Connect external server · Soon</button
+  <a class="secondary-button" href="/workspace/connect"
+    >Connect external server</a
   >
   <button disabled title="Native-only export is a subsequent step"
     >Export native · Soon</button
@@ -122,7 +127,11 @@
       )}
     <article class="workflow-row">
       <div>
-        <span class="source-badge">Native</span>
+        <span
+          class="source-badge"
+          class:external={row.source.kind === 'external'}
+          >{row.source.kind === 'external' ? 'External' : 'Native'}</span
+        >
         <span class="workflow-muted"
           >{row.category} · {row.source.id}{!row.source.enabled
             ? ' · Disabled source'
@@ -132,26 +141,32 @@
         >
         <h2>
           <a
-            href={`/workspace/native/${encodeURIComponent(row.source.id)}/${row.category}/${encodeURIComponent(row.definition.name)}`}
+            href={row.source.kind === 'external'
+              ? `/project/external/${encodeURIComponent(row.source.id)}`
+              : `/workspace/native/${encodeURIComponent(row.source.id)}/${row.category}/${encodeURIComponent(row.definition.name)}`}
             >{row.definition.name}</a
           >
         </h2>
         <p>{row.definition.description || 'No description yet.'}</p>
       </div>
       <div class="workflow-toolbar">
-        <button
-          disabled={busy}
-          onclick={() =>
-            toggle(
-              row.source.id,
-              row.category,
-              row.definition.name,
-              Boolean(disabled)
-            )}>{disabled ? 'Enable' : 'Disable'}</button
-        ><a
+        {#if row.source.kind === 'native'}<button
+            disabled={busy}
+            onclick={() =>
+              toggle(
+                row.source.id,
+                row.category,
+                row.definition.name,
+                Boolean(disabled)
+              )}>{disabled ? 'Enable' : 'Disable'}</button
+          >{/if}<a
           class="secondary-button"
-          href={`/workspace/native/${encodeURIComponent(row.source.id)}/${row.category}/${encodeURIComponent(row.definition.name)}`}
-          >Edit details</a
+          href={row.source.kind === 'external'
+            ? `/project/external/${encodeURIComponent(row.source.id)}`
+            : `/workspace/native/${encodeURIComponent(row.source.id)}/${row.category}/${encodeURIComponent(row.definition.name)}`}
+          >{row.source.kind === 'external'
+            ? 'Inspect & test'
+            : 'Edit details'}</a
         >
       </div>
     </article>
@@ -176,3 +191,10 @@
   <a href="/project">Configure sources and inspect workers</a>. Reconnect
   clients after changing definitions.
 </p>
+
+<style>
+  .source-badge.external {
+    color: var(--teal);
+    background: color-mix(in srgb, var(--teal) 12%, transparent);
+  }
+</style>

@@ -110,9 +110,14 @@
               void action({ action: 'remove', id: source.id });
           }}>Detach</button
         >
+      {:else if source.kind === 'external'}
+        <a href={`/project/external/${encodeURIComponent(source.id)}`}
+          >Connection &amp; catalog</a
+        >
       {/if}
     </div>
   {/each}
+  <p><a href="/workspace/connect">Connect external server</a></p>
   <form
     onsubmit={(event) => {
       event.preventDefault();
