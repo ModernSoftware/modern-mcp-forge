@@ -292,6 +292,111 @@ test('project native authoring exposes Node and Python over HTTP and recovers af
         })
       ).body.snapshot.status
     ).toBe('ready');
+
+    const createdCapability = await action({
+      action: 'create-capability',
+      id: 'orders',
+      runtime: 'node',
+      kind: 'tools',
+      name: 'lookup_order',
+      description: 'Find an order'
+    });
+    expect(createdCapability.body.snapshot.status).toBe('ready');
+    for (const path of [
+      '/workspace',
+      '/workspace/new',
+      '/workspace/native/orders/tools/lookup_order',
+      '/project'
+    ]) {
+      expect((await fetch(base + path)).status).toBe(200);
+    }
+    for (const kind of ['tools', 'resources', 'prompts']) {
+      const redirected = await fetch(`${base}/${kind}/new`, {
+        redirect: 'manual'
+      });
+      expect(redirected.headers.get('location')).toBe(
+        `/workspace/new?kind=${kind}`
+      );
+    }
+    const workspace = await (await fetch(base + '/workspace')).text();
+    expect(workspace).toContain('lookup_order');
+    expect(workspace).toContain('legacy definitions');
+    expect(workspace).not.toContain('href="/mcpack"');
+    const disableCapability = await action({
+      action: 'set-capability-enabled',
+      id: 'orders',
+      kind: 'tools',
+      name: 'lookup_order',
+      enabled: false
+    });
+    expect(disableCapability.body.snapshot.status).toBe('ready');
+    const withoutDisabled = await connect();
+    expect(
+      (await withoutDisabled.listTools()).tools.some(
+        (item) => item.name === 'lookup_order'
+      )
+    ).toBe(false);
+    expect(
+      (
+        await action({
+          action: 'invoke',
+          id: 'orders',
+          kind: 'tool',
+          name: 'lookup_order',
+          arguments: { name: 'test' }
+        })
+      ).status
+    ).toBe(400);
+    await action({
+      action: 'set-capability-enabled',
+      id: 'orders',
+      kind: 'tools',
+      name: 'lookup_order',
+      enabled: true
+    });
+    const definitionFile = (
+      await action({
+        action: 'read',
+        id: 'orders',
+        path: 'native/orders/mcpack.json',
+        generation: undefined
+      })
+    ).body.file;
+    const definition = JSON.parse(definitionFile.content).tools[0];
+    const edited = await action({
+      action: 'update-definition',
+      id: 'orders',
+      kind: 'tools',
+      originalName: 'lookup_order',
+      revision: definitionFile.revision,
+      definition: {
+        ...definition,
+        name: 'find_order',
+        description: 'Updated description'
+      }
+    });
+    expect(edited.body.snapshot.status).toBe('ready');
+    const afterEdit = await connect();
+    expect(
+      (await afterEdit.listTools()).tools.find(
+        (item) => item.name === 'find_order'
+      )?.description
+    ).toBe('Updated description');
+    expect(
+      (
+        await afterEdit.callTool({
+          name: 'find_order',
+          arguments: { name: 'Diego' }
+        })
+      ).content
+    ).toEqual([{ type: 'text', text: 'Hello, Diego!' }]);
+    await post('projects/close', {});
+    expect((await fetch(base + '/mcp')).status).toBe(503);
+    expect(
+      (await fetch(base + '/workspace', { redirect: 'manual' })).headers.get(
+        'location'
+      )
+    ).toBe('/projects');
   } finally {
     for (const client of clients) await client.close().catch(() => {});
     const sources = await server.ssrLoadModule(

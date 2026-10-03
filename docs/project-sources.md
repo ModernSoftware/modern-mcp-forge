@@ -2,8 +2,7 @@
 
 Project sources provide persisted definitions and runtime ownership for regular
 Forge projects. Native authoring and combined classic/native HTTP exposure are
-available; see [Native authoring](native-authoring.md). The standalone preview
-continues to work.
+available; see [Native authoring](native-authoring.md). The unified workspace replaces the standalone preview.
 
 ## Configuration
 
@@ -70,8 +69,7 @@ transition. A side effect may already have occurred: rejection does not authoriz
 retrying a write.
 
 Create/open/activate starts configured sources. Switching projects, closing,
-forgetting the active project, and selecting the standalone native preview close
-the old sources. Partial startup rolls back all started adapters and clears their
+forgetting the active project close the old sources. Partial startup rolls back all started adapters and clears their
 catalogs. A cleanup failure retains failed owners for retry and prevents invocation.
 
 The owner survives Vite module reloads. After a Forge process restart, remembered
@@ -100,4 +98,17 @@ Tests cover legacy manifests, invalid and duplicate definitions, disabled adapte
 startup rollback, retryable cleanup failures, concurrent transitions, cancellation
 signal forwarding, stale results, isolated Node/Python workers, symlink boundaries,
 manifest-authoring preservation and real HTTP project transitions. Existing classic
-and native-preview tests continue to run. This work targets `v0.10.0`, not `main`.
+tests and native HTTP integration tests continue to run. This work targets `v0.10.0`, not `main`.
+
+## Capability exposure
+
+A native source may include `disabledCapabilities`, for example:
+
+```json
+"disabledCapabilities": [{ "kind": "tools", "name": "lookup_order" }]
+```
+
+These are Forge exposure settings, separate from the MCPack manifest. Disabling a
+capability filters discovery and rejects direct invocation through Forge. It does
+not stop a worker shared by other capabilities. Reconnect clients after changing
+exposure. Deployment/export semantics will be handled in the native export slice.

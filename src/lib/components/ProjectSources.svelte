@@ -9,8 +9,6 @@
     catalogError?: string;
   }>();
   let id = $state('');
-  let mode = $state('create');
-  let runtime = $state('node');
   let manifest = $state('');
   let busy = $state(false);
   let error = $state('');
@@ -65,7 +63,7 @@
   <div class="heading">
     <div>
       <div class="eyebrow">PROJECT SOURCES</div>
-      <h2>Native MCPack</h2>
+      <h2>Sources</h2>
     </div>
     <button disabled={busy} onclick={reload}>Reload sources</button>
   </div>
@@ -118,14 +116,14 @@
   <form
     onsubmit={(event) => {
       event.preventDefault();
-      void action(
-        mode === 'create'
-          ? { action: 'create', id, runtime }
-          : { action: 'attach', id, manifest }
-      );
+      void action({ action: 'attach', id, manifest });
     }}
   >
-    <h3>Add native source</h3>
+    <h3>Attach an existing native source</h3>
+    <p>
+      To create new capabilities, use <a href="/workspace/new">Add capability</a
+      > in the workspace.
+    </p>
     <div class="fields">
       <label
         >Source ID<input
@@ -137,36 +135,19 @@
         /></label
       >
       <label
-        >Source<select bind:value={mode} disabled={busy}
-          ><option value="create">Create starter</option><option value="attach"
-            >Attach existing manifest</option
-          ></select
-        ></label
+        >Manifest path<input
+          bind:value={manifest}
+          required
+          disabled={busy}
+          placeholder="native/support/mcpack.json"
+        /></label
       >
-      {#if mode === 'create'}
-        <label
-          >Runtime<select bind:value={runtime} disabled={busy}
-            ><option value="node">Node</option><option value="python"
-              >Python</option
-            ></select
-          ></label
-        >
-      {:else}
-        <label
-          >Manifest path<input
-            bind:value={manifest}
-            required
-            disabled={busy}
-            placeholder="native/support/mcpack.json"
-          /></label
-        >
-      {/if}
       <button disabled={busy}>{busy ? 'Working…' : 'Add source'}</button>
     </div>
     <p class="note">
-      Creating adds one tool, resource and prompt under
-      native/&lt;source-id&gt;. Attaching uses a project-relative manifest. Both
-      start trusted local code.
+      Use a project-relative manifest. Attaching starts trusted local code.
+      Disabling a source stops its workers and removes its capabilities from
+      discovery.
     </p>
   </form>
 </section>
@@ -217,7 +198,6 @@
     font-size: 0.8rem;
   }
   input,
-  select,
   button {
     min-width: 0;
     padding: 10px;

@@ -1,30 +1,20 @@
-import {
-  redirect,
-  type Handle
-} from '@sveltejs/kit';
+import { redirect, type Handle } from '@sveltejs/kit';
 
 import { hasActiveProject } from '$lib/server/project/loader';
-
-import { nativeProjects } from '$lib/server/mcpack/session';
 
 const projectPagePrefixes = [
   '/tools',
   '/resources',
   '/prompts',
-  '/executions'
+  '/executions',
+  '/workspace',
+  '/project/'
 ];
 
-const projectApiPrefixes = [
-  '/api/project/',
-  '/api/tools/'
-];
+const projectApiPrefixes = ['/api/project/', '/api/tools/'];
 
 export const handle: Handle = async ({ event, resolve }) => {
   const pathname = event.url.pathname;
-
-  if (pathname === '/mcp' && nativeProjects.selected()) {
-    return resolve(event);
-  }
 
   if (hasActiveProject()) {
     return resolve(event);
@@ -60,11 +50,11 @@ export const handle: Handle = async ({ event, resolve }) => {
     );
   }
 
-  if (projectPagePrefixes.some((prefix) => pathname.startsWith(prefix))) {
-    throw redirect(
-      303,
-      '/projects'
-    );
+  if (
+    pathname === '/project' ||
+    projectPagePrefixes.some((prefix) => pathname.startsWith(prefix))
+  ) {
+    throw redirect(303, '/projects');
   }
 
   return resolve(event);

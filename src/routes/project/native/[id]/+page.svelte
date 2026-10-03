@@ -1,4 +1,9 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
+  import {
+    registerProjectLeaveGuard,
+    canLeaveProject
+  } from '$lib/navigation/project-leave';
   import { beforeNavigate, invalidateAll } from '$app/navigation';
   import MonacoEditor from '$lib/components/MonacoEditor.svelte';
   import NativeDefinitionEditor from '$lib/components/NativeDefinitionEditor.svelte';
@@ -38,10 +43,15 @@
       error = '';
     }
   });
+  onMount(() =>
+    registerProjectLeaveGuard(
+      () => !busy && (!dirty || window.confirm('Discard unsaved changes?'))
+    )
+  );
   beforeNavigate((navigation) => {
-    if (busy || (dirty && !window.confirm('Discard unsaved native changes?')))
-      navigation.cancel();
+    if (!canLeaveProject()) navigation.cancel();
   });
+
   async function request(body: object) {
     const response = await fetch('/api/project/native', {
       method: 'POST',
@@ -183,8 +193,8 @@
         >
       </div>
     {:else}<p>
-        Select a manifest or worker module. New sources include editable
-        examples of all three capability types.
+        Select a manifest or worker module. Definitions and handler files remain
+        editable even when a source cannot start.
       </p>{/if}
     <p class="note">
       Compile TypeScript before reloading. Configure extra workers in the

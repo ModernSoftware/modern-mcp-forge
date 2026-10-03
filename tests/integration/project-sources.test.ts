@@ -18,19 +18,39 @@ const definition = (id: string) => ({
 const empty = { tools: [], resources: [], prompts: [] };
 
 test('sources preserve legacy manifests and reject ambiguous or unsafe descriptors', () => {
-  expect(ForgeProjectManifestSchema.parse(createManifest()).sources).toBeUndefined();
-  expect(ProjectSourcesSchema.safeParse([definition('a'), definition('a')]).success).toBe(false);
-  for (const manifest of ['../mcpack.json', '/tmp/mcpack.json', 'C:\\repo\\mcpack.json']) {
-    expect(ProjectSourcesSchema.safeParse([{ ...definition('a'), manifest }]).success).toBe(false);
+  expect(
+    ForgeProjectManifestSchema.parse(createManifest()).sources
+  ).toBeUndefined();
+  expect(
+    ProjectSourcesSchema.safeParse([definition('a'), definition('a')]).success
+  ).toBe(false);
+  for (const manifest of [
+    '../mcpack.json',
+    '/tmp/mcpack.json',
+    'C:\\repo\\mcpack.json'
+  ]) {
+    expect(
+      ProjectSourcesSchema.safeParse([{ ...definition('a'), manifest }]).success
+    ).toBe(false);
   }
   expect(
     ProjectSourcesSchema.safeParse([
-      { id: 'remote', kind: 'external', enabled: true, url: 'https://example.com/mcp' }
+      {
+        id: 'remote',
+        kind: 'external',
+        enabled: true,
+        url: 'https://example.com/mcp'
+      }
     ]).success
   ).toBe(false);
   expect(
     ProjectSourcesSchema.safeParse([
-      { id: 'remote', kind: 'external', enabled: false, url: 'https://user:secret@example.com/mcp' }
+      {
+        id: 'remote',
+        kind: 'external',
+        enabled: false,
+        url: 'https://user:secret@example.com/mcp'
+      }
     ]).success
   ).toBe(false);
 });
@@ -56,12 +76,19 @@ test('partial startup rolls back all adapters, including the failing one', async
       }
     })
   );
-  const failed = await manager.open('one', '.', [definition('good'), definition('broken')]);
+  const failed = await manager.open('one', '.', [
+    definition('good'),
+    definition('broken')
+  ]);
   expect(failed.error).toBe('deliberate failure');
   expect(failed.status).toBe('failed');
   expect(closed.sort()).toEqual(['broken', 'good']);
-  expect(failed.sources.every((source) => source.catalog.tools.length === 0)).toBe(true);
-  expect((await manager.open('two', '.', [definition('good')])).status).toBe('ready');
+  expect(
+    failed.sources.every((source) => source.catalog.tools.length === 0)
+  ).toBe(true);
+  expect((await manager.open('two', '.', [definition('good')])).status).toBe(
+    'ready'
+  );
   await manager.close();
 });
 
@@ -73,7 +100,10 @@ test('close invalidates in-flight results and failed cleanup retains ownership f
   const manager = new ProjectSourceManager(() => ({
     async start() {},
     async discover() {
-      return empty;
+      return {
+        ...empty,
+        tools: [{ name: 'x', inputSchema: { type: 'object' } }]
+      };
     },
     invoke(call) {
       expect(call.signal).toBe(controller.signal);
@@ -90,7 +120,12 @@ test('close invalidates in-flight results and failed cleanup retains ownership f
     }
   }));
   const opened = await manager.open('one', '.', [definition('a')]);
-  const call = { kind: 'tool' as const, name: 'x', arguments: {}, signal: controller.signal };
+  const call = {
+    kind: 'tool' as const,
+    name: 'x',
+    arguments: {},
+    signal: controller.signal
+  };
   const pending = manager.invoke('one', opened.generation, 'a', call);
   const outcome = pending.then(
     () => null,
@@ -98,7 +133,9 @@ test('close invalidates in-flight results and failed cleanup retains ownership f
   );
   await expect(manager.close()).rejects.toThrow('cleanup failed');
   const failed = manager.snapshot();
-  await expect(manager.invoke('one', failed.generation, 'a', call)).rejects.toThrow('not ready');
+  await expect(
+    manager.invoke('one', failed.generation, 'a', call)
+  ).rejects.toThrow('not ready');
   finish('obsolete result');
   expect((await outcome)?.message).toContain('changed');
   failClose = false;
@@ -125,7 +162,10 @@ test('queued transitions complete in order and disabled sources never launch', a
     }
   }));
   await Promise.all([
-    manager.open('one', '.', [definition('a'), { ...definition('disabled'), enabled: false }]),
+    manager.open('one', '.', [
+      definition('a'),
+      { ...definition('disabled'), enabled: false }
+    ]),
     manager.open('two', '.', [definition('b')]),
     manager.close()
   ]);
@@ -138,12 +178,27 @@ test('native sources isolate state and reject manifest symlinks outside the proj
   const outside = await mkdtemp(join(tmpdir(), 'forge-source-outside-'));
   const manager = new ProjectSourceManager();
   try {
-    const example = join(dirname(dirname(installedMCPackCli())), 'examples', 'mixed');
-    for (const id of ['a', 'b']) await cp(example, join(root, id), { recursive: true });
-    const opened = await manager.open('one', root, [definition('a'), definition('b')]);
+    const example = join(
+      dirname(dirname(installedMCPackCli())),
+      'examples',
+      'mixed'
+    );
+    for (const id of ['a', 'b'])
+      await cp(example, join(root, id), { recursive: true });
+    const opened = await manager.open('one', root, [
+      definition('a'),
+      definition('b')
+    ]);
     expect(opened.error).toBeUndefined();
-    expect(opened.sources.map((source) => source.status)).toEqual(['ready', 'ready']);
-    const call = { kind: 'tool' as const, name: 'summarize', arguments: { values: [1, 2] } };
+    expect(opened.sources.map((source) => source.status)).toEqual([
+      'ready',
+      'ready'
+    ]);
+    const call = {
+      kind: 'tool' as const,
+      name: 'summarize',
+      arguments: { values: [1, 2] }
+    };
     const invoke = (source: string) =>
       manager.invoke('one', opened.generation, source, call) as Promise<any>;
     const a = await invoke('a');
@@ -154,12 +209,26 @@ test('native sources isolate state and reject manifest symlinks outside the proj
     await manager.open('two', root, []);
     await expect(invoke('a')).rejects.toThrow('changed');
     await cp(example, outside, { recursive: true });
-    await symlink(outside, join(root, 'escape'), process.platform === 'win32' ? 'junction' : 'dir');
+    await symlink(
+      outside,
+      join(root, 'escape'),
+      process.platform === 'win32' ? 'junction' : 'dir'
+    );
     const rejected = await manager.open('three', root, [definition('escape')]);
     expect(rejected.error).toContain('inside the project');
   } finally {
     await manager.close();
-    await rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
-    await rm(outside, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+    await rm(root, {
+      recursive: true,
+      force: true,
+      maxRetries: 5,
+      retryDelay: 100
+    });
+    await rm(outside, {
+      recursive: true,
+      force: true,
+      maxRetries: 5,
+      retryDelay: 100
+    });
   }
 }, 30_000);
