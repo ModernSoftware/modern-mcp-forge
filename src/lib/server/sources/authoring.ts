@@ -15,7 +15,7 @@ import { ForgeProjectManifestSchema } from '../project/schema';
 import { NativeProjectError } from '../mcpack/session';
 import type { RegisteredProject } from '../projects/project-service';
 import { ProjectSourceSchema, ProjectSourcesSchema } from './schema';
-import { nativeStarter } from './starter';
+import { nativeStarter, capabilityStarter } from './starter';
 
 const MAX_BYTES = 256 * 1024;
 const digest = (content: string) =>
@@ -297,7 +297,7 @@ export function createNativeCapability(
     throw new NativeProjectError(
       'This capability name already exists in the project.'
     );
-  const starter = nativeStarter(id, runtime);
+  const starter = capabilityStarter(id, runtime, kind, name);
   const definition = { ...starter.manifest[kind][0], name, description };
   if (kind === 'resources')
     Object.assign(definition, { uri: `mcpack://${id}/${name}` });
@@ -358,7 +358,7 @@ export function createNativeCapability(
     [kind]: [definition]
   };
   ManifestSchema.parse(manifest);
-  // Keep the factory's internal handlers; only the requested definition is exposed.
+  // New authoring emits only the requested handler; demonstration sources are separate.
   createNativeSource(project, id, runtime, {
     ...starter,
     manifest
@@ -454,5 +454,41 @@ export function setCapabilityEnabled(
     (entry) => entry.kind !== kind || entry.name !== name
   );
   if (!enabled) source.disabledCapabilities.push({ kind, name });
+  atomicWrite(projectFile(project), JSON.stringify(manifest, null, 2) + '\n');
+}
+
+export function saveExternalSource(
+  project: RegisteredProject,
+  input: unknown,
+  create: boolean
+) {
+  const source = ProjectSourceSchema.parse(input);
+  if (source.kind !== 'external')
+    throw new NativeProjectError('Expected an external source.');
+  const manifest = configuration(project);
+  const sources = manifest.sources ?? [];
+  const index = sources.findIndex((entry) => entry.id === source.id);
+  if (create && index !== -1)
+    throw new NativeProjectError('Source ID already exists.');
+  if (!create && (index === -1 || sources[index].kind !== 'external'))
+    throw new NativeProjectError('External source not found.');
+  if (create) sources.push(source);
+  else sources[index] = source;
+  manifest.sources = ProjectSourcesSchema.parse(sources);
+  atomicWrite(projectFile(project), JSON.stringify(manifest, null, 2) + '\n');
+}
+
+export function changeExternalSource(
+  project: RegisteredProject,
+  id: string,
+  action: 'enable' | 'disable' | 'remove'
+) {
+  const manifest = configuration(project);
+  const source = manifest.sources?.find((entry) => entry.id === id);
+  if (!source || source.kind !== 'external')
+    throw new NativeProjectError('External source not found.');
+  if (action === 'remove')
+    manifest.sources = manifest.sources!.filter((entry) => entry.id !== id);
+  else source.enabled = action === 'enable';
   atomicWrite(projectFile(project), JSON.stringify(manifest, null, 2) + '\n');
 }

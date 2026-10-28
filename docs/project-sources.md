@@ -49,16 +49,18 @@ Reserved descriptors for later adapters:
 ]
 ```
 
-Bridge and external descriptors **must stay disabled**. They neither execute code
-nor connect to URLs. Enabling them is rejected. Authentication, bridge dispatch,
-and connection options will be specified with those implementations. External URL
-credentials, query strings and fragments are rejected at this stage.
+Bridge descriptors **must stay disabled** until bridge dispatch is implemented.
+External descriptors now support Streamable HTTP and optional bearer credentials
+through an environment-variable reference; see [External sources](external-sources.md).
+External URL credentials, query strings and fragments are rejected.
+The disabled external example above can be enabled when its server is available.
 
 ## Ownership and failure behavior
 
 Each enabled native source owns a separate MCPack CLI process and worker set.
 Catalogs remain keyed by source ID, so identical upstream names can coexist
 internally. The combined endpoint rejects duplicate tool/prompt names, resource names and URIs.
+External capability names and URIs are automatically namespaced by connection ID.
 Explicit aliases are future work.
 
 The adapter contract covers start, discovery, invocation with cancellation, health,

@@ -42,7 +42,7 @@ test('sources preserve legacy manifests and reject ambiguous or unsafe descripto
         url: 'https://example.com/mcp'
       }
     ]).success
-  ).toBe(false);
+  ).toBe(true);
   expect(
     ProjectSourcesSchema.safeParse([
       {

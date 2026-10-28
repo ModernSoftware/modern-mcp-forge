@@ -78,7 +78,8 @@ To migrate deliberately, create a native definition, port its handler signature 
 result format, test it, then disable the old classic definition. Existing classic
 files are not directly deployable with MCPack merely by attaching them.
 
-MCPack deployment remains native-only. External/bridge adapters, OAuth, export and
+MCPack deployment remains native-only. [External MCP connections](external-sources.md)
+are available in the project workspace. Bridge adapters, OAuth, export and
 folder editing are later steps. The management API uses Forge's existing local
 Host/Origin guards. Keep the authoring service on your local development machine.
 
