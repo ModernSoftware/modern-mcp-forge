@@ -21,6 +21,14 @@ Target branch: `v0.10.0`. Unified workspace merged in PR #16; external source in
 3. Native-only export and dependency handling; improved runtime telemetry and supported controls.
 4. End-to-end mixed-source testing, documentation and release review.
 
+## UX review follow-up
+
+The 28 October recording and tracked fixes are summarized in
+[UX review and implementation plan](reviews/2026-10-28-ux-plan.md).
+Native item editing now keeps Definition, Code and Test together. Visual field
+edits save directly; new items generate a single named handler. PR #18 remains
+open for review on `feat/external-mcp-sources`.
+
 ## Continue in a fresh chat
 
 Use ModernSoftware/modern-mcp-forge, base v0.10.0, working branch

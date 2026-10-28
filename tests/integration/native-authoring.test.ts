@@ -252,6 +252,20 @@ test('workspace creates one capability, reuses workers, and preserves disabled d
         ''
       )
     ).toThrow('already exists');
+    // Existing-worker binding does not inject unrelated example handlers.
+    const moduleFile = join(root, 'native/support/handlers.mjs');
+    const initialCode = readFileSync(moduleFile, 'utf8');
+    expect(initialCode).toContain('lookup');
+    expect(initialCode).not.toContain('greet');
+    expect(initialCode).not.toContain('prompts:');
+    writeFileSync(
+      moduleFile,
+      initialCode.replace(
+        '    tools: {',
+        `    prompts: { welcome: async ({ name = 'Test' }) => ({ messages: [{ role: 'user', content: { type: 'text', text: 'Welcome ' + name } }] }) },
+    tools: {`
+      )
+    );
     createNativeCapability(
       project,
       'support',
@@ -338,13 +352,82 @@ test('workspace creates one capability, reuses workers, and preserves disabled d
       project.id,
       opened.generation,
       'support',
-      { kind: 'prompt', name: 'welcome', arguments: { name: 'Test' } }
+      { kind: 'prompt', name: 'welcome', arguments: {} }
     )) as any;
     expect(prompt.messages[0].content.text).toBe('Welcome Test');
     setCapabilityEnabled(project, 'support', 'tools', 'lookup', true);
     expect(nativeWorkspace(project).sources[0].source).toMatchObject({
       disabledCapabilities: []
     });
+  } finally {
+    await manager.close();
+    close();
+  }
+}, 30_000);
+
+test('single-capability starters use requested names for every kind and runtime', async () => {
+  const { createNativeCapability } =
+    await import('../../src/lib/server/sources/authoring');
+  const { project, root, close } = fixture();
+  const manager = new ProjectSourceManager();
+  try {
+    for (const runtime of ['node', 'python'] as const) {
+      for (const kind of ['tools', 'resources', 'prompts'] as const) {
+        const id = `${runtime}_${kind}`;
+        // A Python keyword is a valid public MCP name; generated code must still load.
+        const name =
+          runtime === 'python' && kind === 'tools' ? 'class' : `${id}-example`;
+        createNativeCapability(
+          project,
+          id,
+          runtime,
+          kind,
+          name,
+          'User-created item'
+        );
+        const code = readFileSync(
+          join(
+            root,
+            `native/${id}/handlers.${runtime === 'node' ? 'mjs' : 'py'}`
+          ),
+          'utf8'
+        );
+        expect(code).toContain(name);
+        expect(code).not.toContain('greet');
+      }
+    }
+    const config = JSON.parse(
+      readFileSync(join(root, 'forge.project.json'), 'utf8')
+    );
+    const opened = await manager.open(project.id, root, config.sources);
+    expect(opened.status).toBe('ready');
+    for (const runtime of ['node', 'python'] as const) {
+      for (const kind of ['tools', 'resources', 'prompts'] as const) {
+        const id = `${runtime}_${kind}`;
+        const name =
+          runtime === 'python' && kind === 'tools' ? 'class' : `${id}-example`;
+        const result = (await manager.invoke(
+          project.id,
+          opened.generation,
+          id,
+          {
+            kind:
+              kind === 'tools'
+                ? 'tool'
+                : kind === 'resources'
+                  ? 'resource'
+                  : 'prompt',
+            name: kind === 'resources' ? `mcpack://${id}/${name}` : name,
+            arguments: {}
+          }
+        )) as any;
+        if (kind === 'tools') expect(result.isError).toBe(true);
+        if (kind === 'resources')
+          expect(result.contents[0].uri).toBe(`mcpack://${id}/${name}`);
+        if (kind === 'prompts')
+          expect(result.messages[0].content.text).toBe('Not implemented yet.');
+      }
+    }
   } finally {
     await manager.close();
     close();

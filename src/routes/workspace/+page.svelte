@@ -70,19 +70,25 @@
     <h1>{data.project.name}</h1>
     <p>Build, edit and test your project's MCP capabilities.</p>
   </div>
-  <a class="primary-button" href="/workspace/new">＋ Add capability</a>
+  <div class="workflow-toolbar" aria-label="Create native item">
+    <a class="primary-button" href="/workspace/new?kind=tools">＋ Add tool</a>
+    <a class="secondary-button" href="/workspace/new?kind=resources"
+      >Add resource</a
+    >
+    <a class="secondary-button" href="/workspace/new?kind=prompts">Add prompt</a
+    >
+  </div>
 </section>
 <div class="workflow-toolbar">
   <label
-    >Search capabilities<input
+    >Search tools, resources and prompts<input
       bind:value={search}
       placeholder="Name, description or source"
     /></label
   >
   <label
     >Show<select bind:value={kind}
-      ><option value="all">All capabilities</option><option value="tools"
-        >Tools</option
+      ><option value="all">All types</option><option value="tools">Tools</option
       ><option value="resources">Resources</option><option value="prompts"
         >Prompts</option
       ></select
@@ -166,7 +172,7 @@
             : `/workspace/native/${encodeURIComponent(row.source.id)}/${row.category}/${encodeURIComponent(row.definition.name)}`}
           >{row.source.kind === 'external'
             ? 'Inspect & test'
-            : 'Edit details'}</a
+            : 'Open editor'}</a
         >
       </div>
     </article>
@@ -174,7 +180,7 @@
       <h2>
         {rows.length
           ? 'No matching capabilities'
-          : 'Start with a native capability'}
+          : 'Add a tool, resource or prompt'}
       </h2>
       <p>
         {rows.length
@@ -182,7 +188,7 @@
           : 'Add a tool, resource or prompt backed by a Node or Python worker.'}
       </p>
       {#if !rows.length}<a class="primary-button" href="/workspace/new"
-          >Add your first capability</a
+          >Add your first tool</a
         >{/if}
     </div>{/each}
 </section>

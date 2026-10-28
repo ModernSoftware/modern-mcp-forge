@@ -15,7 +15,7 @@ import { ForgeProjectManifestSchema } from '../project/schema';
 import { NativeProjectError } from '../mcpack/session';
 import type { RegisteredProject } from '../projects/project-service';
 import { ProjectSourceSchema, ProjectSourcesSchema } from './schema';
-import { nativeStarter } from './starter';
+import { nativeStarter, capabilityStarter } from './starter';
 
 const MAX_BYTES = 256 * 1024;
 const digest = (content: string) =>
@@ -297,7 +297,7 @@ export function createNativeCapability(
     throw new NativeProjectError(
       'This capability name already exists in the project.'
     );
-  const starter = nativeStarter(id, runtime);
+  const starter = capabilityStarter(id, runtime, kind, name);
   const definition = { ...starter.manifest[kind][0], name, description };
   if (kind === 'resources')
     Object.assign(definition, { uri: `mcpack://${id}/${name}` });
@@ -358,7 +358,7 @@ export function createNativeCapability(
     [kind]: [definition]
   };
   ManifestSchema.parse(manifest);
-  // Keep the factory's internal handlers; only the requested definition is exposed.
+  // New authoring emits only the requested handler; demonstration sources are separate.
   createNativeSource(project, id, runtime, {
     ...starter,
     manifest

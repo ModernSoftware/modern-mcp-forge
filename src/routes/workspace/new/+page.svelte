@@ -3,7 +3,13 @@
   import { goto } from '$app/navigation';
   let { data } = $props();
   let kind = $state(untrack(() => data.initialKind));
+  let name = $state('');
   let sourceId = $state('');
+  let customSourceId = $state(false);
+  let effectiveSourceId = $derived(customSourceId ? sourceId : name);
+  let label = $derived(
+    kind === 'tools' ? 'tool' : kind === 'resources' ? 'resource' : 'prompt'
+  );
   let sourceChoice = $state('new');
   let workerChoice = $state('new');
   let workerId = $state('');
@@ -11,7 +17,6 @@
   let existing = $derived(
     data.sources.find((entry) => entry.source.id === sourceChoice)
   );
-  let name = $state('');
   let description = $state('');
   let runtime = $state('node');
   let busy = $state(false);
@@ -27,7 +32,7 @@
           action: 'create-capability',
           projectId: data.project.id,
           generation: data.snapshot.generation,
-          id: sourceChoice === 'new' ? sourceId : sourceChoice,
+          id: sourceChoice === 'new' ? effectiveSourceId : sourceChoice,
           name,
           description,
           kind,
@@ -46,7 +51,7 @@
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error);
       await goto(
-        `/workspace/native/${encodeURIComponent(sourceChoice === 'new' ? sourceId : sourceChoice)}/${kind}/${encodeURIComponent(name)}`,
+        `/workspace/native/${encodeURIComponent(sourceChoice === 'new' ? effectiveSourceId : sourceChoice)}/${kind}/${encodeURIComponent(name)}`,
         { invalidateAll: true }
       );
     } catch (failure) {
@@ -61,7 +66,7 @@
 <a href="/workspace">← Workspace</a>
 <section class="page-heading">
   <div>
-    <h1>Add a capability</h1>
+    <h1>Add a {label}</h1>
     <p>Create an editable native implementation in your project folder.</p>
   </div>
 </section>
@@ -81,7 +86,7 @@
     ></label
   >
   <label
-    >Capability<select aria-label="Capability" bind:value={kind} disabled={busy}
+    >Type<select aria-label="Capability" bind:value={kind} disabled={busy}
       ><option value="tools">Tool</option><option value="resources"
         >Resource</option
       ><option value="prompts">Prompt</option></select
@@ -100,11 +105,10 @@
     >Description<textarea
       bind:value={description}
       maxlength="4096"
-      disabled={busy}
-    ></textarea></label
+      disabled={busy}></textarea></label
   >
   <label
-    >Source<select
+    >Native source<select
       aria-label="Source"
       bind:value={sourceChoice}
       disabled={busy}
@@ -115,15 +119,28 @@
         >{/each}</select
     ></label
   >
+  <p class="workflow-muted">
+    A native source is a group of tools, resources and prompts backed by one
+    MCPack manifest. Reuse a source to keep related items together.
+  </p>
   {#if sourceChoice === 'new'}<label
-      >New source ID<input
-        bind:value={sourceId}
+      >Source ID<input
+        value={effectiveSourceId}
+        oninput={(event) => {
+          customSourceId = true;
+          sourceId = event.currentTarget.value;
+        }}
         required
         pattern={'[A-Za-z][A-Za-z0-9_-]{0,63}'}
         disabled={busy}
         placeholder="orders"
       /></label
-    >{:else}
+    >
+    <p class="workflow-muted">
+      Creates <code>native/{effectiveSourceId || 'source-id'}/mcpack.json</code> and
+      a worker module. The source ID identifies this group; it is not the handler
+      filename.
+    </p>{:else}
     <label
       >Worker<select
         aria-label="Worker"
@@ -164,11 +181,11 @@
       ></label
     >{/if}
   <p class="workflow-muted">
-    Creates one exposed capability. New workers include editable example
-    handlers. Configure the schema and implement your handler next; source
-    startup errors remain visible and repairable.
+    Tools, resources and prompts can all use native MCPack handlers. New workers
+    get only the selected item, named after it. Configure its definition,
+    implement its code, then test it in the editor.
   </p>
   <button class="primary-button" disabled={busy}
-    >{busy ? 'Creating…' : 'Create capability'}</button
+    >{busy ? 'Creating…' : `Create ${label}`}</button
   >
 </form>

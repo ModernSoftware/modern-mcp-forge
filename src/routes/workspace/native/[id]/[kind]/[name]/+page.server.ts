@@ -15,7 +15,27 @@ export const load: PageServerLoad = ({ params }) => {
     (item: { name: string }) => item.name === params.name
   );
   if (!definition) error(404, 'Capability not found.');
+  let handlerFile: ReturnType<typeof readNativeFile> | null = null;
+  let codeError = '';
+  try {
+    const worker = manifest.workers[definition.worker];
+    const directory = document.files[0].split('/').slice(0, -1).join('/');
+    const module = worker.module.replaceAll('\\', '/').replace(/^\.\//, '');
+    handlerFile = readNativeFile(
+      project,
+      params.id,
+      `${directory ? directory + '/' : ''}${module}`
+    );
+  } catch (failure) {
+    codeError = failure instanceof Error ? failure.message : String(failure);
+  }
   return {
+    disabled:
+      document.source.disabledCapabilities?.some(
+        (item) => item.kind === params.kind && item.name === params.name
+      ) ?? false,
+    handlerFile,
+    codeError,
     projectId: project.id,
     sourceId: params.id,
     kind: params.kind as 'tools' | 'resources' | 'prompts',

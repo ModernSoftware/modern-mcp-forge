@@ -383,13 +383,8 @@ test('project native authoring exposes Node and Python over HTTP and recovers af
       )?.description
     ).toBe('Updated description');
     expect(
-      (
-        await afterEdit.callTool({
-          name: 'find_order',
-          arguments: { name: 'Diego' }
-        })
-      ).content
-    ).toEqual([{ type: 'text', text: 'Hello, Diego!' }]);
+      await afterEdit.callTool({ name: 'find_order', arguments: {} })
+    ).toMatchObject({ isError: true });
     await post('projects/close', {});
     expect((await fetch(base + '/mcp')).status).toBe(503);
     expect(
