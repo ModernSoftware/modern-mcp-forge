@@ -6,7 +6,7 @@ export const load: PageServerLoad = ({ params }) => {
   const source = data.sources.find(
     (entry) => entry.source.id === params.id
   )?.source;
-  if (!source || source.kind !== 'external')
-    error(404, 'External source not found.');
+  if (!source || source.kind === 'native' || source.kind !== params.sourceKind)
+    error(404, 'Connection not found.');
   return { ...data, source };
 };

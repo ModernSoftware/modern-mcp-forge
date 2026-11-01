@@ -81,7 +81,7 @@
       <div>
         <strong>{source.id}</strong> · {source.kind} · {state?.status ??
           'stopped'}
-        {#if source.kind === 'external' && state?.error}<p class="error">
+        {#if source.kind !== 'native' && state?.error}<p class="error">
             {state.error}
           </p>{/if}
         {#if source.kind === 'native'}<div>
@@ -109,14 +109,17 @@
               void action({ action: 'remove', id: source.id });
           }}>Detach</button
         >
-      {:else if source.kind === 'external'}
-        <a href={`/project/external/${encodeURIComponent(source.id)}`}
+      {:else}
+        <a href={`/project/${source.kind}/${encodeURIComponent(source.id)}`}
           >Connection &amp; catalog</a
         >
       {/if}
     </div>
   {/each}
-  <p><a href="/workspace/connect">Connect external server</a></p>
+  <p>
+    <a href="/workspace/connect">Connect external server</a> ·
+    <a href="/workspace/connect?kind=bridge">Attach bridge</a>
+  </p>
   <form
     onsubmit={(event) => {
       event.preventDefault();

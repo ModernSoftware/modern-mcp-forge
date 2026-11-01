@@ -82,7 +82,7 @@ result format, test it, then disable the old classic definition. Existing classi
 files are not directly deployable with MCPack merely by attaching them.
 
 MCPack deployment remains native-only. [External MCP connections](external-sources.md)
-are available in the project workspace. Bridge adapters, OAuth, export and
+are available in the project workspace. [Local bridges](bridged-sources.md) can run existing stdio servers. OAuth, export and
 folder editing are later steps. The management API uses Forge's existing local
 Host/Origin guards. Keep the authoring service on your local development machine.
 

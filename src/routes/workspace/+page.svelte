@@ -4,6 +4,11 @@
   import { reloadProjectSources } from '$lib/client/reload-project-sources';
   import { invalidateAll } from '$app/navigation';
   let { data } = $props();
+  const callKind = {
+    tools: 'tool',
+    resources: 'resource',
+    prompts: 'prompt'
+  } as const;
   let busy = $state(false);
   let endpoint = $derived(new URL('/mcp', page.url).href);
   let copyNotice = $state('');
@@ -65,7 +70,7 @@
   }
   let unavailable = $derived(
     data.snapshot.sources.filter(
-      (s) => s.kind === 'external' && s.status === 'failed'
+      (s) => s.kind !== 'native' && s.status === 'failed'
     )
   );
   let search = $state('');
@@ -74,7 +79,7 @@
   let rows = $derived(
     data.sources.flatMap((entry) =>
       (['tools', 'resources', 'prompts'] as const).flatMap((category) =>
-        (entry.source.kind === 'external'
+        (entry.source.kind !== 'native'
           ? (data.snapshot.sources.find(
               (source) => source.id === entry.source.id
             )?.catalog[category] ?? [])
@@ -115,6 +120,9 @@
   <a class="secondary-button" href="/workspace/new?kind=prompts">Add prompt</a>
   <a class="secondary-button" href="/workspace/connect"
     >Connect external server</a
+  >
+  <a class="secondary-button" href="/workspace/connect?kind=bridge"
+    >Attach bridge</a
   >
   <button disabled title="Native-only export is a subsequent step"
     >Export native · Soon</button
@@ -170,7 +178,7 @@
 {#each unavailable as source (source.id)}
   <p class="workflow-error" role="alert">
     <strong>{source.id}</strong> · {source.error}
-    <a href={`/project/external/${encodeURIComponent(source.id)}`}
+    <a href={`/project/${source.kind}/${encodeURIComponent(source.id)}`}
       >Manage connection</a
     >
     <button class="secondary-button" disabled={busy} onclick={reload}
@@ -189,6 +197,17 @@
   </p>{/each}
 <section class="glass-card workflow-list">
   {#each visible as row (`${row.source.id}/${row.category}/${row.definition.name}`)}
+    {@const target = new URLSearchParams({
+      kind: callKind[row.category],
+      name:
+        'uri' in row.definition
+          ? String(row.definition.uri)
+          : row.definition.name
+    })}
+    {@const detail =
+      row.source.kind === 'native'
+        ? `/workspace/native/${encodeURIComponent(row.source.id)}/${row.category}/${encodeURIComponent(row.definition.name)}`
+        : `/project/${row.source.kind}/${encodeURIComponent(row.source.id)}?${target}`}
     {@const disabled =
       row.source.kind === 'native' &&
       row.source.disabledCapabilities?.some(
@@ -214,12 +233,7 @@
               : ''}</span
         >
         <h2>
-          <a
-            href={row.source.kind === 'external'
-              ? `/project/external/${encodeURIComponent(row.source.id)}`
-              : `/workspace/native/${encodeURIComponent(row.source.id)}/${row.category}/${encodeURIComponent(row.definition.name)}`}
-            >{row.definition.name}</a
-          >
+          <a href={detail}>{row.definition.name}</a>
         </h2>
         <ExpandableDescription text={row.definition.description} />
       </div>
@@ -233,14 +247,8 @@
                 row.definition.name,
                 Boolean(disabled)
               )}>{disabled ? 'Enable' : 'Disable'}</button
-          >{/if}<a
-          class="secondary-button"
-          href={row.source.kind === 'external'
-            ? `/project/external/${encodeURIComponent(row.source.id)}`
-            : `/workspace/native/${encodeURIComponent(row.source.id)}/${row.category}/${encodeURIComponent(row.definition.name)}`}
-          >{row.source.kind === 'external'
-            ? 'Inspect & test'
-            : 'Open editor'}</a
+          >{/if}<a class="secondary-button" href={detail}
+          >{row.source.kind !== 'native' ? 'Inspect & test' : 'Open editor'}</a
         >
       </div>
     </article>
@@ -251,10 +259,12 @@
           : 'Add a tool, resource or prompt'}
       </h2>
       <p>
-        {sourceKind === 'bridge' && !rows.some((row) => row.source.kind === 'bridge')
-          ? 'Bridged sources will appear here when bridge support is available.'
-          : rows.length ? 'Change your search or filter.'
-          : 'Add a tool, resource or prompt backed by a Node or Python worker.'}
+        {sourceKind === 'bridge' &&
+        !rows.some((row) => row.source.kind === 'bridge')
+          ? 'Attach a local Node or Python bridge to see its capabilities here.'
+          : rows.length
+            ? 'Change your search or filter.'
+            : 'Add a tool, resource or prompt backed by a Node or Python worker.'}
       </p>
       {#if !rows.length}<a class="primary-button" href="/workspace/new"
           >Add your first tool</a

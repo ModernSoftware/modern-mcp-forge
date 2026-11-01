@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import type { SourceCatalog } from './contracts';
-import { externalName } from './external';
+import { qualifiedName } from './upstream';
 
 export type ReservedCatalog = {
   [K in keyof SourceCatalog]: ReadonlyArray<{
@@ -72,7 +72,7 @@ export function publishCatalogs(entries: Entry[], legacy?: ReservedCatalog) {
         compare(a.item.uri ?? '', b.item.uri ?? '')
     );
     for (const { id, item, original } of qualify) {
-      const prefix = externalName(id, original);
+      const prefix = qualifiedName(id, original);
       let name = prefix;
       for (let n = 0; taken.has(name); n++) {
         const suffix = createHash('sha256')

@@ -1,15 +1,19 @@
 <script lang="ts">
   import { afterConfirmingProjectLeave } from '$lib/navigation/project-leave';
+  import { page } from '$app/state';
   import { goto, invalidateAll } from '$app/navigation';
   import ExpandableDescription from '$lib/components/ExpandableDescription.svelte';
-  import ExternalConnection from '$lib/components/ExternalConnection.svelte';
+  import SourceConnection from '$lib/components/SourceConnection.svelte';
   let { data } = $props();
   const categories = ['tools', 'resources', 'prompts'] as const;
   let busy = $state(false);
   let error = $state('');
   let result = $state('');
-  let kind = $state<'tool' | 'resource' | 'prompt'>('tool');
-  let name = $state('');
+  let kind = $derived.by((): 'tool' | 'resource' | 'prompt' => {
+    const selected = page.url.searchParams.get('kind');
+    return selected === 'resource' || selected === 'prompt' ? selected : 'tool';
+  });
+  let name = $derived(page.url.searchParams.get('name') ?? '');
   let args = $state('{}');
   let sourceState = $derived(
     data.snapshot.sources.find((source) => source.id === data.source.id)
@@ -27,7 +31,7 @@
     error = '';
     result = '';
     try {
-      const response = await fetch('/api/project/external', {
+      const response = await fetch(`/api/project/${data.source.kind}`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
@@ -59,13 +63,18 @@
 </script>
 
 <svelte:head
-  ><title>{data.source.id} · External MCP · Modern MCP Forge</title
+  ><title
+    >{data.source.id} · {data.source.kind === 'bridge'
+      ? 'Bridged MCP'
+      : 'External MCP'} · Modern MCP Forge</title
   ></svelte:head
 >
 <a href="/workspace">← Workspace</a>
 <section class="page-heading">
   <div>
-    <div class="eyebrow">EXTERNAL MCP</div>
+    <div class="eyebrow">
+      {data.source.kind === 'bridge' ? 'BRIDGED MCP' : 'EXTERNAL MCP'}
+    </div>
     <h1>{data.source.id}</h1>
     <p>
       {sourceState?.status ?? 'stopped'} · Source definitions and schemas are owned
@@ -97,9 +106,10 @@
     }}>Remove connection</button
   >
 </div>
-{#key data.source.id}<ExternalConnection
+{#key data.source.kind + '/' + data.source.id}<SourceConnection
     projectId={data.project.id}
     generation={data.snapshot.generation}
+    kind={data.source.kind}
     source={data.source}
   />{/key}
 <section class="glass-card workflow-form">
@@ -128,7 +138,9 @@
   {/each}
 </section>
 <section class="glass-card workflow-form">
-  <h2>Test an external capability</h2>
+  <h2>
+    Test {data.source.kind === 'bridge' ? 'a bridged' : 'an external'} capability
+  </h2>
   <label
     >Kind<select
       bind:value={kind}
@@ -142,7 +154,7 @@
     ></label
   >
   <label
-    >Capability<select bind:value={name}
+    >Capability<select aria-label="Capability" bind:value={name}
       ><option value="">Select a capability</option
       >{#each capabilities as capability}<option
           value={'uri' in capability ? String(capability.uri) : capability.name}

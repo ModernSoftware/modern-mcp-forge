@@ -26,17 +26,16 @@ Target branch: `v0.10.0`. Unified workspace merged in PR #16; external source in
 The 28 October recording and tracked fixes are summarized in
 [UX review and implementation plan](reviews/2026-10-28-ux-plan.md).
 Native item editing now keeps Definition, Code and Test together. Visual field
-edits save directly; new items generate a single named handler. PR #18 remains
-open for review on `feat/external-mcp-sources`.
+edits save directly; new items generate a single named handler. PR #18 merged into `v0.10.0`.
 
 The [November 1 walkthrough](reviews/2026-11-01-ux-plan.md) tracks the IDE edit/reload fixes, source-local npm setup and agent connection flow. It includes a replay recipe for the SQLite quote tool.
 
-For the pre-merge replay, filter by capability type and source type together, then invoke a native tool from Inspector and from the workbench. Execution history should show two rows with different origins. Change an existing external connection to **Prefix only colliding names**, reconnect Inspector, and verify discovery and calls. Bridging is the next integration milestone, followed by native-only export.
+For the pre-merge replay, filter by capability type and source type together, then invoke a native tool from Inspector and from the workbench. Execution history should show two rows with different origins. Change an existing external connection to **Prefix only colliding names**, reconnect Inspector, and verify discovery and calls. Use **Attach bridge** to add a project-owned stdio source.
 
 ## Continue in a fresh chat
 
 Use ModernSoftware/modern-mcp-forge, base v0.10.0, working branch
-feat/external-mcp-sources and issue #17. Inspect the linked PR and current CI
+feat/bridged-mcp-sources for local bridge work. Inspect the linked PR and current CI
 before editing. Do not merge or publish without the user's instruction. Keep
 changes in this branch. Read this document and the PR's test results; do not
 assume future items above are implemented.
@@ -60,11 +59,15 @@ Workspace → Disable/Enable → Edit details → change description → Close a
 searching recent projects, dark theme and a narrow viewport. No browser console
 errors should occur when editing JSON.
 
-Source controls restart all sources after configuration edits. Native and external tool calls appear in Execution history. Individual worker stop/restart is still pending.
+Source controls restart all sources after configuration edits. Native, bridged and external tool calls appear in Execution history. Individual worker stop/restart is still pending.
 
 ## External sources slice
 
 PR #18 adds trusted Streamable HTTP connections, bearer authentication through environment variables, and routing alongside native capabilities.
 See [External sources](external-sources.md) for supported behavior and limits.
-Bridge implementation, external metadata overrides, OAuth login, and native-only
+External metadata overrides, OAuth login, and native-only
 export remain subsequent work. Do not treat their UI placeholders as implemented.
+
+## Local bridges
+
+Use **Attach bridge** in the workspace to start an existing Node or Python stdio server or generate a starter. [Local bridge setup and testing](bridged-sources.md) covers dependencies, public names and recovery.
