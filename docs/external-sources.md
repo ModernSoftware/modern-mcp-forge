@@ -50,8 +50,10 @@ Forge exposes a resource once when multiple pages return the same URI and identi
 Discovery preserves input schemas, tool annotations and output schemas. The catalog
 is read-only: Forge does not edit external handler code or input validation.
 Custom per-capability aliases, metadata overrides and exposure controls are future work;
-this slice supports connection-level disable and automatic namespacing. Collisions
-with native/legacy names still fail closed; Forge never silently shadows a tool.
+this slice supports connection-level disable and automatic namespacing. Forge
+rejects conflicting fixed names, such as an always-prefixed external tool whose
+public name matches a native tool. Collision-only connections qualify the name
+and route calls through that alias.
 
 Only listed static resources are supported. Resource templates, subscriptions,
 server-initiated sampling/elicitation, task APIs, upstream list-change notifications,

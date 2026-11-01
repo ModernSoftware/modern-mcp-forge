@@ -72,8 +72,11 @@ not silently rename or shadow names. Source-specific testing remains available.
 Existing classic handlers keep their ABI and are not automatically converted. The
 workspace explicitly identifies legacy definitions and links to their older views.
 New authoring starts with native MCPack; old creation URLs redirect to the new form. Legacy detail routes remain for deliberate migration.
-Execution history currently records classic runs only; native test results remain
-in the source test panel. Worker listings are configuration, not live telemetry.
+Execution history includes classic, native and external tool calls. For native
+tools, the Test tab shows the result immediately. Open Execution history to
+compare that workbench test with calls from an MCP client. Resource reads and
+prompt retrievals do not create tool execution records. Worker listings show the
+project's configuration.
 To migrate deliberately, create a native definition, port its handler signature and
 result format, test it, then disable the old classic definition. Existing classic
 files are not directly deployable with MCPack merely by attaching them.
