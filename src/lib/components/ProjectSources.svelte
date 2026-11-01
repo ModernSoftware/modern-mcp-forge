@@ -118,7 +118,7 @@
   {/each}
   <p>
     <a href="/workspace/connect">Connect external server</a> ·
-    <a href="/workspace/connect?kind=bridge">Attach bridge</a>
+    <a href="/workspace/connect?kind=bridge">Bridge existing implementation</a>
   </p>
   <form
     onsubmit={(event) => {

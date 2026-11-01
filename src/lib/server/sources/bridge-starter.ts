@@ -5,50 +5,55 @@ import { NativeProjectError } from '../mcpack/session';
 import type { RegisteredProject } from '../projects/project-service';
 import { sourceId } from './schema';
 
-const nodeServer = `import { McpServer } from '@modelcontextprotocol/server';
-import { StdioServerTransport } from '@modelcontextprotocol/server/stdio';
-import { z } from 'zod';
-
-const server = new McpServer({ name: 'inventory', version: '1.0.0' });
-
-server.registerTool('stock', { inputSchema: z.object({ sku: z.string() }) }, async ({ sku }) => ({
-  content: [{ type: 'text', text: sku === 'DEMO' ? '12' : '0' }]
-}));
-
-server.registerResource('guide', 'inventory://guide', { mimeType: 'text/plain' }, async (uri) => ({
-  contents: [{ uri: uri.href, text: 'Use DEMO to try the stock tool.' }]
-}));
-
-server.registerPrompt('review_stock', { argsSchema: z.object({ sku: z.string() }) }, async ({ sku }) => ({
-  messages: [{ role: 'user', content: { type: 'text', text: 'Review stock for ' + sku } }]
-}));
-
-await server.connect(new StdioServerTransport());
+// The editable module contains only integration code. Forge supplies the MCP host.
+const nodeAdapter = `// Import your application's registry or dispatcher here.
+export default {
+  async listTools(params, { applicationRoot }) {
+    // Return your registry's tool definitions, including their original inputSchema.
+    return [];
+  },
+  async callTool({ name, arguments: args }, { signal }) {
+    // Delegate to your application's dispatcher and return its MCP result.
+    throw new Error("Wire callTool to your application.");
+  },
+  async listResources() { return []; },
+  async readResource({ uri }, context) {
+    throw new Error("Wire readResource to your application.");
+  },
+  async listPrompts() { return []; },
+  async getPrompt({ name, arguments: args }, context) {
+    throw new Error("Wire getPrompt to your application.");
+  }
+};
 `;
 
-const pythonServer = `from mcp.server.fastmcp import FastMCP
-
-server = FastMCP("shipping")
+const pythonAdapter = `"""Wire these hooks to your application's existing registry or dispatcher."""
 
 
-@server.tool()
-def shipping_days(region: str) -> int:
-    """Return the example delivery estimate in days."""
-    return 2 if region == "local" else 5
+async def list_tools(params, context):
+    # Return the registry's tool definitions, including their original inputSchema.
+    return []
 
 
-@server.resource("shipping://guide", name="guide")
-def guide() -> str:
-    return "Use local to try the shipping estimate."
+async def call_tool(params, context):
+    # Forward params["name"] and params.get("arguments", {}) to your application.
+    raise NotImplementedError("Wire call_tool to your application.")
 
 
-@server.prompt()
-def review_shipping(region: str) -> str:
-    return f"Review shipping for {region}"
+async def list_resources(params, context):
+    return []
 
 
-if __name__ == "__main__":
-    server.run(transport="stdio")
+async def read_resource(params, context):
+    raise NotImplementedError("Wire read_resource to your application.")
+
+
+async def list_prompts(params, context):
+    return []
+
+
+async def get_prompt(params, context):
+    raise NotImplementedError("Wire get_prompt to your application.")
 `;
 
 export function createBridgeStarter(
@@ -64,35 +69,32 @@ export function createBridgeStarter(
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'EEXIST')
       throw new NativeProjectError(
-        'That bridge folder already exists. Attach its entrypoint or choose a different name.',
+        'That bridge folder already exists. Select its adapter file or choose a different name.',
         409
       );
     throw error;
   }
-  const filename = runtime === 'node' ? 'server.mjs' : 'server.py';
+  const filename = runtime === 'node' ? 'adapter.mjs' : 'adapter.py';
   try {
-    if (runtime === 'node') {
-      const pkg = {
-        private: true,
-        type: 'module',
-        dependencies: { '@modelcontextprotocol/server': '2.0.0', zod: '4.6.5' }
-      };
-      writeFileSync(
-        join(folder, 'package.json'),
-        JSON.stringify(pkg, null, 2) + '\n',
-        { flag: 'wx' }
-      );
-    } else {
-      writeFileSync(join(folder, 'requirements.txt'), 'mcp==1.29.0\n', {
+    writeFileSync(
+      join(folder, '.gitignore'),
+      '.venv/\n__pycache__/\nnode_modules/\n.env\n',
+      { flag: 'wx' }
+    );
+    if (runtime === 'python') {
+      writeFileSync(join(folder, 'requirements-forge.txt'), 'mcp>=1.29,<2\n', {
         flag: 'wx'
       });
     }
     writeFileSync(
       join(folder, filename),
-      runtime === 'node' ? nodeServer : pythonServer,
+      runtime === 'node' ? nodeAdapter : pythonAdapter,
       { flag: 'wx' }
     );
-    return { entrypoint: `bridges/${id}/${filename}` };
+    return {
+      mode: 'adapter' as const,
+      entrypoint: `bridges/${id}/${filename}`
+    };
   } catch (error) {
     rmSync(folder, { recursive: true, force: true });
     throw error;

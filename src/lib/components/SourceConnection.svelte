@@ -41,6 +41,15 @@
   let runtime = $state<'node' | 'python'>(
     untrack(() => (source?.kind === 'bridge' ? source.runtime : 'node'))
   );
+  let mode = $state<'adapter' | 'stdio'>(
+    untrack(() =>
+      source?.kind === 'bridge' ? (source.mode ?? 'stdio') : 'adapter'
+    )
+  );
+  let checkoutEnv = $state(
+    untrack(() => (source?.kind === 'bridge' ? (source.checkoutEnv ?? '') : ''))
+  );
+  let startOnSave = $state(true);
   let entrypoint = $state(
     untrack(() => (source?.kind === 'bridge' ? source.entrypoint : ''))
   );
@@ -61,7 +70,18 @@
   function values() {
     return JSON.stringify(
       kind === 'bridge'
-        ? [id, naming, runtime, entrypoint, cwd, envNames, argv]
+        ? [
+            id,
+            naming,
+            runtime,
+            mode,
+            mode === 'adapter' ? checkoutEnv : '',
+            entrypoint,
+            cwd,
+            envNames,
+            argv,
+            startOnSave
+          ]
         : [id, url, naming, auth, auth === 'bearer' ? tokenEnv : '']
     );
   }
@@ -108,10 +128,7 @@
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error);
       entrypoint = payload.entrypoint;
-      starterNotice =
-        runtime === 'node'
-          ? 'Starter created. Install the dependencies from its package.json in the starter folder, then attach the bridge.'
-          : 'Starter created. Create a .venv in the starter folder and install requirements.txt there, then attach the bridge.';
+      starterNotice = `Created ${entrypoint}. Wire its hooks in your editor, then save the connection. You can also save it disabled and wire it later.`;
     } catch (failure) {
       error = failure instanceof Error ? failure.message : String(failure);
     } finally {
@@ -146,8 +163,11 @@
                   id,
                   kind,
                   naming,
-                  enabled: source?.enabled ?? true,
+                  enabled: source?.enabled ?? (mode === 'stdio' || startOnSave),
                   runtime,
+                  mode,
+                  ...(mode === 'adapter' &&
+                    checkoutEnv.trim() && { checkoutEnv: checkoutEnv.trim() }),
                   entrypoint: entrypoint.trim(),
                   ...(cwd.trim() && { cwd: cwd.trim() }),
                   ...(envNames.trim() && {
@@ -246,6 +266,16 @@
   </p>
   {#if kind === 'bridge'}
     <label
+      >Connection method<select
+        aria-label="Connection method"
+        bind:value={mode}
+        disabled={busy}
+      >
+        <option value="adapter">Wire an existing implementation</option>
+        <option value="stdio">Launch an existing stdio server</option>
+      </select></label
+    >
+    <label
       >Runtime<select aria-label="Runtime" bind:value={runtime} disabled={busy}
         ><option value="node">Node.js</option><option value="python"
           >Python</option
@@ -253,34 +283,60 @@
       ></label
     >
     <label
-      >Entrypoint<input
+      >{mode === 'adapter' ? 'Adapter file' : 'Stdio entrypoint'}<input
         bind:value={entrypoint}
         required
         disabled={busy}
-        placeholder={runtime === 'node'
-          ? 'bridges/inventory/server.mjs'
-          : 'bridges/shipping/server.py'}
+        placeholder={mode === 'adapter'
+          ? `bridges/my-source/adapter.${runtime === 'node' ? 'mjs' : 'py'}`
+          : 'Project-relative server script'}
       /></label
     >
-    <p class="workflow-muted">
-      Choose a project-relative script that starts an MCP stdio server. Edit its
-      implementation in your project.
-    </p>
-    {#if !source}
-      <div>
-        <button
-          type="button"
-          disabled={busy ||
-            !/^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(id) ||
-            Boolean(entrypoint)}
-          onclick={scaffold}>Create starter files</button
-        >
-      </div>
+    {#if mode === 'adapter'}
       <p class="workflow-muted">
-        For a new server, enter a bridge name and leave the entrypoint empty to
-        create a starter with a tool, resource and prompt.
+        Keep the adapter under this Forge project and commit it with
+        forge.project.json. Its hooks discover and call your existing tools,
+        resources and prompts.
       </p>
-      {#if starterNotice}<p role="status">{starterNotice}</p>{/if}
+      {#if !source}
+        <div>
+          <button
+            type="button"
+            disabled={busy ||
+              !/^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(id) ||
+              Boolean(entrypoint)}
+            onclick={scaffold}>Create adapter file</button
+          >
+        </div>
+        {#if starterNotice}<p role="status">{starterNotice}</p>{/if}
+      {/if}
+      <label
+        >Application checkout variable (optional)<input
+          aria-label="Application checkout variable"
+          bind:value={checkoutEnv}
+          disabled={busy}
+          placeholder="MY_APP_ROOT"
+          pattern="[A-Za-z_][A-Za-z0-9_]*"
+        /></label
+      >
+      <p class="workflow-muted">
+        Leave blank when the application is in this project. For a separate
+        checkout, enter the name of an environment variable that points to its
+        folder on this machine.
+      </p>
+      {#if runtime === 'python'}<p class="workflow-muted">
+          The Forge Python host uses the mcp dependency listed in
+          requirements-forge.txt. Use the adapter’s .venv or the application’s
+          Python environment.
+        </p>{/if}
+      {#if !source}<label
+          ><input type="checkbox" bind:checked={startOnSave} disabled={busy} /> Start
+          and discover on save</label
+        >{/if}
+    {:else}
+      <p class="workflow-muted">
+        Select a project-relative script that already serves MCP over stdio.
+      </p>
     {/if}
     <details>
       <summary>Launch settings</summary>
@@ -288,7 +344,9 @@
         >Working directory<input
           bind:value={cwd}
           disabled={busy}
-          placeholder="Defaults to the entrypoint folder"
+          placeholder={mode === 'adapter'
+            ? 'Defaults to the application root'
+            : 'Defaults to the entrypoint folder'}
         /></label
       >
       <label
@@ -361,7 +419,9 @@
         : source
           ? 'Save connection and reload'
           : kind === 'bridge'
-            ? 'Attach bridge'
+            ? mode === 'adapter' && !startOnSave
+              ? 'Save disabled bridge'
+              : 'Attach bridge'
             : 'Connect server'}</button
     >
     <button

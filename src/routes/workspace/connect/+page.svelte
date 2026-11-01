@@ -14,7 +14,7 @@
 <section class="page-heading">
   <div>
     <div class="eyebrow">{bridge ? 'LOCAL STDIO' : 'EXTERNAL MCP'}</div>
-    <h1>{bridge ? 'Attach a local bridge' : 'Connect an external server'}</h1>
+    <h1>{bridge ? 'Bridge an existing implementation' : 'Connect an external server'}</h1>
     <p>
       Add its tools, static resources and prompts to this project's MCP
       endpoint.

@@ -122,7 +122,7 @@
     >Connect external server</a
   >
   <a class="secondary-button" href="/workspace/connect?kind=bridge"
-    >Attach bridge</a
+    >Bridge existing implementation</a
   >
   <button disabled title="Native-only export is a subsequent step"
     >Export native · Soon</button

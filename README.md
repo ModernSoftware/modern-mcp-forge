@@ -248,4 +248,4 @@ Open a recent project, choose **Add capability**, then create a native Node or P
 
 External Streamable HTTP servers can also be connected from the project workspace, with optional bearer authentication through an environment-variable reference. See [External sources](docs/external-sources.md) for namespacing, security boundaries and current limits.
 
-Choose **Attach bridge** in the workspace to run an existing Node or Python stdio server or generate a project-owned starter. Its tools, static resources and prompts join the same agent endpoint. [Bridge setup and testing](docs/bridged-sources.md)
+Choose **Bridge existing implementation** to wire a Node or Python adapter to an existing application. Commit the adapter and Forge manifest together. A named environment variable can locate a separate application checkout. Its tools, static resources and prompts join the same agent endpoint. [Bridge setup and testing](docs/bridged-sources.md)

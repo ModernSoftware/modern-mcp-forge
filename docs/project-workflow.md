@@ -30,7 +30,7 @@ edits save directly; new items generate a single named handler. PR #18 merged in
 
 The [November 1 walkthrough](reviews/2026-11-01-ux-plan.md) tracks the IDE edit/reload fixes, source-local npm setup and agent connection flow. It includes a replay recipe for the SQLite quote tool.
 
-For the pre-merge replay, filter by capability type and source type together, then invoke a native tool from Inspector and from the workbench. Execution history should show two rows with different origins. Change an existing external connection to **Prefix only colliding names**, reconnect Inspector, and verify discovery and calls. Use **Attach bridge** to add a project-owned stdio source.
+For the pre-merge replay, filter by capability type and source type together, then invoke a native tool from Inspector and from the workbench. Execution history should show two rows with different origins. Change an existing external connection to **Prefix only colliding names**, reconnect Inspector, and verify discovery and calls. Use **Bridge existing implementation** to wire a project-owned adapter.
 
 ## Continue in a fresh chat
 
@@ -70,4 +70,4 @@ export remain subsequent work. Do not treat their UI placeholders as implemented
 
 ## Local bridges
 
-Use **Attach bridge** in the workspace to start an existing Node or Python stdio server or generate a starter. [Local bridge setup and testing](bridged-sources.md) covers dependencies, public names and recovery.
+Use **Bridge existing implementation** to generate a Node or Python adapter inside the project. You can also launch an existing stdio entrypoint. [Local bridge setup and testing](bridged-sources.md) covers dependencies, public names and recovery.

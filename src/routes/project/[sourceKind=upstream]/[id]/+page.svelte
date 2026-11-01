@@ -120,6 +120,13 @@
     sources. Resource templates, subscriptions, sampling and elicitation are not
     relayed.
   </p>
+  {#if data.source.kind === 'bridge' && data.source.mode === 'adapter' && sourceState?.status === 'ready' && categories.every((c) => !sourceState?.catalog[c].length)}
+    <p role="status">
+      The adapter is connected and returned an empty catalog. Wire the discovery
+      hooks in <code>{data.source.entrypoint}</code>, then reload project
+      sources.
+    </p>
+  {/if}
   {#each categories as category}
     {@const items = sourceState?.catalog[category] ?? []}
     <details open>

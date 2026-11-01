@@ -1,5 +1,6 @@
 import { existsSync, statSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, isAbsolute, join } from 'node:path';
+import { createRequire } from 'node:module';
 import { Client } from '@modelcontextprotocol/client';
 import { getDefaultEnvironment } from '@modelcontextprotocol/client/stdio';
 import { NativeNodeTransport } from '../mcpack/node-transport';
@@ -43,14 +44,48 @@ export class BridgeSourceAdapter implements SourceAdapter {
     this.status = 'starting';
     const { entrypoint, runtime, inheritEnv = [], args = [] } = this.source;
     const entry = containedFile(this.root, entrypoint);
+    const hooks = this.source.mode === 'adapter';
+    let application = this.root;
+    if (this.source.checkoutEnv) {
+      if (!hooks)
+        throw new Error(
+          'A checkout variable is supported only for an adapter module.'
+        );
+      const checkout = process.env[this.source.checkoutEnv];
+      if (
+        !checkout ||
+        !isAbsolute(checkout) ||
+        !statSync(checkout, { throwIfNoEntry: false })?.isDirectory()
+      )
+        throw new Error(
+          `Set ${this.source.checkoutEnv} to the absolute path of the application checkout before starting Forge.`
+        );
+      application = checkout;
+    }
     const cwd = this.source.cwd
-      ? containedFile(this.root, this.source.cwd)
-      : dirname(entry);
+      ? containedFile(application, this.source.cwd)
+      : hooks
+        ? application
+        : dirname(entry);
     if (!statSync(entry).isFile() || !statSync(cwd).isDirectory())
       throw new Error(
-        'Choose an entrypoint file and a working directory inside the project.'
+        'Choose an adapter or entrypoint file and a valid working directory.'
       );
-    const command = interpreter(runtime, cwd);
+    // A dedicated adapter venv can contain both the runner and application dependencies.
+    const adapterFolder = dirname(entry);
+    const command = interpreter(
+      runtime,
+      hooks && existsSync(join(adapterFolder, '.venv')) ? adapterFolder : cwd
+    );
+    const launchArgs = [...command.prefixArgs];
+    if (hooks) {
+      if (runtime === 'python') launchArgs.push('-B');
+      const host = runtime === 'node' ? 'node.mjs' : 'python.py';
+      launchArgs.push(
+        createRequire(import.meta.url).resolve(`#forge-bridges/${host}`),
+        application
+      );
+    }
     const env = getDefaultEnvironment();
     for (const key of inheritEnv) {
       const value = process.env[key];
@@ -63,7 +98,7 @@ export class BridgeSourceAdapter implements SourceAdapter {
     this.stderr = '';
     const transport = (this.transport = new NativeNodeTransport({
       command: command.executable,
-      args: [...command.prefixArgs, entry, ...args],
+      args: [...launchArgs, entry, ...args],
       cwd,
       env,
       shutdownMs: 3000,
@@ -109,6 +144,18 @@ export class BridgeSourceAdapter implements SourceAdapter {
       if (deadline.aborted)
         throw new Error(
           'Bridge discovery timed out. Check that the entrypoint serves MCP over stdio.'
+        );
+      if (hooks && this.stderr.includes('FORGE_BRIDGE_INVALID_HOOKS'))
+        throw new Error(
+          'The adapter must export at least one complete pair of discovery and invocation hooks. Check the bridge guide.'
+        );
+      if (
+        hooks &&
+        runtime === 'python' &&
+        /No module named ['"]mcp['"]/.test(this.stderr)
+      )
+        throw new Error(
+          'Install requirements-forge.txt in the Python environment used by this adapter.'
         );
       if (
         /ModuleNotFoundError|ERR_MODULE_NOT_FOUND|Cannot find module|ImportError/.test(

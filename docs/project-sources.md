@@ -49,7 +49,7 @@ Example disabled connections:
 ]
 ```
 
-Node and Python bridges run a project-owned MCP stdio entrypoint when enabled. See [Local bridges](bridged-sources.md) for setup, environment forwarding and lifecycle.
+Node and Python bridges run a project-owned adapter with Forge’s host when mode is `adapter`. Earlier descriptors launch their existing stdio script. See [Local bridges](bridged-sources.md) for setup, environment forwarding and lifecycle.
 External descriptors now support Streamable HTTP and optional bearer credentials
 through an environment-variable reference; see [External sources](external-sources.md).
 External URL credentials, query strings and fragments are rejected.

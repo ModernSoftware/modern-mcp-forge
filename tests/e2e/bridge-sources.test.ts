@@ -1,6 +1,14 @@
 import { expect, test } from 'bun:test';
 import { execFileSync } from 'node:child_process';
-import { mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import {
+  copyFile,
+  mkdir,
+  mkdtemp,
+  readFile,
+  rm,
+  symlink,
+  writeFile
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { dirname, join, resolve } from 'node:path';
@@ -15,6 +23,10 @@ import { getAvailablePort } from '../helpers/network';
 test('Node and Python bridges attach, serve the mixed catalog and stop with the project', async () => {
   const root = await mkdtemp(join(tmpdir(), 'forge bridges '));
   const folder = join(root, 'mixed project');
+  const checkout = join(root, 'developer checkout');
+  const checkoutEnv = 'FORGE_TEST_SHIPPING_CHECKOUT';
+  const originalCheckout = process.env[checkoutEnv];
+  process.env[checkoutEnv] = checkout;
   const originalDb = process.env.MCP_FORGE_DB_PATH;
   const originalSecret = process.env.FORGE_BRIDGE_TEST_SECRET;
   process.env.MCP_FORGE_DB_PATH = join(root, 'registry.db');
@@ -77,39 +89,46 @@ test('Node and Python bridges attach, serve the mixed catalog and stop with the 
       ).status
     ).toBe(200);
     const before = await manifest();
-    const n = await bridge({
-      action: 'scaffold',
-      runtime: 'node',
-      id: 'inventory'
-    });
-    const p = await bridge({
+    await mkdir(join(folder, 'bridges/inventory'), { recursive: true });
+    await copyFile(
+      resolve('examples/bridges/direct-stdio/server.mjs'),
+      join(folder, 'bridges/inventory/server.mjs')
+    );
+    await mkdir(checkout);
+    const application = await readFile(
+      resolve('examples/bridges/direct-stdio/server.py'),
+      'utf8'
+    );
+    await writeFile(join(checkout, 'server.py'), application);
+    const generated = await bridge({
       action: 'scaffold',
       runtime: 'python',
       id: 'shipping'
     });
-    expect(n.status).toBe(200);
-    expect(p.status).toBe(200);
+    expect(generated.status).toBe(200);
+    expect(generated.value.entrypoint).toBe('bridges/shipping/adapter.py');
     expect(
-      (await bridge({ action: 'scaffold', runtime: 'node', id: 'inventory' }))
+      (await bridge({ action: 'scaffold', runtime: 'python', id: 'shipping' }))
         .status
     ).toBe(409);
     const node = {
       kind: 'bridge',
       id: 'inventory',
       runtime: 'node',
-      entrypoint: n.value.entrypoint,
+      entrypoint: 'bridges/inventory/server.mjs',
       enabled: true
     };
     const python = {
       kind: 'bridge',
       id: 'shipping',
       runtime: 'python',
-      entrypoint: p.value.entrypoint,
+      ...generated.value,
+      checkoutEnv,
       enabled: true
     };
     const nodeDir = dirname(join(folder, node.entrypoint));
     const pyDir = dirname(join(folder, python.entrypoint));
-    // Use the installed SDK dependencies. Each starter still lives in a real project folder.
+    // Use the installed SDK dependencies. Each existing server lives in a real project folder.
     await symlink(
       resolve('node_modules'),
       join(nodeDir, 'node_modules'),
@@ -196,6 +215,17 @@ test('Node and Python bridges attach, serve the mixed catalog and stop with the 
     ).toBe(400);
     expect(await manifest()).toBe(saved);
     const stale = generation;
+    const unwired = await bridge({
+      action: 'preview',
+      operation: 'create',
+      source: python
+    });
+    expect(unwired.value.error).toBeUndefined();
+    expect(await manifest()).toBe(saved);
+    await copyFile(
+      resolve('examples/bridges/adapters/fastmcp_adapter.py'),
+      join(folder, python.entrypoint)
+    );
     const attached = await bridge({ action: 'create', source: python });
     expect(attached.value.error).toBeUndefined();
     expect(attached.status).toBe(200);
@@ -277,7 +307,7 @@ test('Node and Python bridges attach, serve the mixed catalog and stop with the 
     expect(
       await (await fetch(base + '/project/bridge/shipping')).text()
     ).toContain('Test a bridged capability');
-    const pyFile = join(pyDir, 'server.py');
+    const pyFile = join(folder, python.entrypoint);
     const healthyPy = await readFile(pyFile, 'utf8');
     await writeFile(pyFile, 'import missing_bridge_dependency_for_test\n');
     const broken = await post('project/sources', {
@@ -316,6 +346,10 @@ test('Node and Python bridges attach, serve the mixed catalog and stop with the 
     );
     expect(launched.forwarded).toBe('local-test-value');
     expect(await manifest()).not.toContain('local-test-value');
+    expect(await manifest()).not.toContain(checkout);
+    expect(await readFile(join(checkout, 'server.py'), 'utf8')).toBe(
+      application
+    );
     process.kill(launched.pid, 'SIGKILL');
     const deadline = Date.now() + 5000;
     while (
@@ -365,6 +399,8 @@ test('Node and Python bridges attach, serve the mixed catalog and stop with the 
     (await vite.ssrLoadModule('/src/lib/server/database.ts')).closeDatabase();
     await vite.close();
     upstream.close();
+    if (originalCheckout === undefined) delete process.env[checkoutEnv];
+    else process.env[checkoutEnv] = originalCheckout;
     if (originalDb === undefined) delete process.env.MCP_FORGE_DB_PATH;
     else process.env.MCP_FORGE_DB_PATH = originalDb;
     if (originalSecret === undefined)

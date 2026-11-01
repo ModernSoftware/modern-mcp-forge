@@ -38,6 +38,11 @@ export const ProjectSourceSchema = z.discriminatedUnion('kind', [
       enabled: z.boolean().default(false),
       runtime: z.enum(['node', 'python']),
       entrypoint: projectPath,
+      mode: z.enum(['adapter', 'stdio']).optional(),
+      checkoutEnv: z
+        .string()
+        .regex(/^[A-Za-z_][A-Za-z0-9_]*$/)
+        .optional(),
       cwd: projectPath.optional(),
       args: z.array(z.string().max(2048)).max(32).optional(),
       inheritEnv: z
@@ -46,7 +51,11 @@ export const ProjectSourceSchema = z.discriminatedUnion('kind', [
         .optional(),
       naming: z.enum(['always', 'collisions']).optional()
     })
-    .strict(),
+    .strict()
+    .refine((source) => !source.checkoutEnv || source.mode === 'adapter', {
+      path: ['checkoutEnv'],
+      message: 'Checkout variables apply only to adapter modules.'
+    }),
   z
     .object({
       ...identity,
