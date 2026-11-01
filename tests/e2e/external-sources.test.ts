@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, utimes } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createServer } from 'vite';
@@ -16,7 +16,11 @@ test('Forge combines authenticated external and native sources over HTTP and clo
   const previousToken = process.env.FORGE_EXTERNAL_E2E_TOKEN;
   process.env.MCP_FORGE_DB_PATH = join(root, 'forge.db');
   process.env.FORGE_EXTERNAL_E2E_TOKEN = 'external-fixture-token';
-  const upstream = externalServer({ token: 'external-fixture-token' });
+  const description = 'Reference material. '.repeat(30) + 'End of description.';
+  const upstream = externalServer({
+    token: 'external-fixture-token',
+    description
+  });
   const port = await getAvailablePort();
   const base = `http://127.0.0.1:${port}`;
   const vite = await createServer({
@@ -85,9 +89,64 @@ test('Forge combines authenticated external and native sources over HTTP and clo
     expect(
       (await action({ action: 'create', source, projectId: 'stale' })).status
     ).toBe(409);
+    const projectFile = join(root, 'project', 'forge.project.json');
+    const before = await readFile(projectFile, 'utf8');
+    const nativeGeneration = generation;
+    const beforeClient = await connect();
+    // A newly-created, untouched starter is immediately callable. A timestamp
+    // update (sync client / IDE) must not turn identical bytes into a stale worker.
+    const future = new Date(Date.now() + 5_000);
+    await utimes(
+      join(root, 'project/native/local/handlers.mjs'),
+      future,
+      future
+    );
+    const immediate = await post('project/native', {
+      projectId,
+      generation,
+      action: 'invoke',
+      id: 'local',
+      kind: 'tool',
+      name: 'local_lookup',
+      arguments: {}
+    });
+    expect(immediate.status).toBe(200);
+    expect(immediate.body.result.content[0].text).toContain('Not implemented');
+    const denied = await action({
+      action: 'create',
+      source: { ...source, bearerTokenEnv: undefined }
+    });
+    expect(denied.status).toBe(400);
+    expect(denied.body.error).toContain('HTTP 401');
+    expect(denied.body.error).not.toContain('external-fixture-token');
+    expect(await readFile(projectFile, 'utf8')).toBe(before);
     expect(
-      (await action({ action: 'create', source })).body.snapshot.status
+      (await (await fetch(base + '/api/project/sources')).json()).generation
+    ).toBe(nativeGeneration);
+    expect(
+      (await beforeClient.callTool({ name: 'local_lookup', arguments: {} }))
+        .content?.[0]
+    ).toMatchObject({ type: 'text' });
+    const preview = await action({
+      action: 'preview',
+      operation: 'create',
+      source
+    });
+    expect(preview.status).toBe(200);
+    expect(await readFile(projectFile, 'utf8')).toBe(before);
+    const handshakes = upstream.calls.filter(
+      (c) => c.method === 'initialize'
+    ).length;
+    expect(
+      (await action({ action: 'commit', ticket: preview.body.ticket })).body
+        .snapshot.status
     ).toBe('ready');
+    expect(
+      upstream.calls.filter((c) => c.method === 'initialize')
+    ).toHaveLength(handshakes);
+    expect(
+      (await action({ action: 'commit', ticket: preview.body.ticket })).status
+    ).toBe(409);
     expect(
       await readFile(join(root, 'project', 'forge.project.json'), 'utf8')
     ).not.toContain('external-fixture-token');
@@ -101,6 +160,7 @@ test('Forge combines authenticated external and native sources over HTTP and clo
     const workspace = await (await fetch(base + '/workspace')).text();
     expect(workspace).toContain('remote__lookup');
     expect(workspace).toContain('External');
+    expect(workspace).toContain('Show more');
     const client = await connect();
     const tools = (await client.listTools()).tools;
     expect(tools.map((tool) => tool.name).sort()).toEqual([
@@ -117,6 +177,7 @@ test('Forge combines authenticated external and native sources over HTTP and clo
     });
     expect(call.content?.[0]).toMatchObject({ text: 'Order ORDER-42' });
     const resource = (await client.listResources()).resources[0];
+    expect(resource.description).toBe(description);
     expect(resource.uri).toStartWith('forge-external://source/remote/');
     expect(
       (await client.readResource({ uri: resource.uri })).contents[0]
@@ -137,6 +198,21 @@ test('Forge combines authenticated external and native sources over HTTP and clo
         })
       ).isError
     ).toBe(true);
+    const goodConfig = await readFile(projectFile, 'utf8');
+    const rejectedUpdate = await action({
+      action: 'update',
+      source: { ...source, bearerTokenEnv: 'MISSING_FORGE_EXTERNAL_E2E_TOKEN' }
+    });
+    expect(rejectedUpdate.status).toBe(400);
+    expect(await readFile(projectFile, 'utf8')).toBe(goodConfig);
+    expect(
+      (
+        await client.callTool({
+          name: 'remote__lookup',
+          arguments: { filter: { id: 'STILL-LIVE' } }
+        })
+      ).content?.[0]
+    ).toMatchObject({ text: 'Order STILL-LIVE' });
     const oldGeneration = generation;
     await action({ action: 'disable', id: 'remote' });
     expect(
@@ -166,23 +242,44 @@ test('Forge combines authenticated external and native sources over HTTP and clo
         })
       ).body.result.content[0].text
     ).toBe('Order UI');
-    await action({ action: 'remove', id: 'remote' });
+    // A saved (including pre-upgrade) remote can later become unavailable.
+    // It remains repairable while the native tool stays exposed.
+    delete process.env.FORGE_EXTERNAL_E2E_TOKEN;
+    const reloaded = await post('project/sources', {
+      projectId,
+      generation,
+      action: 'reload'
+    });
+    generation = reloaded.body.generation;
+    expect(reloaded.status).toBe(200);
     expect(
-      (
-        await action({
-          action: 'create',
-          source: {
-            ...source,
-            bearerTokenEnv: 'MISSING_FORGE_EXTERNAL_E2E_TOKEN'
-          }
-        })
-      ).body.snapshot.status
-    ).toBe('failed');
+      reloaded.body.sources.find((s: { id: string }) => s.id === 'remote')
+    ).toMatchObject({
+      status: 'failed',
+      catalog: { tools: [], resources: [], prompts: [] }
+    });
+    const degraded = await connect();
+    expect((await degraded.listTools()).tools.map((t) => t.name)).toEqual([
+      'local_lookup'
+    ]);
+    expect(
+      (await degraded.callTool({ name: 'local_lookup', arguments: {} }))
+        .content?.[0]
+    ).toMatchObject({ type: 'text' });
     expect((await fetch(base + '/project/external/remote')).status).toBe(200);
-    await action({ action: 'disable', id: 'remote' });
+    const html = await (await fetch(base + '/workspace')).text();
+    expect(html).toContain('Manage connection');
+    process.env.FORGE_EXTERNAL_E2E_TOKEN = 'external-fixture-token';
+    const recovered = await post('project/sources', {
+      projectId,
+      generation,
+      action: 'reload'
+    });
+    generation = recovered.body.generation;
     expect(
-      (await (await connect()).listTools()).tools.map((tool) => tool.name)
-    ).toEqual(['local_lookup']);
+      (await (await connect()).listTools()).tools.map((t) => t.name).sort()
+    ).toEqual(['local_lookup', 'remote__lookup']);
+    await action({ action: 'remove', id: 'remote' });
     await post('projects/close', {});
     expect((await fetch(base + '/mcp')).status).toBe(503);
   } finally {

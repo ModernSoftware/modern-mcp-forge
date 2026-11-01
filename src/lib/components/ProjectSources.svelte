@@ -81,6 +81,9 @@
       <div>
         <strong>{source.id}</strong> · {source.kind} · {state?.status ??
           'stopped'}
+        {#if source.kind === 'external' && state?.error}<p class="error">
+            {state.error}
+          </p>{/if}
         {#if source.kind === 'native'}<div>
             <code>{source.manifest}</code>
           </div>{/if}

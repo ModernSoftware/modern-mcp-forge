@@ -36,7 +36,8 @@ export class ExternalSourceAdapter implements SourceAdapter {
 
   constructor(private source: ExternalSource) {}
 
-  async start() {
+  async start(signal?: AbortSignal) {
+    signal?.throwIfAborted();
     this.status = 'starting';
     this.lifetime = new AbortController();
     const url = new URL(this.source.url);
@@ -60,6 +61,7 @@ export class ExternalSourceAdapter implements SourceAdapter {
       version: '0.10.0'
     });
     this.client = client;
+    let authStatus: number | undefined;
     const transport = new StreamableHTTPClientTransport(url, {
       requestInit: token
         ? { headers: { Authorization: `Bearer ${token}` } }
@@ -82,6 +84,8 @@ export class ExternalSourceAdapter implements SourceAdapter {
             redirect: 'error',
             signal: AbortSignal.any(signals)
           });
+          if (response.status === 401 || response.status === 403)
+            authStatus = response.status;
           if (!response.body) return response;
           let bytes = 0;
           const bounded = response.body.pipeThrough(
@@ -108,6 +112,8 @@ export class ExternalSourceAdapter implements SourceAdapter {
     client.onclose = () => {
       if (this.status !== 'stopped') this.status = 'failed';
     };
+    const abort = () => this.lifetime.abort();
+    signal?.addEventListener('abort', abort, { once: true });
     const discoveryDeadline = setTimeout(() => this.lifetime.abort(), 30_000);
     try {
       await client.connect(transport, { timeout: REQUEST_TIMEOUT });
@@ -181,12 +187,24 @@ export class ExternalSourceAdapter implements SourceAdapter {
       this.status = 'ready';
     } catch {
       this.status = 'failed';
+      signal?.throwIfAborted();
+      if (authStatus === 401)
+        throw new Error(
+          token
+            ? 'The server rejected the access token (HTTP 401). Check its audience and expiry, then restart Forge with a valid token.'
+            : 'The server requires an access token (HTTP 401). Obtain one from its authorization server and choose Bearer token.'
+        );
+      if (authStatus === 403)
+        throw new Error(
+          'The server denied access (HTTP 403). Check the permissions granted to this connection.'
+        );
       // SDK errors can include remote response bodies containing secrets.
       throw new Error(
         `External source ${this.source.id} could not connect or discover its catalog. Check URL, authentication and server availability.`
       );
     } finally {
       clearTimeout(discoveryDeadline);
+      signal?.removeEventListener('abort', abort);
     }
   }
 

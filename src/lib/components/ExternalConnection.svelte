@@ -13,16 +13,35 @@
   }>();
   let id = $state(untrack(() => source?.id ?? ''));
   let url = $state(untrack(() => source?.url ?? ''));
+  let auth = $state(
+    untrack(() => (source?.bearerTokenEnv ? 'bearer' : 'none'))
+  );
   let tokenEnv = $state(untrack(() => source?.bearerTokenEnv ?? ''));
-  let baseline = $state(untrack(() => JSON.stringify([id, url, tokenEnv])));
-  let dirty = $derived(JSON.stringify([id, url, tokenEnv]) !== baseline);
+  let baseline = $state(
+    untrack(() =>
+      JSON.stringify([id, url, auth, auth === 'bearer' ? tokenEnv : ''])
+    )
+  );
+  let dirty = $derived(
+    JSON.stringify([id, url, auth, auth === 'bearer' ? tokenEnv : '']) !==
+      baseline
+  );
   let busy = $state(false);
   let error = $state('');
+  let pending: AbortController | undefined;
+  let leaving = false;
+  let committing = $state(false);
+  async function cancel() {
+    leaving = true;
+    pending?.abort();
+    await goto('/workspace', { invalidateAll: true });
+  }
   onMount(() =>
     registerProjectLeaveGuard(
       () =>
-        !busy &&
-        (!dirty || window.confirm('Discard unsaved connection changes?'))
+        leaving ||
+        (!busy &&
+          (!dirty || window.confirm('Discard unsaved connection changes?')))
     )
   );
   beforeNavigate((navigation) => {
@@ -33,34 +52,58 @@
     busy = true;
     error = '';
     let navigate = false;
+    pending = new AbortController();
     try {
       const response = await fetch('/api/project/external', {
         method: 'POST',
+        signal: pending.signal,
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           projectId,
           generation,
-          action: source ? 'update' : 'create',
+          action: 'preview',
+          operation: source ? 'update' : 'create',
           source: {
             id,
             kind: 'external',
             enabled: source?.enabled ?? true,
             url,
-            ...(tokenEnv ? { bearerTokenEnv: tokenEnv } : {})
+            ...(auth === 'bearer' ? { bearerTokenEnv: tokenEnv.trim() } : {})
           }
         })
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error);
-      baseline = JSON.stringify([id, url, tokenEnv]);
+      if (leaving) return;
+      committing = true;
+      const saved = await fetch('/api/project/external', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          projectId,
+          generation,
+          action: 'commit',
+          ticket: payload.ticket
+        })
+      });
+      if (!saved.ok) throw new Error((await saved.json()).error);
+      baseline = JSON.stringify([
+        id,
+        url,
+        auth,
+        auth === 'bearer' ? tokenEnv : ''
+      ]);
       navigate = true;
     } catch (failure) {
-      error = failure instanceof Error ? failure.message : String(failure);
+      if (!leaving)
+        error = failure instanceof Error ? failure.message : String(failure);
     } finally {
       busy = false;
-      await invalidateAll();
+      pending = undefined;
+      committing = false;
+      if (!leaving) await invalidateAll();
     }
-    if (navigate)
+    if (navigate && !leaving)
       await goto(`/project/external/${encodeURIComponent(id)}`, {
         invalidateAll: true
       });
@@ -69,7 +112,7 @@
 
 <svelte:window
   onbeforeunload={(event) => {
-    if (dirty) {
+    if (dirty && !leaving) {
       event.preventDefault();
       event.returnValue = '';
     }
@@ -106,28 +149,61 @@
     /></label
   >
   <label
-    >Bearer token environment variable (optional)<input
-      bind:value={tokenEnv}
-      disabled={busy}
-      placeholder="SUPPORT_MCP_TOKEN"
-    /></label
+    >Authentication<select bind:value={auth} disabled={busy}>
+      <option value="none">No authentication</option>
+      <option value="bearer">Bearer token</option>
+    </select></label
   >
-  <p class="workflow-muted">
-    Enter the variable name, never its secret value. Set it in the environment
-    that starts Forge. Bearer tokens require HTTPS except on loopback. OAuth
-    login, custom headers and legacy SSE transport are not supported in this
-    slice.
-  </p>
+  {#if auth === 'bearer'}
+    <label
+      >Token environment variable<input
+        bind:value={tokenEnv}
+        disabled={busy}
+        required
+        pattern="[A-Za-z_][A-Za-z0-9_]*"
+        placeholder="EXAMPLE_MCP_TOKEN"
+      /></label
+    >
+    <p class="workflow-muted">
+      Enter only the variable name. In the terminal that starts Forge, set that
+      variable to the access token issued for this server. Restart Forge after
+      changing the value.
+    </p>
+    <details>
+      <summary>Windows terminal setup</summary>
+      <p>
+        In Git Bash, run these lines and paste the raw access token at the
+        hidden prompt. Use the same variable name in this form.
+      </p>
+      <pre>read -rsp 'Access token: ' EXAMPLE_MCP_TOKEN; echo
+export EXAMPLE_MCP_TOKEN
+bun run dev</pre>
+      <p>
+        Forge adds the Bearer prefix. If the server uses OAuth, complete its
+        sign-in in an OAuth client first and renew the token when it expires.
+      </p>
+    </details>
+  {/if}
   <p class="workflow-notice">
     Connect only servers you trust. Forge sends this source's configured
     credential and test arguments to it. Tools may perform real actions; Forge
     does not retry failed calls.
   </p>
-  <button class="primary-button" disabled={busy}
-    >{busy
-      ? 'Connecting…'
-      : source
-        ? 'Save connection and reload'
-        : 'Connect server'}</button
-  >
+  <div class="workflow-toolbar">
+    <button class="primary-button" disabled={busy}
+      >{busy
+        ? committing
+          ? 'Saving…'
+          : 'Connecting…'
+        : source
+          ? 'Save connection and reload'
+          : 'Connect server'}</button
+    >
+    <button
+      type="button"
+      class="secondary-button"
+      disabled={committing}
+      onclick={cancel}>Cancel</button
+    >
+  </div>
 </form>

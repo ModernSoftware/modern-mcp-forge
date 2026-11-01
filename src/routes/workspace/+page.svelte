@@ -1,4 +1,5 @@
 <script lang="ts">
+  import ExpandableDescription from '$lib/components/ExpandableDescription.svelte';
   import { page } from '$app/state';
   import { reloadProjectSources } from '$lib/client/reload-project-sources';
   import { invalidateAll } from '$app/navigation';
@@ -62,6 +63,11 @@
       busy = false;
     }
   }
+  let unavailable = $derived(
+    data.snapshot.sources.filter(
+      (s) => s.kind === 'external' && s.status === 'failed'
+    )
+  );
   let search = $state('');
   let kind = $state('all');
   let rows = $derived(
@@ -134,17 +140,27 @@
     been converted to MCPack. <a href="/tools">Open legacy views</a> to review them;
     new capabilities use the native workflow.
   </p>{/if}
-{#if actionError}<p role="alert" class="workflow-error">{actionError}</p>{/if}
-{#if data.snapshot.error || data.catalogError}<p
+{#if actionError || data.snapshot.error || data.catalogError}<p
     class="workflow-error"
     role="alert"
   >
-    {data.snapshot.error || data.catalogError}
+    {actionError || data.snapshot.error || data.catalogError}
     <button class="secondary-button" disabled={busy} onclick={reload}
       >{busy ? 'Reloading…' : 'Reload project sources'}</button
     >
     <a href="/project">Review configuration</a>
   </p>{/if}
+{#each unavailable as source (source.id)}
+  <p class="workflow-error" role="alert">
+    <strong>{source.id}</strong> · {source.error}
+    <a href={`/project/external/${encodeURIComponent(source.id)}`}
+      >Manage connection</a
+    >
+    <button class="secondary-button" disabled={busy} onclick={reload}
+      >Reload project sources</button
+    >
+  </p>
+{/each}
 {#each data.sources.filter((entry) => entry.error) as entry}<p
     role="alert"
     class="workflow-error"
@@ -184,7 +200,7 @@
             >{row.definition.name}</a
           >
         </h2>
-        <p>{row.definition.description || 'No description yet.'}</p>
+        <ExpandableDescription text={row.definition.description} />
       </div>
       <div class="workflow-toolbar">
         {#if row.source.kind === 'native'}<button

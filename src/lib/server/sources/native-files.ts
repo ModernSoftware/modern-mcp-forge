@@ -1,3 +1,4 @@
+import { createReadStream } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { readdir, stat } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
@@ -19,10 +20,14 @@ function inaccessible(error: unknown) {
   );
 }
 
-// Native workers retain their module graph until restarted. File stamps let the
-// local tester detect IDE edits without reading file contents or resetting a
+// Native workers retain their module graph until restarted. Content fingerprints let the
+// local tester detect IDE edits without rereading unchanged files or resetting a
 // stateful worker on every call. Installed packages are reloaded explicitly.
-export async function nativeFileStamp(manifest: string) {
+export async function nativeFileStamp(
+  manifest: string,
+  cache: Map<string, { metadata: string; digest: string }>
+) {
+  const seen = new Set<string>();
   const hash = createHash('sha256');
   async function visit(folder: string) {
     const entries = await readdir(folder, { withFileTypes: true }).catch(
@@ -45,16 +50,21 @@ export async function nativeFileStamp(manifest: string) {
         throw error;
       });
       if (!info) continue;
-      hash.update(
-        JSON.stringify([
-          path,
-          String(info.size),
-          String(info.mtimeNs),
-          String(info.ctimeNs)
-        ])
+      seen.add(path);
+      const metadata = [info.ino, info.size, info.mtimeNs, info.ctimeNs].join(
+        '/'
       );
+      let cached = cache.get(path);
+      if (cached?.metadata !== metadata) {
+        const content = createHash('sha256');
+        for await (const chunk of createReadStream(path)) content.update(chunk);
+        cached = { metadata, digest: content.digest('hex') };
+        cache.set(path, cached);
+      }
+      hash.update(JSON.stringify([path, cached.digest]));
     }
   }
   await visit(dirname(manifest));
+  for (const path of cache.keys()) if (!seen.has(path)) cache.delete(path);
   return hash.digest('hex');
 }

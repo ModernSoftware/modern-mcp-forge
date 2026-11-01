@@ -71,8 +71,7 @@ transition. A side effect may already have occurred: rejection does not authoriz
 retrying a write.
 
 Create/open/activate starts configured sources. Switching projects, closing,
-forgetting the active project close the old sources. Partial startup rolls back all started adapters and clears their
-catalogs. A cleanup failure retains failed owners for retry and prevents invocation.
+forgetting the active project close the old sources. A native startup failure rolls back started adapters and clears their catalogs. An unavailable external connection is reported on its own source and excluded from discovery. Healthy native and external sources can still serve requests. A cleanup failure retains failed owners for retry and prevents invocation.
 
 The owner survives Vite module reloads. After a Forge process restart, remembered
 SQLite selection alone does not execute source code: reopen the project or reload

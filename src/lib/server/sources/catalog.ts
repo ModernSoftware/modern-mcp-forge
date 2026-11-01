@@ -35,8 +35,25 @@ export function projectCatalog(
   }
   const catalogs =
     snapshot.project === manifest.project.id
-      ? snapshot.sources.filter((source) => source.enabled)
+      ? snapshot.sources.filter(
+          (source) =>
+            source.enabled &&
+            !(source.kind === 'external' && source.status === 'failed')
+        )
       : [];
+  validateCatalogNames(manifest, catalogs);
+  return { snapshot, catalogs };
+}
+
+export function validateCatalogNames(
+  manifest: ForgeProjectManifest,
+  catalogs: Array<
+    Pick<
+      ReturnType<ProjectSourceManager['snapshot']>['sources'][number],
+      'id' | 'status' | 'catalog'
+    >
+  >
+) {
   const names = {
     tools: new Set(
       manifest.tools.filter((item) => item.enabled).map((item) => item.name)
@@ -71,5 +88,4 @@ export function projectCatalog(
       uris.add(resource.uri);
     }
   }
-  return { snapshot, catalogs };
 }

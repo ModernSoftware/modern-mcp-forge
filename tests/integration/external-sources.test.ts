@@ -105,7 +105,7 @@ test('external authentication errors are redacted; redirects cannot leak credent
   const upstream = externalServer({ token: 'SECRET-FROM-UPSTREAM-ERROR' });
   const adapter = new ExternalSourceAdapter(definition(upstream.url));
   try {
-    await expect(adapter.start()).rejects.toThrow('Check URL, authentication');
+    await expect(adapter.start()).rejects.toThrow('HTTP 401');
     expect(adapter.health().status).toBe('failed');
   } finally {
     await adapter.close();

@@ -223,7 +223,11 @@ export const POST: RequestHandler = async ({ request }) => {
           throw error;
         }
       } else changeNativeSource(project, input.id, input.action);
-      const snapshot = await startProjectSources(project);
+      const createdNative =
+        input.action === 'create-capability' || input.action === 'create'
+          ? input.id
+          : undefined;
+      const snapshot = await startProjectSources(project, createdNative);
       // Runtime failure does not discard saved work: files remain editable.
       return json({ file, snapshot });
     });

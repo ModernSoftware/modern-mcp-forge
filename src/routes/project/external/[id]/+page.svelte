@@ -1,8 +1,10 @@
 <script lang="ts">
   import { afterConfirmingProjectLeave } from '$lib/navigation/project-leave';
   import { goto, invalidateAll } from '$app/navigation';
+  import ExpandableDescription from '$lib/components/ExpandableDescription.svelte';
   import ExternalConnection from '$lib/components/ExternalConnection.svelte';
   let { data } = $props();
+  const categories = ['tools', 'resources', 'prompts'] as const;
   let busy = $state(false);
   let error = $state('');
   let result = $state('');
@@ -71,11 +73,11 @@
     </p>
   </div>
 </section>
-{#if error || data.snapshot.error || data.catalogError}<p
+{#if error || sourceState?.error || data.snapshot.error || data.catalogError}<p
     role="alert"
     class="workflow-error"
   >
-    {error || data.snapshot.error || data.catalogError}
+    {error || sourceState?.error || data.snapshot.error || data.catalogError}
   </p>{/if}
 <div class="workflow-toolbar">
   <button
@@ -107,15 +109,22 @@
     and URIs. Refresh by saving the connection or reloading sources. Resource
     templates, subscriptions, sampling and elicitation are not relayed.
   </p>
-  {#each ['tools', 'resources', 'prompts'] as category}<details open>
-      <summary>{category}</summary>
-      <pre class="external-json">{JSON.stringify(
-          sourceState?.catalog[category as 'tools' | 'resources' | 'prompts'] ??
-            [],
-          null,
-          2
-        )}</pre>
-    </details>{/each}
+  {#each categories as category}
+    {@const items = sourceState?.catalog[category] ?? []}
+    <details open>
+      <summary>{category} ({items.length})</summary>
+      {#each items as item (item.name)}
+        <article>
+          <h3>{item.name}</h3>
+          <ExpandableDescription text={item.description} />
+          <details>
+            <summary>Full definition</summary>
+            <pre class="external-json">{JSON.stringify(item, null, 2)}</pre>
+          </details>
+        </article>
+      {/each}
+    </details>
+  {/each}
 </section>
 <section class="glass-card workflow-form">
   <h2>Test an external capability</h2>

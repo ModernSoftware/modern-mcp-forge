@@ -8,18 +8,32 @@ native MCPack capabilities. This is development aggregation, not MCPack deployme
 
 1. Open a project and choose **Connect external server** in the workspace.
 2. Enter a unique connection name and the full Streamable HTTP MCP endpoint.
-3. Optionally enter a bearer-token **environment-variable name**, such as
-   `SUPPORT_MCP_TOKEN`. Set its value in the environment that starts Forge. Do not
-   put the token itself in the form, URL or project manifest.
-4. Connect, inspect the discovered catalog, and test a tool/resource/prompt.
+3. Choose **No authentication** for a public server, or **Bearer token** for a protected one. In the latter case, enter an environment-variable name such as `EXAMPLE_MCP_TOKEN`.
+4. Connect, inspect the discovered catalog, and test a tool, resource or prompt. Use **Show more** to read a long description and **Show less** to collapse it. Clients receive its full text.
 5. Reconnect Inspector or your agent to Forge after changing sources.
 
-Configuration links to each connection. You can update its URL/auth reference,
-disable/enable it, remove it, or reload all sources. A failed connection stays
-editable. Startup remains fail-closed: a failing enabled source prevents the
-combined project catalog from being served; disable that source to restore the
-others. Closing/switching projects closes local clients and makes a best-effort
-attempt to terminate upstream sessions.
+Forge verifies an enabled connection before saving it. A failed attempt leaves the draft available to edit or cancel. A failed edit preserves the last saved configuration and session. If a previously saved external server goes offline, its catalog is omitted while healthy sources remain usable. Use **Manage connection** in the workspace to repair, disable or remove it. Reload to rediscover it when it recovers.
+
+## Set a bearer token on Windows
+
+The upstream service issues the **access token**. You choose the environment-variable name. Forge reads its value from the process that runs `bun run dev` and adds the `Bearer ` prefix. The project manifest stores only the variable name.
+
+In Git Bash, stop the existing Forge process, then run these commands in the Forge repository. Paste the raw token at the hidden prompt.
+
+```bash
+read -rsp 'Access token: ' EXAMPLE_MCP_TOKEN; echo
+export EXAMPLE_MCP_TOKEN
+bun run dev
+```
+
+In PowerShell 7.1 or later, use:
+
+```powershell
+$env:EXAMPLE_MCP_TOKEN = Read-Host 'Access token' -MaskInput
+bun run dev
+```
+
+For [the hosted Inspector example](https://github.com/modelcontextprotocol/inspector/blob/main/specification/v2_auth_smoke_testing.md), connect Inspector directly to `https://example-server.modelcontextprotocol.io/mcp` and complete OAuth consent. In Inspector versions with **Connection Info → OAuth Details**, copy the access token for that server. Use it as the variable value, then enter `EXAMPLE_MCP_TOKEN` in Forge. Forge currently accepts a supplied access token. OAuth login and token refresh happen outside Forge. Replace expired tokens and restart Forge in the same terminal.
 
 ## Identity and schemas
 
@@ -53,7 +67,7 @@ forwarded: each source uses its own explicitly configured credential.
   category, and rejects repeated cursors. Responses/streams are limited to 8 MiB.
 - Calls time out after 20 seconds. Forge never retries a failed write. A timeout or
   disconnect can leave its outcome unknown; verify upstream before retrying.
-- Remote transport/protocol errors are generic so response bodies cannot expose
+- Authentication failures identify HTTP 401 or 403. Other remote transport/protocol errors are generic so response bodies cannot expose
   tokens in Forge diagnostics. Successful tool output is still untrusted upstream
   content and is shown as returned.
 - Local Host/Origin checks protect management operations. Forge is not a production

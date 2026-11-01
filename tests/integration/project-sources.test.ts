@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { cp, mkdtemp, rm, symlink } from 'node:fs/promises';
+import { cp, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { ProjectSourceManager } from '../../src/lib/server/sources/manager';
@@ -233,3 +233,62 @@ test('native sources isolate state and reject manifest symlinks outside the proj
     });
   }
 }, 30_000);
+
+test('a freshly scaffolded source synchronizes a helper edited during worker startup', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'forge-first-sync-'));
+  const manager = new ProjectSourceManager();
+  try {
+    await writeFile(join(root, 'value.mjs'), 'export default "initial";');
+    await writeFile(
+      join(root, 'handlers.mjs'),
+      `
+      import value from './value.mjs';
+      import {writeFileSync} from 'node:fs';
+      export function createWorker() {
+        if (value === 'initial') writeFileSync(new URL('./value.mjs', import.meta.url), 'export default "ready";');
+        return {tools: { inspect: async () => ({content: [{type:'text',text:value}]}) }};
+      }`
+    );
+    await writeFile(
+      join(root, 'mcpack.json'),
+      JSON.stringify({
+        schemaVersion: 1,
+        name: 'scaffold',
+        version: '1.0.0',
+        workers: { main: { runtime: 'node', module: './handlers.mjs' } },
+        tools: [
+          {
+            name: 'inspect',
+            worker: 'main',
+            handler: 'inspect',
+            inputSchema: { type: 'object', properties: {} }
+          }
+        ]
+      })
+    );
+    const snapshot = await manager.open(
+      'project',
+      root,
+      [{ ...definition('new'), manifest: 'mcpack.json' }],
+      { createdNative: 'new' }
+    );
+    expect(snapshot.status).toBe('ready');
+    const result = await manager.testNative(
+      'project',
+      snapshot.generation,
+      'new',
+      { kind: 'tool', name: 'inspect', arguments: {} }
+    );
+    expect(result).toMatchObject({
+      content: [{ type: 'text', text: 'ready' }]
+    });
+  } finally {
+    await manager.close();
+    await rm(root, {
+      recursive: true,
+      force: true,
+      maxRetries: 5,
+      retryDelay: 100
+    });
+  }
+}, 30000);

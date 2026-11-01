@@ -7,6 +7,7 @@ export function externalServer(
     repeatedCursor?: boolean;
     paginated?: boolean;
     toolsOnly?: boolean;
+    description?: string;
   } = {}
 ) {
   const calls: Array<{
@@ -19,7 +20,7 @@ export function externalServer(
     server.registerTool(
       'lookup',
       {
-        description: 'Find an order',
+        description: options.description ?? 'Find an order',
         inputSchema: z.object({ filter: z.object({ id: z.string() }) }),
         annotations: { readOnlyHint: true }
       },
@@ -34,7 +35,7 @@ export function externalServer(
       server.registerResource(
         'invoice',
         'support://invoice',
-        { mimeType: 'text/plain' },
+        { mimeType: 'text/plain', description: options.description },
         async (uri) => ({
           contents: [
             { uri: uri.href, mimeType: 'text/plain', text: 'Invoice contents' }
@@ -43,7 +44,10 @@ export function externalServer(
       );
       server.registerPrompt(
         'review',
-        { argsSchema: z.object({ customer: z.string() }) },
+        {
+          argsSchema: z.object({ customer: z.string() }),
+          description: options.description
+        },
         async ({ customer }) => ({
           messages: [
             {

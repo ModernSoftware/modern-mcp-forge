@@ -6,11 +6,14 @@ import { getActiveProjectRecord } from '$lib/server/projects/project-service';
 import { projectTransition } from '$lib/server/mcpack/project-transition';
 import { NativeProjectError } from '$lib/server/mcpack/session';
 import { projectSources } from '$lib/server/sources/manager';
-import { startProjectSources } from '$lib/server/sources/project';
+import { prepareExternalChange } from '$lib/server/sources/authoring';
+import { validateCatalogNames } from '$lib/server/sources/catalog';
 import {
-  saveExternalSource,
-  changeExternalSource
-} from '$lib/server/sources/authoring';
+  stageExternalDraft,
+  takeExternalDraft,
+  type VerifiedExternalChange
+} from '$lib/server/sources/external-drafts';
+import { ExternalSourceAdapter } from '$lib/server/sources/external';
 import { ProjectSourceSchema } from '$lib/server/sources/schema';
 
 const identity = {
@@ -18,6 +21,17 @@ const identity = {
   generation: z.number().int().nonnegative()
 };
 const Input = z.discriminatedUnion('action', [
+  z
+    .object({
+      ...identity,
+      action: z.literal('preview'),
+      operation: z.enum(['create', 'update']),
+      source: ProjectSourceSchema
+    })
+    .strict(),
+  z
+    .object({ ...identity, action: z.literal('commit'), ticket: z.uuid() })
+    .strict(),
   z
     .object({
       ...identity,
@@ -90,10 +104,83 @@ export const POST: RequestHandler = async ({ request }) => {
     }
     return await projectTransition(async () => {
       const project = current();
-      if ('source' in input)
-        saveExternalSource(project, input.source, input.action === 'create');
-      else changeExternalSource(project, input.id, input.action);
-      return json({ snapshot: await startProjectSources(project) });
+      let verified: VerifiedExternalChange;
+      if (input.action === 'commit') {
+        verified = takeExternalDraft(
+          project.id,
+          input.generation,
+          input.ticket
+        );
+      } else {
+        const change = prepareExternalChange(
+          project,
+          input.action === 'preview'
+            ? { action: input.operation, source: input.source }
+            : input
+        );
+        const { candidate, manifest } = change;
+        const adapter = candidate
+          ? new ExternalSourceAdapter(candidate)
+          : undefined;
+        try {
+          await adapter?.start(request.signal);
+          if (candidate && adapter) {
+            const catalog = await adapter.discover();
+            const snapshot = projectSources.snapshot();
+            const others =
+              snapshot.project === project.id
+                ? snapshot.sources.filter(
+                    (source) =>
+                      source.id !== candidate.id && source.status === 'ready'
+                  )
+                : [];
+            validateCatalogNames(manifest, [
+              ...others,
+              { id: candidate.id, status: 'ready', catalog }
+            ]);
+          }
+          request.signal.throwIfAborted();
+          verified = { change, adapter };
+          if (input.action === 'preview') {
+            const ticket = await stageExternalDraft(
+              project.id,
+              input.generation,
+              verified
+            );
+            return json(
+              { ticket },
+              { headers: { 'cache-control': 'no-store' } }
+            );
+          }
+        } catch (error) {
+          await adapter?.close();
+          throw error;
+        }
+      }
+      const { change, adapter } = verified;
+      const { candidate, manifest } = change;
+      try {
+        request.signal.throwIfAborted();
+        if (adapter && adapter.health().status !== 'ready')
+          throw new NativeProjectError(
+            'The connection closed before saving. Connect again.'
+          );
+        change.commit();
+      } catch (error) {
+        await adapter?.close();
+        throw error;
+      }
+      return json({
+        snapshot: await projectSources.open(
+          project.id,
+          project.path,
+          manifest.sources ?? [],
+          {
+            prepared:
+              candidate && adapter ? { id: candidate.id, adapter } : undefined
+          }
+        )
+      });
     });
   } catch (error) {
     return json(

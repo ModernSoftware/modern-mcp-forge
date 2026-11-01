@@ -8,6 +8,7 @@ export class NativeSourceAdapter implements SourceAdapter {
   private manager = new NativeProjectManager();
   private manifest?: string;
   private loadedStamp?: string;
+  private fileCache = new Map<string, { metadata: string; digest: string }>();
   constructor(
     private root: string,
     private filename: string
@@ -23,7 +24,9 @@ export class NativeSourceAdapter implements SourceAdapter {
       throw new Error('Native source manifest must remain inside the project.');
     }
     // Stamp before startup so a concurrent edit is detected on the next test.
-    this.loadedStamp = await nativeFileStamp(manifest).catch(() => undefined);
+    this.loadedStamp = await nativeFileStamp(manifest, this.fileCache).catch(
+      () => undefined
+    );
     const opened = await this.manager.open(manifest);
     if (opened?.status !== 'ready')
       throw new Error(opened?.error ?? 'Source failed to start.');
@@ -46,7 +49,7 @@ export class NativeSourceAdapter implements SourceAdapter {
     );
   }
 
-  async assertTestFilesCurrent() {
+  async filesChanged() {
     if (!this.manifest)
       throw new NativeProjectError('Start the source before testing.', 409);
     if (this.loadedStamp === undefined)
@@ -54,12 +57,10 @@ export class NativeSourceAdapter implements SourceAdapter {
         'Forge could not check this source for external edits. Check folder access and reload sources.',
         409
       );
-    const current = await nativeFileStamp(this.manifest).catch(() => undefined);
-    if (this.loadedStamp !== current)
-      throw new NativeProjectError(
-        'Files changed on disk since this worker started. Reload files & restart sources before testing.',
-        409
-      );
+    const current = await nativeFileStamp(this.manifest, this.fileCache).catch(
+      () => undefined
+    );
+    return this.loadedStamp !== current;
   }
 
   diagnostics() {

@@ -16,7 +16,7 @@ export interface SourceAdapter {
     status: 'starting' | 'ready' | 'failed' | 'stopped';
     error?: string;
   };
-  assertTestFilesCurrent?(): Promise<void>;
+  filesChanged?(): Promise<boolean>;
   diagnostics?(): string;
   close(): Promise<void>;
 }

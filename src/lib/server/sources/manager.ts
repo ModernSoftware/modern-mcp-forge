@@ -4,6 +4,8 @@ import type {
   SourceCatalog,
   SourceFactory
 } from './contracts';
+import { NativeProjectError } from '../mcpack/session';
+import { discardExternalDrafts } from './external-drafts';
 import { ExternalSourceAdapter } from './external';
 import { NativeSourceAdapter } from './native';
 import { ProjectSourcesSchema, type ProjectSource } from './schema';
@@ -25,6 +27,7 @@ export class ProjectSourceManager {
   private adapters = new Map<string, SourceAdapter>();
   private catalogs = new Map<string, SourceCatalog>();
   private error?: string;
+  private externalFailures = new Map<string, string>();
   private failedSource?: { id: string; diagnostics: string };
 
   // Local authoring only. Worker output must never enter the public MCP catalog.
@@ -44,7 +47,11 @@ export class ProjectSourceManager {
   ) {
     if (project !== this.project || generation !== this.generation)
       throw new Error('Project sources changed. Refresh before testing.');
-    await this.adapters.get(source)?.assertTestFilesCurrent?.();
+    if (await this.adapters.get(source)?.filesChanged?.())
+      throw new NativeProjectError(
+        'Files changed on disk since this worker started. Reload files & restart sources before testing.',
+        409
+      );
     return this.invoke(project, generation, source, call);
   }
 
@@ -60,17 +67,31 @@ export class ProjectSourceManager {
       generation: this.generation,
       status: this.status,
       error: this.error,
-      sources: this.definitions.map((definition) => ({
-        ...definition,
-        ...(this.adapters.get(definition.id)?.health() ?? {
-          status: !definition.enabled
+      sources: this.definitions.map((definition) => {
+        const health = this.adapters.get(definition.id)?.health();
+        const externalError = this.externalFailures.get(definition.id);
+        const status =
+          health?.status ??
+          (!definition.enabled
             ? 'disabled'
-            : this.failedSource?.id === definition.id
+            : externalError || this.failedSource?.id === definition.id
               ? 'failed'
-              : 'stopped'
-        }),
-        catalog: this.visibleCatalog(definition)
-      }))
+              : 'stopped');
+        return {
+          ...definition,
+          status,
+          error:
+            externalError ??
+            health?.error ??
+            (definition.kind === 'external' && status === 'failed'
+              ? 'Connection lost. Reload or edit this connection.'
+              : undefined),
+          catalog:
+            status === 'ready'
+              ? this.visibleCatalog(definition)
+              : { tools: [], resources: [], prompts: [] }
+        };
+      })
     };
   }
 
@@ -110,6 +131,7 @@ export class ProjectSourceManager {
     ++this.generation;
     this.status = 'stopped';
     this.catalogs.clear();
+    await discardExternalDrafts();
     const entries = [...this.adapters.entries()];
     const results = await Promise.allSettled(
       entries.map(([, adapter]) => adapter.close())
@@ -126,10 +148,28 @@ export class ProjectSourceManager {
     }
   }
 
-  open(project: string, root: string, input: ProjectSource[]) {
+  // A successfully previewed connection transfers ownership to this manager.
+  open(
+    project: string,
+    root: string,
+    input: ProjectSource[],
+    options: {
+      prepared?: { id: string; adapter: SourceAdapter };
+      createdNative?: string;
+    } = {}
+  ) {
+    const { prepared } = options;
     return this.exclusive(async () => {
-      const sources = ProjectSourcesSchema.parse(input);
-      await this.stop();
+      let sources: ProjectSource[];
+      try {
+        sources = ProjectSourcesSchema.parse(input);
+        await this.stop();
+      } catch (error) {
+        await prepared?.adapter.close();
+        throw error;
+      }
+      if (prepared) this.adapters.set(prepared.id, prepared.adapter);
+      this.externalFailures.clear();
       this.project = project;
       this.definitions = sources;
       this.error = undefined;
@@ -139,10 +179,32 @@ export class ProjectSourceManager {
       try {
         for (const source of sources.filter((source) => source.enabled)) {
           startingId = source.id;
-          const adapter = this.factory(root, source);
+          const staged =
+            source.id === prepared?.id ? prepared.adapter : undefined;
+          const adapter = staged ?? this.factory(root, source);
           this.adapters.set(source.id, adapter);
-          await adapter.start();
-          this.catalogs.set(source.id, await adapter.discover());
+          try {
+            if (!staged) await adapter.start();
+            // Confirm the freshly scaffolded files were the ones the worker loaded.
+            // If they changed during startup, sync once before opening the editor.
+            if (
+              source.kind === 'native' &&
+              source.id === options.createdNative &&
+              (await adapter.filesChanged?.())
+            ) {
+              await adapter.close();
+              await adapter.start();
+            }
+            this.catalogs.set(source.id, await adapter.discover());
+          } catch (error) {
+            if (source.kind !== 'external') throw error;
+            await adapter.close();
+            this.adapters.delete(source.id);
+            this.externalFailures.set(
+              source.id,
+              error instanceof Error ? error.message : 'Connection failed.'
+            );
+          }
         }
         this.status = 'ready';
       } catch (error) {
@@ -165,6 +227,7 @@ export class ProjectSourceManager {
       this.project = undefined;
       this.failedSource = undefined;
       this.definitions = [];
+      this.externalFailures.clear();
       this.error = undefined;
     });
   }
