@@ -50,3 +50,5 @@ Once those exist, this file can act as the permanent documentation index.
 - [Native authoring](native-authoring.md) — create, edit and test project MCPack sources.
 
 - [Project workflow and continuation guide](project-workflow.md): UX decisions, current scope and next steps.
+
+- [External MCP sources](external-sources.md): connect trusted HTTP endpoints and test their capabilities.

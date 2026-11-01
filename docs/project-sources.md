@@ -49,17 +49,18 @@ Reserved descriptors for later adapters:
 ]
 ```
 
-Bridge and external descriptors **must stay disabled**. They neither execute code
-nor connect to URLs. Enabling them is rejected. Authentication, bridge dispatch,
-and connection options will be specified with those implementations. External URL
-credentials, query strings and fragments are rejected at this stage.
+Bridge descriptors **must stay disabled** until bridge dispatch is implemented.
+External descriptors now support Streamable HTTP and optional bearer credentials
+through an environment-variable reference; see [External sources](external-sources.md).
+External URL credentials, query strings and fragments are rejected.
+The disabled external example above can be enabled when its server is available.
 
 ## Ownership and failure behavior
 
 Each enabled native source owns a separate MCPack CLI process and worker set.
 Catalogs remain keyed by source ID, so identical upstream names can coexist
 internally. The combined endpoint rejects duplicate tool/prompt names, resource names and URIs.
-Explicit aliases are future work.
+External connections can prefix every name or only collisions. Resource URIs always identify the owning connection. Custom aliases are future work.
 
 The adapter contract covers start, discovery, invocation with cancellation, health,
 and close. The project owner serializes open/close/reload. Reload is a full restart
@@ -69,8 +70,7 @@ transition. A side effect may already have occurred: rejection does not authoriz
 retrying a write.
 
 Create/open/activate starts configured sources. Switching projects, closing,
-forgetting the active project close the old sources. Partial startup rolls back all started adapters and clears their
-catalogs. A cleanup failure retains failed owners for retry and prevents invocation.
+forgetting the active project close the old sources. A native startup failure rolls back started adapters and clears their catalogs. An unavailable external connection is reported on its own source and excluded from discovery. Healthy native and external sources can still serve requests. A cleanup failure retains failed owners for retry and prevents invocation.
 
 The owner survives Vite module reloads. After a Forge process restart, remembered
 SQLite selection alone does not execute source code: reopen the project or reload

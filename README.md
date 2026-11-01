@@ -245,3 +245,5 @@ sharing feedback during the 0.9 public beta.
 ## v0.10.0 project workspace
 
 Open a recent project, choose **Add capability**, then create a native Node or Python tool, resource or prompt. Edit its definition and handler, test it, and manage sources from Configuration. The same native files run with standalone MCPack. See [native authoring](docs/native-authoring.md) and [the setup guide](docs/mcpack.md). Forge includes the published MCPack 0.9.0 package from npm. A local checkout override remains available for maintainer testing.
+
+External Streamable HTTP servers can also be connected from the project workspace, with optional bearer authentication through an environment-variable reference. See [External sources](docs/external-sources.md) for namespacing, security boundaries and current limits.

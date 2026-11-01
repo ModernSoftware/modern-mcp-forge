@@ -1,6 +1,6 @@
 # Project workflow and continuation guide
 
-Target branch: `v0.10.0`. Follow-up to PR #14; tracked in issue #15.
+Target branch: `v0.10.0`. Unified workspace merged in PR #16; external source integration tracked in issue #17.
 
 ## Product decisions
 
@@ -9,7 +9,7 @@ Target branch: `v0.10.0`. Follow-up to PR #14; tracked in issue #15.
 - The project workspace groups tools, resources and prompts and identifies their sources.
 - Native capabilities execute exclusively through MCPack 0.9.0. Node and Python are supported.
 - Bridge adapters and external servers contribute complete catalogs, not individual imported tools. Their code and schemas remain owned by the source; later local aliases must preserve routing identity.
-- Names and resource URIs can collide across any sources. Until aliases exist, fail closed.
+- New external connections can keep unique upstream names and qualify collisions. Existing connections keep their prefix policy. Resource URIs carry the source identity.
 - Native export will include only native code, manifests and dependency declarations. No secrets or remote/bridge capabilities.
 - Runtime controls currently operate on sources; do not represent source status as per-worker telemetry.
 - Preserve theme switching. Keep legacy data recognizable; never silently relabel it native.
@@ -21,10 +21,22 @@ Target branch: `v0.10.0`. Follow-up to PR #14; tracked in issue #15.
 3. Native-only export and dependency handling; improved runtime telemetry and supported controls.
 4. End-to-end mixed-source testing, documentation and release review.
 
+## UX review follow-up
+
+The 28 October recording and tracked fixes are summarized in
+[UX review and implementation plan](reviews/2026-10-28-ux-plan.md).
+Native item editing now keeps Definition, Code and Test together. Visual field
+edits save directly; new items generate a single named handler. PR #18 remains
+open for review on `feat/external-mcp-sources`.
+
+The [November 1 walkthrough](reviews/2026-11-01-ux-plan.md) tracks the IDE edit/reload fixes, source-local npm setup and agent connection flow. It includes a replay recipe for the SQLite quote tool.
+
+For the pre-merge replay, filter by capability type and source type together, then invoke a native tool from Inspector and from the workbench. Execution history should show two rows with different origins. Change an existing external connection to **Prefix only colliding names**, reconnect Inspector, and verify discovery and calls. Bridging is the next integration milestone, followed by native-only export.
+
 ## Continue in a fresh chat
 
 Use ModernSoftware/modern-mcp-forge, base v0.10.0, working branch
-feat/unified-project-workflow and issue #15. Inspect the linked PR and current CI
+feat/external-mcp-sources and issue #17. Inspect the linked PR and current CI
 before editing. Do not merge or publish without the user's instruction. Keep
 changes in this branch. Read this document and the PR's test results; do not
 assume future items above are implemented.
@@ -34,7 +46,7 @@ assume future items above are implemented.
 - Search recent projects; open into the unified workspace.
 - Create one native capability in a new source, a new worker in an existing source,
   or bind an existing worker handler. Node and Python use MCPack 0.9.0.
-- Edit metadata and full definitions; tool schemas also have an explicit simple-field builder.
+- Edit tool metadata in either input-schema mode. Use visual fields for simple schemas, JSON for advanced rules and Advanced source files for the full manifest.
 - Filter/search capabilities and disable them without removing their code.
 - Configuration links to the same editors, shows configured workers, and manages sources.
 - Retire standalone preview selection. Close protects dirty drafts, stops sources and disables MCP.
@@ -48,5 +60,11 @@ Workspace → Disable/Enable → Edit details → change description → Close a
 searching recent projects, dark theme and a narrow viewport. No browser console
 errors should occur when editing JSON.
 
-Source controls restart all sources after configuration edits. Individual worker
-stop/restart and native execution-history persistence are not implemented yet.
+Source controls restart all sources after configuration edits. Native and external tool calls appear in Execution history. Individual worker stop/restart is still pending.
+
+## External sources slice
+
+PR #18 adds trusted Streamable HTTP connections, bearer authentication through environment variables, and routing alongside native capabilities.
+See [External sources](external-sources.md) for supported behavior and limits.
+Bridge implementation, external metadata overrides, OAuth login, and native-only
+export remain subsequent work. Do not treat their UI placeholders as implemented.

@@ -14,8 +14,12 @@ import { ManifestSchema, type Manifest } from '@modern-software/mcpack';
 import { ForgeProjectManifestSchema } from '../project/schema';
 import { NativeProjectError } from '../mcpack/session';
 import type { RegisteredProject } from '../projects/project-service';
-import { ProjectSourceSchema, ProjectSourcesSchema } from './schema';
-import { nativeStarter } from './starter';
+import {
+  ProjectSourceSchema,
+  ProjectSourcesSchema,
+  type ProjectSource
+} from './schema';
+import { nativeStarter, capabilityStarter } from './starter';
 
 const MAX_BYTES = 256 * 1024;
 const digest = (content: string) =>
@@ -199,6 +203,18 @@ export function createNativeSource(
   mkdirSync(folder);
   try {
     const starter = initial ?? nativeStarter(id, runtime);
+    if (runtime === 'node') {
+      const pkg = {
+        name: `forge-${id.toLowerCase()}`,
+        private: true,
+        type: 'module'
+      };
+      writeFileSync(
+        join(folder, 'package.json'),
+        JSON.stringify(pkg, null, 2) + '\n',
+        { flag: 'wx' }
+      );
+    }
     writeFileSync(join(folder, starter.module), starter.code, { flag: 'wx' });
     writeFileSync(
       join(folder, 'mcpack.json'),
@@ -297,7 +313,7 @@ export function createNativeCapability(
     throw new NativeProjectError(
       'This capability name already exists in the project.'
     );
-  const starter = nativeStarter(id, runtime);
+  const starter = capabilityStarter(id, runtime, kind, name);
   const definition = { ...starter.manifest[kind][0], name, description };
   if (kind === 'resources')
     Object.assign(definition, { uri: `mcpack://${id}/${name}` });
@@ -358,7 +374,7 @@ export function createNativeCapability(
     [kind]: [definition]
   };
   ManifestSchema.parse(manifest);
-  // Keep the factory's internal handlers; only the requested definition is exposed.
+  // New authoring emits only the requested handler; demonstration sources are separate.
   createNativeSource(project, id, runtime, {
     ...starter,
     manifest
@@ -455,4 +471,51 @@ export function setCapabilityEnabled(
   );
   if (!enabled) source.disabledCapabilities.push({ kind, name });
   atomicWrite(projectFile(project), JSON.stringify(manifest, null, 2) + '\n');
+}
+
+type ExternalChange =
+  | { action: 'create' | 'update'; source: ProjectSource }
+  | { action: 'enable' | 'disable' | 'remove'; id: string };
+
+/** Build the proposed manifest without writing it while discovery is in flight. */
+export function prepareExternalChange(
+  project: RegisteredProject,
+  change: ExternalChange
+) {
+  const path = projectFile(project);
+  const original = read(path);
+  const manifest = ForgeProjectManifestSchema.parse(JSON.parse(original));
+  const sources = manifest.sources ?? [];
+  const id = 'source' in change ? change.source.id : change.id;
+  const index = sources.findIndex((entry) => entry.id === id);
+  let source = sources[index];
+  if (change.action === 'create') {
+    if (index !== -1) throw new NativeProjectError('Source ID already exists.');
+  } else if (!source || source.kind !== 'external') {
+    throw new NativeProjectError('External source not found.');
+  }
+  if ('source' in change) {
+    source = change.source;
+    if (source.kind !== 'external')
+      throw new NativeProjectError('Expected an external source.');
+    if (change.action === 'create') sources.push(source);
+    else sources[index] = source;
+  } else if (change.action === 'remove') sources.splice(index, 1);
+  else source.enabled = change.action === 'enable';
+  manifest.sources = ProjectSourcesSchema.parse(sources);
+  return {
+    manifest,
+    candidate:
+      change.action !== 'remove' && source.kind === 'external' && source.enabled
+        ? source
+        : undefined,
+    commit() {
+      if (read(path) !== original)
+        throw new NativeProjectError(
+          'Project configuration changed on disk. Review it and retry.',
+          409
+        );
+      atomicWrite(path, JSON.stringify(manifest, null, 2) + '\n');
+    }
+  };
 }

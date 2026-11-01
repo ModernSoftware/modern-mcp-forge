@@ -22,6 +22,9 @@ const identity = { projectId: z.string(), id: z.string().min(1) };
 const generation = { generation: z.number().int().nonnegative() };
 const Input = z.discriminatedUnion('action', [
   z
+    .object({ ...identity, ...generation, action: z.literal('diagnostics') })
+    .strict(),
+  z
     .object({
       ...identity,
       ...generation,
@@ -133,9 +136,18 @@ export const POST: RequestHandler = async ({ request }) => {
       }
       return project;
     };
+    if (input.action === 'diagnostics') {
+      current();
+      return json(
+        { diagnostics: projectSources.diagnostics(input.projectId, input.id) },
+        {
+          headers: { 'cache-control': 'no-store' }
+        }
+      );
+    }
     if (input.action === 'invoke') {
       current();
-      const result = await projectSources.invoke(
+      const result = await projectSources.testNative(
         input.projectId,
         input.generation,
         input.id,
@@ -143,7 +155,8 @@ export const POST: RequestHandler = async ({ request }) => {
           kind: input.kind,
           name: input.name,
           arguments: input.arguments,
-          signal: request.signal
+          signal: request.signal,
+          origin: 'workbench'
         }
       );
       return json({ result });
@@ -211,7 +224,11 @@ export const POST: RequestHandler = async ({ request }) => {
           throw error;
         }
       } else changeNativeSource(project, input.id, input.action);
-      const snapshot = await startProjectSources(project);
+      const createdNative =
+        input.action === 'create-capability' || input.action === 'create'
+          ? input.id
+          : undefined;
+      const snapshot = await startProjectSources(project, createdNative);
       // Runtime failure does not discard saved work: files remain editable.
       return json({ file, snapshot });
     });

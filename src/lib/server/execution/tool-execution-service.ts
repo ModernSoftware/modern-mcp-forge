@@ -32,13 +32,15 @@ export interface ToolExecutionOutcome {
 
 export async function executeToolDefinition(
   definition: ToolDefinition,
-  args: Record<string, unknown>
+  args: Record<string, unknown>,
+  origin: 'mcp' | 'workbench' = 'workbench'
 ): Promise<ToolExecutionOutcome> {
   const execution = startToolExecution(
     definition.name,
     definition.runtime,
     args,
-    definition.entrypoint
+    definition.entrypoint,
+    {origin}
   );
 
   try {

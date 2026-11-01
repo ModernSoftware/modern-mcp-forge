@@ -1,7 +1,7 @@
 import type { ForgeProjectManifest } from '../project/schema';
 import { projectSources, type ProjectSourceManager } from './manager';
 
-/** Preserve source names; reject ambiguous routing until explicit aliases exist. */
+/** Validate the names published for this generation before registering MCP handlers. */
 export function projectCatalog(
   manifest: ForgeProjectManifest,
   manager: ProjectSourceManager = projectSources
@@ -35,8 +35,25 @@ export function projectCatalog(
   }
   const catalogs =
     snapshot.project === manifest.project.id
-      ? snapshot.sources.filter((source) => source.enabled)
+      ? snapshot.sources.filter(
+          (source) =>
+            source.enabled &&
+            !(source.kind === 'external' && source.status === 'failed')
+        )
       : [];
+  validateCatalogNames(manifest, catalogs);
+  return { snapshot, catalogs };
+}
+
+export function validateCatalogNames(
+  manifest: ForgeProjectManifest,
+  catalogs: Array<
+    Pick<
+      ReturnType<ProjectSourceManager['snapshot']>['sources'][number],
+      'id' | 'status' | 'catalog'
+    >
+  >
+) {
   const names = {
     tools: new Set(
       manifest.tools.filter((item) => item.enabled).map((item) => item.name)
@@ -71,5 +88,4 @@ export function projectCatalog(
       uris.add(resource.uri);
     }
   }
-  return { snapshot, catalogs };
 }

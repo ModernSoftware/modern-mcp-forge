@@ -1,7 +1,36 @@
 <script lang="ts">
+  import ExpandableDescription from '$lib/components/ExpandableDescription.svelte';
+  import { page } from '$app/state';
+  import { reloadProjectSources } from '$lib/client/reload-project-sources';
   import { invalidateAll } from '$app/navigation';
   let { data } = $props();
   let busy = $state(false);
+  let endpoint = $derived(new URL('/mcp', page.url).href);
+  let copyNotice = $state('');
+  async function reload() {
+    busy = true;
+    actionError = '';
+    try {
+      const result = await reloadProjectSources(
+        data.project.id,
+        data.snapshot.generation
+      );
+      if (result.error) throw new Error(result.error);
+    } catch (error) {
+      actionError = error instanceof Error ? error.message : String(error);
+    } finally {
+      await invalidateAll();
+      busy = false;
+    }
+  }
+  async function copyEndpoint() {
+    try {
+      await navigator.clipboard.writeText(endpoint);
+      copyNotice = 'Copied.';
+    } catch {
+      copyNotice = 'Select the URL and copy it.';
+    }
+  }
   let actionError = $state('');
   async function toggle(
     id: string,
@@ -34,12 +63,23 @@
       busy = false;
     }
   }
+  let unavailable = $derived(
+    data.snapshot.sources.filter(
+      (s) => s.kind === 'external' && s.status === 'failed'
+    )
+  );
   let search = $state('');
   let kind = $state('all');
+  let sourceKind = $state('all');
   let rows = $derived(
     data.sources.flatMap((entry) =>
       (['tools', 'resources', 'prompts'] as const).flatMap((category) =>
-        (entry.manifest?.[category] ?? []).map((definition) => ({
+        (entry.source.kind === 'external'
+          ? (data.snapshot.sources.find(
+              (source) => source.id === entry.source.id
+            )?.catalog[category] ?? [])
+          : (entry.manifest?.[category] ?? [])
+        ).map((definition) => ({
           definition,
           category,
           source: entry.source
@@ -51,6 +91,7 @@
     rows.filter(
       (row) =>
         (kind === 'all' || row.category === kind) &&
+        (sourceKind === 'all' || row.source.kind === sourceKind) &&
         `${row.definition.name} ${row.definition.description ?? ''} ${row.source.id}`
           .toLowerCase()
           .includes(search.toLowerCase())
@@ -65,29 +106,50 @@
     <h1>{data.project.name}</h1>
     <p>Build, edit and test your project's MCP capabilities.</p>
   </div>
-  <a class="primary-button" href="/workspace/new">＋ Add capability</a>
+</section>
+<div class="workflow-toolbar" role="group" aria-label="Project actions">
+  <a class="primary-button" href="/workspace/new?kind=tools">＋ Add tool</a>
+  <a class="secondary-button" href="/workspace/new?kind=resources"
+    >Add resource</a
+  >
+  <a class="secondary-button" href="/workspace/new?kind=prompts">Add prompt</a>
+  <a class="secondary-button" href="/workspace/connect"
+    >Connect external server</a
+  >
+  <button disabled title="Native-only export is a subsequent step"
+    >Export native · Soon</button
+  >
+</div>
+<section class="connect-agent" aria-label="Connect an agent">
+  <h2>Connect an agent</h2>
+  <span>Streamable HTTP</span><code>{endpoint}</code>
+  <button class="secondary-button" onclick={copyEndpoint}>Copy URL</button>
+  <span role="status">{copyNotice}</span>
 </section>
 <div class="workflow-toolbar">
   <label
-    >Search capabilities<input
+    >Search tools, resources and prompts<input
       bind:value={search}
       placeholder="Name, description or source"
     /></label
   >
   <label
-    >Show<select bind:value={kind}
-      ><option value="all">All capabilities</option><option value="tools"
-        >Tools</option
+    >Capability type<select aria-label="Capability type" bind:value={kind}
+      ><option value="all">All types</option><option value="tools">Tools</option
       ><option value="resources">Resources</option><option value="prompts"
         >Prompts</option
       ></select
     ></label
   >
-  <button disabled title="External server connections are a subsequent step"
-    >Connect external server · Soon</button
-  >
-  <button disabled title="Native-only export is a subsequent step"
-    >Export native · Soon</button
+  <label
+    >Source type<select aria-label="Source type" bind:value={sourceKind}>
+      <option value="all">All sources</option><option value="native"
+        >Native</option
+      >
+      <option value="external">External</option><option value="bridge"
+        >Bridged</option
+      >
+    </select></label
   >
 </div>
 {#if data.legacyCount}<p class="workflow-notice" role="status">
@@ -95,14 +157,27 @@
     been converted to MCPack. <a href="/tools">Open legacy views</a> to review them;
     new capabilities use the native workflow.
   </p>{/if}
-{#if actionError}<p role="alert" class="workflow-error">{actionError}</p>{/if}
-{#if data.snapshot.error || data.catalogError}<p
+{#if actionError || data.snapshot.error || data.catalogError}<p
     class="workflow-error"
     role="alert"
   >
-    {data.snapshot.error || data.catalogError}
-    <a href="/project">Review sources</a>
+    {actionError || data.snapshot.error || data.catalogError}
+    <button class="secondary-button" disabled={busy} onclick={reload}
+      >{busy ? 'Reloading…' : 'Reload project sources'}</button
+    >
+    <a href="/project">Review configuration</a>
   </p>{/if}
+{#each unavailable as source (source.id)}
+  <p class="workflow-error" role="alert">
+    <strong>{source.id}</strong> · {source.error}
+    <a href={`/project/external/${encodeURIComponent(source.id)}`}
+      >Manage connection</a
+    >
+    <button class="secondary-button" disabled={busy} onclick={reload}
+      >Reload project sources</button
+    >
+  </p>
+{/each}
 {#each data.sources.filter((entry) => entry.error) as entry}<p
     role="alert"
     class="workflow-error"
@@ -122,7 +197,15 @@
       )}
     <article class="workflow-row">
       <div>
-        <span class="source-badge">Native</span>
+        <span
+          class="source-badge"
+          class:external={row.source.kind === 'external'}
+          >{row.source.kind === 'external'
+            ? 'External'
+            : row.source.kind === 'bridge'
+              ? 'Bridged'
+              : 'Native'}</span
+        >
         <span class="workflow-muted"
           >{row.category} · {row.source.id}{!row.source.enabled
             ? ' · Disabled source'
@@ -132,26 +215,32 @@
         >
         <h2>
           <a
-            href={`/workspace/native/${encodeURIComponent(row.source.id)}/${row.category}/${encodeURIComponent(row.definition.name)}`}
+            href={row.source.kind === 'external'
+              ? `/project/external/${encodeURIComponent(row.source.id)}`
+              : `/workspace/native/${encodeURIComponent(row.source.id)}/${row.category}/${encodeURIComponent(row.definition.name)}`}
             >{row.definition.name}</a
           >
         </h2>
-        <p>{row.definition.description || 'No description yet.'}</p>
+        <ExpandableDescription text={row.definition.description} />
       </div>
       <div class="workflow-toolbar">
-        <button
-          disabled={busy}
-          onclick={() =>
-            toggle(
-              row.source.id,
-              row.category,
-              row.definition.name,
-              Boolean(disabled)
-            )}>{disabled ? 'Enable' : 'Disable'}</button
-        ><a
+        {#if row.source.kind === 'native'}<button
+            disabled={busy}
+            onclick={() =>
+              toggle(
+                row.source.id,
+                row.category,
+                row.definition.name,
+                Boolean(disabled)
+              )}>{disabled ? 'Enable' : 'Disable'}</button
+          >{/if}<a
           class="secondary-button"
-          href={`/workspace/native/${encodeURIComponent(row.source.id)}/${row.category}/${encodeURIComponent(row.definition.name)}`}
-          >Edit details</a
+          href={row.source.kind === 'external'
+            ? `/project/external/${encodeURIComponent(row.source.id)}`
+            : `/workspace/native/${encodeURIComponent(row.source.id)}/${row.category}/${encodeURIComponent(row.definition.name)}`}
+          >{row.source.kind === 'external'
+            ? 'Inspect & test'
+            : 'Open editor'}</a
         >
       </div>
     </article>
@@ -159,20 +248,46 @@
       <h2>
         {rows.length
           ? 'No matching capabilities'
-          : 'Start with a native capability'}
+          : 'Add a tool, resource or prompt'}
       </h2>
       <p>
-        {rows.length
-          ? 'Change your search or filter.'
+        {sourceKind === 'bridge' && !rows.some((row) => row.source.kind === 'bridge')
+          ? 'Bridged sources will appear here when bridge support is available.'
+          : rows.length ? 'Change your search or filter.'
           : 'Add a tool, resource or prompt backed by a Node or Python worker.'}
       </p>
       {#if !rows.length}<a class="primary-button" href="/workspace/new"
-          >Add your first capability</a
+          >Add your first tool</a
         >{/if}
     </div>{/each}
 </section>
-<p class="workflow-muted">
-  Endpoint: <code>/mcp</code> ·
-  <a href="/project">Configure sources and inspect workers</a>. Reconnect
-  clients after changing definitions.
-</p>
+
+<style>
+  .connect-agent {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+    border-block: 1px solid var(--border);
+    padding: 0.65rem 0;
+  }
+  .connect-agent h2 {
+    margin: 0;
+    font-size: 0.95rem;
+  }
+  .connect-agent span {
+    color: var(--muted);
+    font-size: 0.8rem;
+  }
+  .connect-agent code {
+    overflow-wrap: anywhere;
+    min-width: 0;
+  }
+  .connect-agent button {
+    min-height: 2rem;
+  }
+  .source-badge.external {
+    color: var(--teal);
+    background: color-mix(in srgb, var(--teal) 12%, transparent);
+  }
+</style>

@@ -7,12 +7,21 @@ export interface SourceCall {
   name: string;
   arguments: Record<string, unknown>;
   signal?: AbortSignal;
+  origin?: 'mcp' | 'workbench';
 }
 export interface SourceAdapter {
   start(): Promise<void>;
   discover(): Promise<SourceCatalog>;
   invoke(call: SourceCall): Promise<unknown>;
-  health(): { status: 'starting' | 'ready' | 'failed' | 'stopped'; error?: string };
+  health(): {
+    status: 'starting' | 'ready' | 'failed' | 'stopped';
+    error?: string;
+  };
+  filesChanged?(): Promise<boolean>;
+  diagnostics?(): string;
   close(): Promise<void>;
 }
-export type SourceFactory = (root: string, source: ProjectSource) => SourceAdapter;
+export type SourceFactory = (
+  root: string,
+  source: ProjectSource
+) => SourceAdapter;

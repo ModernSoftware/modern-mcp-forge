@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { reloadProjectSources } from '$lib/client/reload-project-sources';
   import { goto, invalidateAll } from '$app/navigation';
   import type { ProjectSource } from '$lib/server/sources/schema';
   import type { ProjectSourceManager } from '$lib/server/sources/manager';
@@ -43,13 +44,8 @@
     busy = true;
     error = '';
     try {
-      const response = await fetch('/api/project/sources', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ action: 'reload', projectId })
-      });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error);
+      const result = await reloadProjectSources(projectId, snapshot.generation);
+      if (result.error) throw new Error(result.error);
     } catch (failure) {
       error = failure instanceof Error ? failure.message : String(failure);
     } finally {
@@ -85,6 +81,9 @@
       <div>
         <strong>{source.id}</strong> · {source.kind} · {state?.status ??
           'stopped'}
+        {#if source.kind === 'external' && state?.error}<p class="error">
+            {state.error}
+          </p>{/if}
         {#if source.kind === 'native'}<div>
             <code>{source.manifest}</code>
           </div>{/if}
@@ -110,9 +109,14 @@
               void action({ action: 'remove', id: source.id });
           }}>Detach</button
         >
+      {:else if source.kind === 'external'}
+        <a href={`/project/external/${encodeURIComponent(source.id)}`}
+          >Connection &amp; catalog</a
+        >
       {/if}
     </div>
   {/each}
+  <p><a href="/workspace/connect">Connect external server</a></p>
   <form
     onsubmit={(event) => {
       event.preventDefault();

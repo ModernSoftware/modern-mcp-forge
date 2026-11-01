@@ -17,17 +17,32 @@ export const POST: RequestHandler = async ({ request }) => {
   try {
     const input = await request.json();
     if (input?.action !== 'reload' || typeof input.projectId !== 'string') {
-      return json({ error: 'reload and projectId are required.' }, { status: 400 });
+      return json(
+        { error: 'reload and projectId are required.' },
+        { status: 400 }
+      );
     }
     return await projectTransition(async () => {
       const project = getActiveProjectRecord();
       if (!project || project.id !== input.projectId) {
         return json({ error: 'Selected project changed.' }, { status: 409 });
       }
+      if (
+        input.generation !== undefined &&
+        input.generation !== projectSources.snapshot().generation
+      ) {
+        return json(
+          { error: 'Project sources changed. Refresh before reloading.' },
+          { status: 409 }
+        );
+      }
       const snapshot = await startProjectSources(project);
       return json(snapshot, { status: snapshot.error ? 503 : 200 });
     });
   } catch (error) {
-    return json({ error: error instanceof Error ? error.message : String(error) }, { status: 400 });
+    return json(
+      { error: error instanceof Error ? error.message : String(error) },
+      { status: 400 }
+    );
   }
 };
