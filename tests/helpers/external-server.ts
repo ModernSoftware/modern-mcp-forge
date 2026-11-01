@@ -5,6 +5,7 @@ export function externalServer(
   options: {
     token?: string;
     repeatedCursor?: boolean;
+    repeatedResource?: 'identical' | 'conflicting';
     paginated?: boolean;
     toolsOnly?: boolean;
     description?: string;
@@ -57,6 +58,26 @@ export function externalServer(
           ]
         })
       );
+    }
+    if (options.repeatedResource) {
+      server.server.setRequestHandler('resources/list', async ({ params }) => ({
+        resources: [
+          {
+            uri: params?.cursor ? 'support://second' : 'support://first',
+            name: params?.cursor ? 'Second' : 'First'
+          },
+          {
+            uri: 'support://invoice',
+            name: 'Invoice',
+            mimeType: 'text/plain',
+            description:
+              params?.cursor && options.repeatedResource === 'conflicting'
+                ? 'private upstream change'
+                : 'Shared on each page'
+          }
+        ],
+        ...(!params?.cursor ? { nextCursor: 'page-two' } : {})
+      }));
     }
     if (options.paginated || options.repeatedCursor) {
       server.server.setRequestHandler('tools/list', async (request) => ({

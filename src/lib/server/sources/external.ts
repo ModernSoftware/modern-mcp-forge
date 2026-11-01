@@ -1,6 +1,11 @@
 import { createHash } from 'node:crypto';
+import { isDeepStrictEqual } from 'node:util';
 import {
   Client,
+  ProtocolError,
+  SdkError,
+  SdkErrorCode,
+  SdkHttpError,
   StreamableHTTPClientTransport
 } from '@modelcontextprotocol/client';
 import type { SourceAdapter, SourceCall, SourceCatalog } from './contracts';
@@ -10,6 +15,43 @@ type ExternalSource = Extract<ProjectSource, { kind: 'external' }>;
 const REQUEST_TIMEOUT = 20_000;
 const MAX_PAGES = 100;
 const MAX_ITEMS = 2_000;
+
+// Only locally composed diagnostics may cross the management API. SDK errors
+// can include upstream response bodies and credentials.
+class DiscoveryError extends Error {}
+
+function discoveryFailure(operation: string, failure: unknown) {
+  if (failure instanceof SdkHttpError && Number.isInteger(failure.status))
+    return new DiscoveryError(`${operation} failed (HTTP ${failure.status}).`);
+  if (failure instanceof ProtocolError && Number.isSafeInteger(failure.code))
+    return new DiscoveryError(
+      `${operation} failed (MCP error ${failure.code}).`
+    );
+  if (failure instanceof SdkError) {
+    if (failure.code === SdkErrorCode.RequestTimeout)
+      return new DiscoveryError(`${operation} timed out.`);
+    if (failure.code === SdkErrorCode.InvalidResult)
+      return new DiscoveryError(
+        `${operation} returned an invalid MCP response.`
+      );
+  }
+  return new DiscoveryError(
+    `${operation} failed. Check the server connection and Streamable HTTP endpoint.`
+  );
+}
+
+function distinctResources(resources: SourceCatalog['resources']) {
+  const byUri = new Map<string, SourceCatalog['resources'][number]>();
+  for (const resource of resources) {
+    const existing = byUri.get(resource.uri);
+    if (!existing) byUri.set(resource.uri, resource);
+    else if (!isDeepStrictEqual(existing, resource))
+      throw new DiscoveryError(
+        'resources/list returned conflicting definitions for the same resource URI.'
+      );
+  }
+  return [...byUri.values()];
+}
 
 export function externalName(source: string, name: string) {
   const full = `${source}__${name}`;
@@ -161,7 +203,9 @@ export class ExternalSourceAdapter implements SourceAdapter {
         original: string
       ) => {
         if (this.routes[kind].has(publicName))
-          throw new Error('Duplicate upstream capability.');
+          throw new DiscoveryError(
+            `The server returned a duplicate ${kind} routing identity.`
+          );
         this.routes[kind].set(publicName, original);
         return publicName;
       };
@@ -170,7 +214,7 @@ export class ExternalSourceAdapter implements SourceAdapter {
           ...item,
           name: bind('tool', externalName(this.source.id, item.name), item.name)
         })),
-        resources: resources.map((item) => ({
+        resources: distinctResources(resources).map((item) => ({
           ...item,
           name: externalName(this.source.id, item.name),
           uri: bind('resource', externalUri(this.source.id, item.uri), item.uri)
@@ -185,7 +229,7 @@ export class ExternalSourceAdapter implements SourceAdapter {
         }))
       };
       this.status = 'ready';
-    } catch {
+    } catch (failure) {
       this.status = 'failed';
       signal?.throwIfAborted();
       if (authStatus === 401)
@@ -198,10 +242,12 @@ export class ExternalSourceAdapter implements SourceAdapter {
         throw new Error(
           'The server denied access (HTTP 403). Check the permissions granted to this connection.'
         );
-      // SDK errors can include remote response bodies containing secrets.
-      throw new Error(
-        `External source ${this.source.id} could not connect or discover its catalog. Check URL, authentication and server availability.`
-      );
+      if (this.lifetime.signal.aborted)
+        throw new DiscoveryError(
+          'External discovery exceeded its 30-second deadline.'
+        );
+      if (failure instanceof DiscoveryError) throw failure;
+      throw discoveryFailure('MCP initialization', failure);
     } finally {
       clearTimeout(discoveryDeadline);
       signal?.removeEventListener('abort', abort);
@@ -218,16 +264,23 @@ export class ExternalSourceAdapter implements SourceAdapter {
     const cursors = new Set<string>();
     let cursor: string | undefined;
     for (let page = 0; page < MAX_PAGES; page++) {
-      const result = await list(cursor);
+      const result = await list(cursor).catch((failure: unknown) => {
+        throw discoveryFailure(`${key}/list`, failure);
+      });
       items.push(...result[key]);
       if (items.length > MAX_ITEMS)
-        throw new Error('Upstream catalog exceeds the discovery limit.');
+        throw new DiscoveryError(
+          `${key}/list exceeded the ${MAX_ITEMS}-item discovery limit.`
+        );
       cursor = result.nextCursor;
       if (!cursor) return items as SourceCatalog[K];
-      if (cursors.has(cursor)) throw new Error('Repeated discovery cursor.');
+      if (cursors.has(cursor))
+        throw new DiscoveryError(`${key}/list repeated its pagination cursor.`);
       cursors.add(cursor);
     }
-    throw new Error('Upstream discovery exceeds the page limit.');
+    throw new DiscoveryError(
+      `${key}/list exceeded the ${MAX_PAGES}-page discovery limit.`
+    );
   }
 
   async discover() {

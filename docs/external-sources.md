@@ -44,6 +44,8 @@ the original upstream identity. Known resource links and embedded resources in
 results are translated to the Forge namespace; arbitrary text and structured data
 are not rewritten.
 
+Forge exposes a resource once when multiple pages return the same URI and identical metadata. Different definitions for one URI produce a discovery error. All entries count toward discovery limits, including repeats.
+
 Discovery preserves input schemas, tool annotations and output schemas. The catalog
 is read-only: Forge does not edit external handler code or input validation.
 Per-capability aliases, metadata overrides and exposure controls are future work;
@@ -67,8 +69,7 @@ forwarded: each source uses its own explicitly configured credential.
   category, and rejects repeated cursors. Responses/streams are limited to 8 MiB.
 - Calls time out after 20 seconds. Forge never retries a failed write. A timeout or
   disconnect can leave its outcome unknown; verify upstream before retrying.
-- Authentication failures identify HTTP 401 or 403. Other remote transport/protocol errors are generic so response bodies cannot expose
-  tokens in Forge diagnostics. Successful tool output is still untrusted upstream
+- Authentication failures identify HTTP 401 or 403. Discovery errors identify the handshake or list operation and report safe status codes, timeouts, or catalog conflicts. Remote response bodies stay out of diagnostics. Successful tool output is still untrusted upstream
   content and is shown as returned.
 - Local Host/Origin checks protect management operations. Forge is not a production
   auth gateway, and shared project credentials do not establish user authorization.

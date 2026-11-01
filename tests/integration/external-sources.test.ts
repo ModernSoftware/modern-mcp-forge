@@ -82,7 +82,7 @@ test('external discovery paginates, tolerates absent capabilities, and bounds re
     try {
       if (repeatedCursor)
         await expect(adapter.start()).rejects.toThrow(
-          'could not connect or discover'
+          'tools/list repeated its pagination cursor'
         );
       else {
         await adapter.start();
@@ -100,6 +100,37 @@ test('external discovery paginates, tolerates absent capabilities, and bounds re
     }
   }
 }, 30_000);
+
+test('a repeated paginated resource stays readable and conflicting definitions fail safely', async () => {
+  for (const repeatedResource of ['identical', 'conflicting'] as const) {
+    const upstream = externalServer({ repeatedResource });
+    const adapter = new ExternalSourceAdapter(definition(upstream.url));
+    try {
+      if (repeatedResource === 'conflicting') {
+        await expect(adapter.start()).rejects.toThrow(
+          /^resources\/list returned conflicting definitions for the same resource URI\.$/
+        );
+        continue;
+      }
+      await adapter.start();
+      const catalog = await adapter.discover();
+      expect(catalog.resources.map((r) => r.uri)).toEqual(
+        ['first', 'invoice', 'second'].map((name) =>
+          externalUri('support', 'support://' + name)
+        )
+      );
+      expect(catalog.tools[0].name).toBe('support__lookup');
+      expect(catalog.prompts[0].name).toBe('support__review');
+      const uri = externalUri('support', 'support://invoice');
+      expect(
+        await adapter.invoke({ kind: 'resource', name: uri, arguments: {} })
+      ).toMatchObject({ contents: [{ uri, text: 'Invoice contents' }] });
+    } finally {
+      await adapter.close();
+      upstream.close();
+    }
+  }
+});
 
 test('external authentication errors are redacted; redirects cannot leak credentials', async () => {
   const upstream = externalServer({ token: 'SECRET-FROM-UPSTREAM-ERROR' });
@@ -131,7 +162,9 @@ test('external authentication errors are redacted; redirects cannot leak credent
     definition(`http://127.0.0.1:${redirect.port}/mcp`)
   );
   try {
-    await expect(redirected.start()).rejects.toThrow('could not connect');
+    await expect(redirected.start()).rejects.toThrow(
+      'MCP initialization failed'
+    );
     expect(received).toBe(0);
   } finally {
     await redirected.close();

@@ -169,20 +169,6 @@
       variable to the access token issued for this server. Restart Forge after
       changing the value.
     </p>
-    <details>
-      <summary>Windows terminal setup</summary>
-      <p>
-        In Git Bash, run these lines and paste the raw access token at the
-        hidden prompt. Use the same variable name in this form.
-      </p>
-      <pre>read -rsp 'Access token: ' EXAMPLE_MCP_TOKEN; echo
-export EXAMPLE_MCP_TOKEN
-bun run dev</pre>
-      <p>
-        Forge adds the Bearer prefix. If the server uses OAuth, complete its
-        sign-in in an OAuth client first and renew the token when it expires.
-      </p>
-    </details>
   {/if}
   <p class="workflow-notice">
     Connect only servers you trust. Forge sends this source's configured
