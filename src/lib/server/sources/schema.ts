@@ -44,6 +44,7 @@ export const ProjectSourceSchema = z.discriminatedUnion('kind', [
     .object({
       ...identity,
       kind: z.literal('external'),
+      naming: z.enum(['always', 'collisions']).optional(),
       enabled: z.boolean().default(true),
       bearerTokenEnv: z
         .string()

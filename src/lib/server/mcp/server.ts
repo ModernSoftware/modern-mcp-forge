@@ -38,7 +38,8 @@ export function createForgeMcpServer(): McpServer {
       async (args) => (
         await executeToolDefinition(
           definition,
-          args as Record<string, unknown>
+          args as Record<string, unknown>,
+          'mcp'
         )
       ).result
     );

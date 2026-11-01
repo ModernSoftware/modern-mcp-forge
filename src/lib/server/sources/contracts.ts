@@ -7,6 +7,7 @@ export interface SourceCall {
   name: string;
   arguments: Record<string, unknown>;
   signal?: AbortSignal;
+  origin?: 'mcp' | 'workbench';
 }
 export interface SourceAdapter {
   start(): Promise<void>;

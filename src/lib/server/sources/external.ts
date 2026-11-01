@@ -209,23 +209,24 @@ export class ExternalSourceAdapter implements SourceAdapter {
         this.routes[kind].set(publicName, original);
         return publicName;
       };
+      // Collision-only names are resolved against the complete project after discovery.
+      const nameFor = (name: string) =>
+        this.source.naming === 'collisions'
+          ? name
+          : externalName(this.source.id, name);
       this.catalog = {
         tools: tools.map((item) => ({
           ...item,
-          name: bind('tool', externalName(this.source.id, item.name), item.name)
+          name: bind('tool', nameFor(item.name), item.name)
         })),
         resources: distinctResources(resources).map((item) => ({
           ...item,
-          name: externalName(this.source.id, item.name),
+          name: nameFor(item.name),
           uri: bind('resource', externalUri(this.source.id, item.uri), item.uri)
         })),
         prompts: prompts.map((item) => ({
           ...item,
-          name: bind(
-            'prompt',
-            externalName(this.source.id, item.name),
-            item.name
-          )
+          name: bind('prompt', nameFor(item.name), item.name)
         }))
       };
       this.status = 'ready';

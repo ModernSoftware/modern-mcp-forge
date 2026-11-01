@@ -126,6 +126,20 @@ test('project native authoring exposes Node and Python over HTTP and recovers af
         })
       ).content
     ).toEqual([{ type: 'text', text: 'Hello, Diego!' }]);
+    const history = await server.ssrLoadModule(
+      '/src/lib/server/workbench/executions.ts'
+    );
+    const calls = history
+      .listExecutions(100)
+      .filter((row: { toolName: string }) => row.toolName === 'py_greet');
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject({
+      origin: 'mcp',
+      sourceId: 'py',
+      runtime: 'native',
+      status: 'succeeded'
+    });
+
     expect(
       (await client.readResource({ uri: 'mcpack://js/guide' })).contents[0]
     ).toMatchObject({ text: 'Your native MCPack guide.' });

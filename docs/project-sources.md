@@ -60,8 +60,7 @@ The disabled external example above can be enabled when its server is available.
 Each enabled native source owns a separate MCPack CLI process and worker set.
 Catalogs remain keyed by source ID, so identical upstream names can coexist
 internally. The combined endpoint rejects duplicate tool/prompt names, resource names and URIs.
-External capability names and URIs are automatically namespaced by connection ID.
-Explicit aliases are future work.
+External connections can prefix every name or only collisions. Resource URIs always identify the owning connection. Custom aliases are future work.
 
 The adapter contract covers start, discovery, invocation with cancellation, health,
 and close. The project owner serializes open/close/reload. Reload is a full restart

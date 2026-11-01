@@ -16,15 +16,23 @@
   let auth = $state(
     untrack(() => (source?.bearerTokenEnv ? 'bearer' : 'none'))
   );
+  let naming = $state<'always' | 'collisions'>(
+    untrack(() => (source ? (source.naming ?? 'always') : 'collisions'))
+  );
   let tokenEnv = $state(untrack(() => source?.bearerTokenEnv ?? ''));
   let baseline = $state(
     untrack(() =>
-      JSON.stringify([id, url, auth, auth === 'bearer' ? tokenEnv : ''])
+      JSON.stringify([id, url, naming, auth, auth === 'bearer' ? tokenEnv : ''])
     )
   );
   let dirty = $derived(
-    JSON.stringify([id, url, auth, auth === 'bearer' ? tokenEnv : '']) !==
-      baseline
+    JSON.stringify([
+      id,
+      url,
+      naming,
+      auth,
+      auth === 'bearer' ? tokenEnv : ''
+    ]) !== baseline
   );
   let busy = $state(false);
   let error = $state('');
@@ -67,6 +75,7 @@
             id,
             kind: 'external',
             enabled: source?.enabled ?? true,
+            naming,
             url,
             ...(auth === 'bearer' ? { bearerTokenEnv: tokenEnv.trim() } : {})
           }
@@ -90,6 +99,7 @@
       baseline = JSON.stringify([
         id,
         url,
+        naming,
         auth,
         auth === 'bearer' ? tokenEnv : ''
       ]);
@@ -135,9 +145,15 @@
       placeholder="support"
     /></label
   >
+  <label
+    >Published names<select aria-label="Published names" bind:value={naming} disabled={busy}>
+      <option value="collisions">Prefix only colliding names</option>
+      <option value="always">Always prefix with connection name</option>
+    </select></label
+  >
   <p class="workflow-muted">
-    Names are prefixed with this connection name. Resource URIs get a separate
-    Forge namespace. Existing connections keep their identity.
+    Applies to tools, resources and prompts. Resource URIs always identify their
+    connection. Reconnect agents after changing published names.
   </p>
   <label
     >Streamable HTTP MCP URL<input

@@ -279,6 +279,139 @@ test('Forge combines authenticated external and native sources over HTTP and clo
     expect(
       (await (await connect()).listTools()).tools.map((t) => t.name).sort()
     ).toEqual(['local_lookup', 'remote__lookup']);
+    // Keep old connections qualified until their owner opts in. A policy change
+    // must be reflected by both public discovery and real upstream dispatch.
+    const flexible = { ...source, naming: 'collisions' };
+    expect((await action({ action: 'update', source: flexible })).status).toBe(
+      200
+    );
+    const bare = await connect();
+    expect((await bare.listTools()).tools.map((t) => t.name).sort()).toEqual([
+      'local_lookup',
+      'lookup'
+    ]);
+    expect(
+      (
+        await bare.callTool({
+          name: 'lookup',
+          arguments: { filter: { id: 'BARE' } }
+        })
+      ).content?.[0]
+    ).toMatchObject({ text: 'Order BARE' });
+    expect((await bare.listPrompts()).prompts[0].name).toBe('review');
+    expect((await bare.listResources()).resources[0]).toMatchObject({
+      name: 'invoice',
+      uri: resource.uri
+    });
+    expect(
+      (await action({ action: 'create', source: { ...flexible, id: 'other' } }))
+        .status
+    ).toBe(200);
+    const paired = await connect();
+    expect((await paired.listTools()).tools.map((t) => t.name).sort()).toEqual([
+      'local_lookup',
+      'other__lookup',
+      'remote__lookup'
+    ]);
+    expect(
+      (
+        await paired.callTool({
+          name: 'other__lookup',
+          arguments: { filter: { id: 'QUALIFIED' } }
+        })
+      ).content?.[0]
+    ).toMatchObject({ text: 'Order QUALIFIED' });
+    expect(
+      (
+        await paired.getPrompt({
+          name: 'remote__review',
+          arguments: { customer: 'Alias' }
+        })
+      ).messages[0].content
+    ).toMatchObject({ text: 'Review Alias' });
+    expect(
+      (await paired.readResource({ uri: resource.uri })).contents[0]
+    ).toMatchObject({ uri: resource.uri });
+    expect(
+      (
+        await action({
+          action: 'invoke',
+          id: 'remote',
+          kind: 'tool',
+          name: 'lookup',
+          arguments: {}
+        })
+      ).status
+    ).toBe(400);
+    const history = await vite.ssrLoadModule(
+      '/src/lib/server/workbench/executions.ts'
+    );
+    const records = history.listExecutions(100);
+    const matching = (id: string) =>
+      records
+        .map((row: { id: number }) => history.getExecution(row.id))
+        .filter(
+          (row: { argumentsJson: string }) =>
+            JSON.parse(row.argumentsJson)?.filter?.id === id
+        );
+    expect(matching('QUALIFIED')).toHaveLength(1);
+    expect(matching('QUALIFIED')[0]).toMatchObject({
+      toolName: 'other__lookup',
+      origin: 'mcp',
+      sourceId: 'other',
+      status: 'succeeded'
+    });
+    expect(matching('UI')[0]).toMatchObject({
+      origin: 'workbench',
+      sourceId: 'remote',
+      status: 'succeeded'
+    });
+    for (const origin of ['mcp', 'workbench']) {
+      expect(
+        records.some(
+          (row: { toolName: string; origin: string; status: string }) =>
+            row.toolName === 'local_lookup' &&
+            row.origin === origin &&
+            row.status === 'failed'
+        )
+      ).toBe(true);
+    }
+    expect(
+      records.some(
+        (row: { toolName: string }) =>
+          row.toolName.includes('invoice') || row.toolName.includes('review')
+      )
+    ).toBe(false);
+    await action({ action: 'remove', id: 'other' });
+    expect(
+      (await (await connect()).listTools()).tools.map((t) => t.name).sort()
+    ).toEqual(['local_lookup', 'lookup']);
+    const collidingNative = await post('project/native', {
+      action: 'create-capability',
+      projectId,
+      generation,
+      id: 'secondNative',
+      kind: 'tools',
+      runtime: 'node',
+      name: 'lookup',
+      description: 'Local lookup'
+    });
+    expect(collidingNative.body.snapshot.status).toBe('ready');
+    const withNative = await connect();
+    expect(
+      (await withNative.listTools()).tools.map((t) => t.name).sort()
+    ).toEqual(['local_lookup', 'lookup', 'remote__lookup']);
+    expect(
+      (await withNative.callTool({ name: 'lookup', arguments: {} })).isError
+    ).toBe(true);
+    expect(
+      (
+        await withNative.callTool({
+          name: 'remote__lookup',
+          arguments: { filter: { id: 'NATIVE-COLLISION' } }
+        })
+      ).content?.[0]
+    ).toMatchObject({ text: 'Order NATIVE-COLLISION' });
     await action({ action: 'remove', id: 'remote' });
     await post('projects/close', {});
     expect((await fetch(base + '/mcp')).status).toBe(503);

@@ -4,18 +4,21 @@ import { dirname, resolve } from 'node:path';
 
 import { resolveDefaultDatabasePath } from '$lib/server/app-data';
 
-let database: Database | undefined;
+// Source workers survive Vite reloads. The history writer and reader must share
+// the same database owner across reloads as well.
+const state = globalThis as typeof globalThis & {
+  forgeDatabase?: { path: string; db: Database };
+};
 
 export function resolveDatabasePath(): string {
   const explicitPath = process.env.MCP_FORGE_DB_PATH?.trim();
 
-  return explicitPath
-    ? resolve(explicitPath)
-    : resolveDefaultDatabasePath();
+  return explicitPath ? resolve(explicitPath) : resolveDefaultDatabasePath();
 }
 
 function setMetadata(db: Database, key: string, value: string): void {
-  db.query(`
+  db.query(
+    `
     INSERT INTO app_metadata (
       key,
       value,
@@ -25,7 +28,8 @@ function setMetadata(db: Database, key: string, value: string): void {
     ON CONFLICT(key) DO UPDATE SET
       value = excluded.value,
       updated_at = CURRENT_TIMESTAMP
-  `).run(key, value);
+  `
+  ).run(key, value);
 }
 
 function initializeSchema(db: Database): void {
@@ -81,40 +85,45 @@ function initializeSchema(db: Database): void {
       ON tool_executions(project_id, started_at DESC);
   `);
 
-  setMetadata(db, 'schema_version', '1');
+  // Older rows predate origin and source tracking. Preserve them as unknown.
+  db.transaction(() => {
+    const columns = new Set(
+      db
+        .query<{ name: string }, []>('PRAGMA table_info(tool_executions)')
+        .all()
+        .map((c) => c.name)
+    );
+    if (!columns.has('origin'))
+      db.exec('ALTER TABLE tool_executions ADD COLUMN origin TEXT');
+    if (!columns.has('source_id'))
+      db.exec('ALTER TABLE tool_executions ADD COLUMN source_id TEXT');
+    setMetadata(db, 'schema_version', '2');
+  }).immediate();
 }
 
 export function getDatabase(): Database {
-  if (database) {
-    return database;
-  }
-
   const path = resolveDatabasePath();
+  if (state.forgeDatabase?.path === path) return state.forgeDatabase.db;
+  closeDatabase();
   mkdirSync(dirname(path), { recursive: true });
-
-  database = new Database(path, {
-    create: true,
-    strict: true
-  });
-
-  initializeSchema(database);
-
-  return database;
+  const db = new Database(path, { create: true, strict: true });
+  try {
+    initializeSchema(db);
+    state.forgeDatabase = { path, db };
+    return db;
+  } catch (error) {
+    db.close();
+    throw error;
+  }
 }
 
 export function closeDatabase(): void {
-  if (!database) {
-    return;
-  }
-
-  database.close();
-  database = undefined;
+  state.forgeDatabase?.db.close();
+  delete state.forgeDatabase;
 }
 
 export function checkDatabase(): boolean {
-  const row = getDatabase()
-    .query<{ ok: number }, []>('SELECT 1 AS ok')
-    .get();
+  const row = getDatabase().query<{ ok: number }, []>('SELECT 1 AS ok').get();
 
   return row?.ok === 1;
 }

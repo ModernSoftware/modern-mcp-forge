@@ -70,6 +70,7 @@
   );
   let search = $state('');
   let kind = $state('all');
+  let sourceKind = $state('all');
   let rows = $derived(
     data.sources.flatMap((entry) =>
       (['tools', 'resources', 'prompts'] as const).flatMap((category) =>
@@ -90,6 +91,7 @@
     rows.filter(
       (row) =>
         (kind === 'all' || row.category === kind) &&
+        (sourceKind === 'all' || row.source.kind === sourceKind) &&
         `${row.definition.name} ${row.definition.description ?? ''} ${row.source.id}`
           .toLowerCase()
           .includes(search.toLowerCase())
@@ -104,14 +106,25 @@
     <h1>{data.project.name}</h1>
     <p>Build, edit and test your project's MCP capabilities.</p>
   </div>
-  <div class="workflow-toolbar" aria-label="Create native item">
-    <a class="primary-button" href="/workspace/new?kind=tools">＋ Add tool</a>
-    <a class="secondary-button" href="/workspace/new?kind=resources"
-      >Add resource</a
-    >
-    <a class="secondary-button" href="/workspace/new?kind=prompts">Add prompt</a
-    >
-  </div>
+</section>
+<div class="workflow-toolbar" role="group" aria-label="Project actions">
+  <a class="primary-button" href="/workspace/new?kind=tools">＋ Add tool</a>
+  <a class="secondary-button" href="/workspace/new?kind=resources"
+    >Add resource</a
+  >
+  <a class="secondary-button" href="/workspace/new?kind=prompts">Add prompt</a>
+  <a class="secondary-button" href="/workspace/connect"
+    >Connect external server</a
+  >
+  <button disabled title="Native-only export is a subsequent step"
+    >Export native · Soon</button
+  >
+</div>
+<section class="connect-agent" aria-label="Connect an agent">
+  <h2>Connect an agent</h2>
+  <span>Streamable HTTP</span><code>{endpoint}</code>
+  <button class="secondary-button" onclick={copyEndpoint}>Copy URL</button>
+  <span role="status">{copyNotice}</span>
 </section>
 <div class="workflow-toolbar">
   <label
@@ -121,18 +134,22 @@
     /></label
   >
   <label
-    >Show<select bind:value={kind}
+    >Capability type<select aria-label="Capability type" bind:value={kind}
       ><option value="all">All types</option><option value="tools">Tools</option
       ><option value="resources">Resources</option><option value="prompts"
         >Prompts</option
       ></select
     ></label
   >
-  <a class="secondary-button" href="/workspace/connect"
-    >Connect external server</a
-  >
-  <button disabled title="Native-only export is a subsequent step"
-    >Export native · Soon</button
+  <label
+    >Source type<select aria-label="Source type" bind:value={sourceKind}>
+      <option value="all">All sources</option><option value="native"
+        >Native</option
+      >
+      <option value="external">External</option><option value="bridge"
+        >Bridged</option
+      >
+    </select></label
   >
 </div>
 {#if data.legacyCount}<p class="workflow-notice" role="status">
@@ -183,7 +200,11 @@
         <span
           class="source-badge"
           class:external={row.source.kind === 'external'}
-          >{row.source.kind === 'external' ? 'External' : 'Native'}</span
+          >{row.source.kind === 'external'
+            ? 'External'
+            : row.source.kind === 'bridge'
+              ? 'Bridged'
+              : 'Native'}</span
         >
         <span class="workflow-muted"
           >{row.category} · {row.source.id}{!row.source.enabled
@@ -230,8 +251,9 @@
           : 'Add a tool, resource or prompt'}
       </h2>
       <p>
-        {rows.length
-          ? 'Change your search or filter.'
+        {sourceKind === 'bridge' && !rows.some((row) => row.source.kind === 'bridge')
+          ? 'Bridged sources will appear here when bridge support is available.'
+          : rows.length ? 'Change your search or filter.'
           : 'Add a tool, resource or prompt backed by a Node or Python worker.'}
       </p>
       {#if !rows.length}<a class="primary-button" href="/workspace/new"
@@ -239,37 +261,31 @@
         >{/if}
     </div>{/each}
 </section>
-<section class="glass-card connect-agent" aria-label="Connect an agent">
-  <h2>Connect an agent</h2>
-  <p>
-    With this project open and its sources ready, connect your MCP client using
-    Streamable HTTP.
-  </p>
-  <div class="workflow-toolbar">
-    <code>{endpoint}</code>
-    <button onclick={copyEndpoint}>Copy URL</button><span role="status"
-      >{copyNotice}</span
-    >
-  </div>
-  <p>
-    Reconnect your client after restarting sources. <a href="/project"
-      >Configure sources</a
-    >
-  </p>
-</section>
 
 <style>
   .connect-agent {
-    margin-top: 1rem;
-    padding: 1rem 1.5rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+    border-block: 1px solid var(--border);
+    padding: 0.65rem 0;
+  }
+  .connect-agent h2 {
+    margin: 0;
+    font-size: 0.95rem;
+  }
+  .connect-agent span {
+    color: var(--muted);
+    font-size: 0.8rem;
   }
   .connect-agent code {
     overflow-wrap: anywhere;
+    min-width: 0;
   }
-  .connect-agent .workflow-toolbar {
-    align-items: center;
+  .connect-agent button {
+    min-height: 2rem;
   }
-
   .source-badge.external {
     color: var(--teal);
     background: color-mix(in srgb, var(--teal) 12%, transparent);

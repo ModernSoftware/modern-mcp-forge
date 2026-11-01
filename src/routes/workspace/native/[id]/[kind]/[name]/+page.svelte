@@ -563,17 +563,8 @@
       <details class="dependencies">
         <summary>Node dependencies</summary>
         <p>
-          Open a terminal in <code>{data.sourceFolder}</code> within the
-          project. Install a third-party package with
-          <code>npm install &lt;package-name&gt;</code>. Commit the package
-          manifest and lockfile. For a fresh checkout with a lockfile, run
-          <code>npm ci</code>, then reload the sources.
-        </p>
-        <p>
-          Node provides <code>node:crypto</code>, <code>node:path</code> and
-          <code>node:sqlite</code>. Built-in modules use the worker's Node
-          version. Older sources without a package manifest can use
-          <code>npm init -y</code> first.
+          Manage this worker's packages in <code>{data.sourceFolder}</code>.
+          Reload the project sources after changing installed dependencies.
         </p>
       </details>
     {/if}
@@ -614,9 +605,12 @@
       </p>{/if}
     {#if disabled}<p role="status">
         {#if !data.sourceEnabled}
-          This source is disabled. <a href="/project">Open Configuration</a> to enable it.
+          This source is disabled. <a href="/project">Open Configuration</a> to enable
+          it.
         {:else if data.disabled}
-          This capability is disabled. <a href="/workspace">Open the workspace</a> to enable it.
+          This capability is disabled. <a href="/workspace"
+            >Open the workspace</a
+          > to enable it.
         {:else if data.snapshot.status === 'failed' || source?.status === 'failed'}
           Startup failed. Inspect worker diagnostics, repair the files, then
           reload the sources.

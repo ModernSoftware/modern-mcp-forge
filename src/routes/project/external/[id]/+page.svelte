@@ -105,9 +105,10 @@
 <section class="glass-card workflow-form">
   <h2>Discovered catalog</h2>
   <p>
-    Public names have a connection prefix. Calls use the original upstream names
-    and URIs. Refresh by saving the connection or reloading sources. Resource
-    templates, subscriptions, sampling and elicitation are not relayed.
+    Public names follow this connection's naming setting. Calls use the original
+    upstream names and URIs. Refresh by saving the connection or reloading
+    sources. Resource templates, subscriptions, sampling and elicitation are not
+    relayed.
   </p>
   {#each categories as category}
     {@const items = sourceState?.catalog[category] ?? []}

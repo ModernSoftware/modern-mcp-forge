@@ -155,7 +155,8 @@ export const POST: RequestHandler = async ({ request }) => {
           kind: input.kind,
           name: input.name,
           arguments: input.arguments,
-          signal: request.signal
+          signal: request.signal,
+          origin: 'workbench'
         }
       );
       return json({ result });

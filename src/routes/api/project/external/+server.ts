@@ -97,7 +97,8 @@ export const POST: RequestHandler = async ({ request }) => {
             kind: input.kind,
             name: input.name,
             arguments: input.arguments,
-            signal: request.signal
+            signal: request.signal,
+            origin: 'workbench'
           }
         )
       });
@@ -126,18 +127,13 @@ export const POST: RequestHandler = async ({ request }) => {
           await adapter?.start(request.signal);
           if (candidate && adapter) {
             const catalog = await adapter.discover();
-            const snapshot = projectSources.snapshot();
-            const others =
-              snapshot.project === project.id
-                ? snapshot.sources.filter(
-                    (source) =>
-                      source.id !== candidate.id && source.status === 'ready'
-                  )
-                : [];
-            validateCatalogNames(manifest, [
-              ...others,
-              { id: candidate.id, status: 'ready', catalog }
-            ]);
+            const planned = projectSources.planNames(
+              project.id,
+              manifest.sources ?? [],
+              manifest,
+              { id: candidate.id, catalog }
+            );
+            validateCatalogNames(manifest, [...planned.values()]);
           }
           request.signal.throwIfAborted();
           verified = { change, adapter };
@@ -176,6 +172,7 @@ export const POST: RequestHandler = async ({ request }) => {
           project.path,
           manifest.sources ?? [],
           {
+            legacy: manifest,
             prepared:
               candidate && adapter ? { id: candidate.id, adapter } : undefined
           }

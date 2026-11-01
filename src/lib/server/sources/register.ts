@@ -26,7 +26,7 @@ export function registerNativeSources(
         manifest.project.id,
         snapshot.generation,
         source.id,
-        { kind, name, arguments: args, signal }
+        { kind, name, arguments: args, signal, origin: 'mcp' }
       );
     for (const tool of source.catalog.tools) {
       server.registerTool(

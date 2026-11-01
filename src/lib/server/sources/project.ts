@@ -12,6 +12,7 @@ export async function startProjectSources(
     JSON.parse(await readFile(join(project.path, 'forge.project.json'), 'utf8'))
   );
   return projectSources.open(project.id, project.path, manifest.sources ?? [], {
-    createdNative
+    createdNative,
+    legacy: manifest
   });
 }

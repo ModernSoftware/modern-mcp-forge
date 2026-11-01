@@ -1,7 +1,7 @@
 import type { ForgeProjectManifest } from '../project/schema';
 import { projectSources, type ProjectSourceManager } from './manager';
 
-/** Preserve source names; reject ambiguous routing until explicit aliases exist. */
+/** Validate the names published for this generation before registering MCP handlers. */
 export function projectCatalog(
   manifest: ForgeProjectManifest,
   manager: ProjectSourceManager = projectSources

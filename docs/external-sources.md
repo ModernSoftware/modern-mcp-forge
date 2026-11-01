@@ -37,8 +37,9 @@ For [the hosted Inspector example](https://github.com/modelcontextprotocol/inspe
 
 ## Identity and schemas
 
-Names are prefixed as `connection__original`. Names that would exceed 64 characters
-or contain unsupported characters receive a stable hash suffix. Resource URIs use
+New connections in the UI default to **Prefix only colliding names**. A unique external tool such as `echo` is exposed as `echo`. Enabled native and legacy items and always-prefixed names reserve their identities. When two collision-only connections supply `echo`, both publish qualified names (for example `Test__echo` and `Other__echo`). Tools, resources and prompts each have their own name space. Tool names that need normalization, or generated aliases that collide again, receive a bounded name.
+
+**Always prefix with connection name** keeps public identities independent of other catalogs. Existing manifests without a `naming` setting retain that behavior. Choose it when agents depend on stable tool names. With collision-only naming, reconnect clients after changing sources and rediscover the names. Resource URIs use
 `forge-external://source/<connection>/<encoded-original-uri>`. Routing always uses
 the original upstream identity. Known resource links and embedded resources in
 results are translated to the Forge namespace; arbitrary text and structured data
@@ -48,7 +49,7 @@ Forge exposes a resource once when multiple pages return the same URI and identi
 
 Discovery preserves input schemas, tool annotations and output schemas. The catalog
 is read-only: Forge does not edit external handler code or input validation.
-Per-capability aliases, metadata overrides and exposure controls are future work;
+Custom per-capability aliases, metadata overrides and exposure controls are future work;
 this slice supports connection-level disable and automatic namespacing. Collisions
 with native/legacy names still fail closed; Forge never silently shadows a tool.
 

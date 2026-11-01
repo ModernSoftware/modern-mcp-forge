@@ -66,6 +66,7 @@
 <a href="/workspace">← Workspace</a>
 <section class="page-heading">
   <div>
+    <div class="eyebrow">NATIVE MCPACK</div>
     <h1>Add a {label}</h1>
     <p>Create an editable native implementation in your project folder.</p>
   </div>
@@ -78,13 +79,6 @@
   }}
 >
   {#if error}<p role="alert" class="workflow-error">{error}</p>{/if}
-  <label
-    >Implementation<select aria-label="Implementation" disabled={busy}
-      ><option>Native MCPack</option><option disabled
-        >Bridge · Coming next</option
-      ></select
-    ></label
-  >
   <label
     >Type<select aria-label="Capability" bind:value={kind} disabled={busy}
       ><option value="tools">Tool</option><option value="resources"

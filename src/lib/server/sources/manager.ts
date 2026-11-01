@@ -4,6 +4,13 @@ import type {
   SourceCatalog,
   SourceFactory
 } from './contracts';
+import { publishCatalogs, type ReservedCatalog } from './public-names';
+import {
+  startToolExecution,
+  completeToolExecution,
+  failToolExecution,
+  tryLogExecution
+} from '../mcp/execution-log';
 import { NativeProjectError } from '../mcpack/session';
 import { discardExternalDrafts } from './external-drafts';
 import { ExternalSourceAdapter } from './external';
@@ -26,6 +33,7 @@ export class ProjectSourceManager {
   private definitions: ProjectSource[] = [];
   private adapters = new Map<string, SourceAdapter>();
   private catalogs = new Map<string, SourceCatalog>();
+  private published: ReturnType<typeof publishCatalogs> = new Map();
   private error?: string;
   private externalFailures = new Map<string, string>();
   private failedSource?: { id: string; diagnostics: string };
@@ -88,20 +96,30 @@ export class ProjectSourceManager {
               : undefined),
           catalog:
             status === 'ready'
-              ? this.visibleCatalog(definition)
+              ? structuredClone(
+                  this.published.get(definition.id)?.catalog ?? {
+                    tools: [],
+                    resources: [],
+                    prompts: []
+                  }
+                )
               : { tools: [], resources: [], prompts: [] }
         };
       })
     };
   }
 
-  private visibleCatalog(definition: ProjectSource): SourceCatalog {
+  private visibleCatalog(
+    definition: ProjectSource,
+    replacement?: SourceCatalog
+  ): SourceCatalog {
     const catalog = structuredClone(
-      this.catalogs.get(definition.id) ?? {
-        tools: [],
-        resources: [],
-        prompts: []
-      }
+      replacement ??
+        this.catalogs.get(definition.id) ?? {
+          tools: [],
+          resources: [],
+          prompts: []
+        }
     );
     if (definition.kind === 'native') {
       const hidden = definition.disabledCapabilities ?? [];
@@ -127,10 +145,39 @@ export class ProjectSourceManager {
     return catalog;
   }
 
+  // Preview and committed discovery must allocate exactly the same public names.
+  planNames(
+    project: string,
+    sources: ProjectSource[],
+    legacy?: ReservedCatalog,
+    replacement?: { id: string; catalog: SourceCatalog }
+  ) {
+    return publishCatalogs(
+      sources
+        .filter(
+          (s) =>
+            s.enabled &&
+            (s.id === replacement?.id ||
+              (this.project === project &&
+                this.adapters.get(s.id)?.health().status === 'ready'))
+        )
+        .map((s) => ({
+          id: s.id,
+          flexible: s.kind === 'external' && s.naming === 'collisions',
+          catalog: this.visibleCatalog(
+            s,
+            s.id === replacement?.id ? replacement.catalog : undefined
+          )
+        })),
+      legacy
+    );
+  }
+
   private async stop() {
     ++this.generation;
     this.status = 'stopped';
     this.catalogs.clear();
+    this.published.clear();
     await discardExternalDrafts();
     const entries = [...this.adapters.entries()];
     const results = await Promise.allSettled(
@@ -156,6 +203,7 @@ export class ProjectSourceManager {
     options: {
       prepared?: { id: string; adapter: SourceAdapter };
       createdNative?: string;
+      legacy?: ReservedCatalog;
     } = {}
   ) {
     const { prepared } = options;
@@ -206,6 +254,7 @@ export class ProjectSourceManager {
             );
           }
         }
+        this.published = this.planNames(project, sources, options.legacy);
         this.status = 'ready';
       } catch (error) {
         this.failedSource = {
@@ -253,8 +302,9 @@ export class ProjectSourceManager {
     const adapter = this.adapters.get(source);
     if (!adapter || adapter.health().status !== 'ready')
       throw new Error('Source is not ready.');
-    const definition = this.definitions.find((item) => item.id === source)!;
-    const catalog = this.visibleCatalog(definition);
+    const publication = this.published.get(source);
+    if (!publication) throw new Error('Source catalog is unavailable.');
+    const { catalog } = publication;
     const exposed =
       call.kind === 'tool'
         ? catalog.tools.some((item) => item.name === call.name)
@@ -263,9 +313,35 @@ export class ProjectSourceManager {
           : catalog.prompts.some((item) => item.name === call.name);
     if (!exposed)
       throw new Error('Capability is disabled or not exposed by this source.');
-    const result = await adapter.invoke(call);
-    assertCurrent();
-    return result;
+    const name =
+      call.kind === 'resource'
+        ? call.name
+        : (publication[call.kind === 'tool' ? 'tools' : 'prompts'].get(
+            call.name
+          ) ?? call.name);
+    const origin = call.origin;
+    const execution =
+      call.kind === 'tool' && origin
+        ? tryLogExecution(() =>
+            startToolExecution(
+              call.name,
+              this.definitions.find((d) => d.id === source)!.kind,
+              call.arguments,
+              undefined,
+              { projectId: project, sourceId: source, origin }
+            )
+          )
+        : undefined;
+    try {
+      const result = await adapter.invoke({ ...call, name });
+      assertCurrent();
+      if (execution)
+        tryLogExecution(() => completeToolExecution(execution, result));
+      return result;
+    } catch (error) {
+      if (execution) tryLogExecution(() => failToolExecution(execution, error));
+      throw error;
+    }
   }
 }
 

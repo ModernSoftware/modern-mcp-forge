@@ -1,6 +1,18 @@
 import { getDatabase } from '$lib/server/database';
 import { getActiveProjectKey } from '$lib/server/project/loader';
 
+// A local history write failure must not turn a completed upstream operation
+// into a tool error that could prompt an agent to execute it a second time.
+export function tryLogExecution<T>(write: () => T): T | undefined {
+  try {
+    return write();
+  } catch {
+    console.warn('Forge could not write to the local execution history.');
+  }
+}
+
+export type ExecutionOrigin = 'mcp' | 'workbench';
+
 export interface ExecutionRecord {
   id: number;
   executionUid: string;
@@ -11,7 +23,8 @@ export function startToolExecution(
   toolName: string,
   runtime: string,
   args: Record<string, unknown>,
-  entrypoint?: string
+  entrypoint?: string,
+  context?: { projectId?: string; origin: ExecutionOrigin; sourceId?: string }
 ): ExecutionRecord {
   const startedAt = Date.now();
 
@@ -19,22 +32,24 @@ export function startToolExecution(
 
   const executionUid = crypto.randomUUID();
 
-  const projectId = getActiveProjectKey();
+  const projectId = context?.projectId ?? getActiveProjectKey();
 
-  const row =
-    getDatabase()
-      .query<
-        { id: number },
-        [
-          string,
-          string,
-          string,
-          string,
-          string,
-          string,
-          string | null
-        ]
-      >(`
+  const row = getDatabase()
+    .query<
+      { id: number },
+      [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string | null,
+        string | null,
+        string | null
+      ]
+    >(
+      `
         INSERT INTO tool_executions (
           project_id,
           execution_uid,
@@ -43,6 +58,8 @@ export function startToolExecution(
           status,
           started_at,
           arguments_json,
+          origin,
+          source_id,
           entrypoint
         )
         VALUES (
@@ -51,24 +68,29 @@ export function startToolExecution(
           ?,
           ?,
           'running',
-          ?,
+          ?, ?, ?,
           ?,
           ?
         )
         RETURNING id
-      `)
-      .get(
-        projectId,
-        executionUid,
-        toolName,
-        runtime,
-        startedAtIso,
-        JSON.stringify(args),
-        entrypoint ?? null
-      );
+      `
+    )
+    .get(
+      projectId,
+      executionUid,
+      toolName,
+      runtime,
+      startedAtIso,
+      JSON.stringify(args),
+      context?.origin ?? null,
+      context?.sourceId ?? null,
+      entrypoint ?? null
+    );
 
   if (!row) {
-    throw new Error(`Could not create execution record for tool "${toolName}".`);
+    throw new Error(
+      `Could not create execution record for tool "${toolName}".`
+    );
   }
 
   return {
@@ -94,33 +116,44 @@ export function completeToolExecution(
       void,
       [
         string,
+        string,
         number,
         string,
         string | null,
         number | null,
         string | null,
-        number
+        number,
+        string
       ]
-    >(`
+    >(
+      `
       UPDATE tool_executions
       SET
-        status = 'succeeded',
+        status = ?,
         completed_at = ?,
         duration_ms = ?,
         result_json = ?,
         stderr_text = ?,
         exit_code = ?,
         entrypoint = COALESCE(?, entrypoint)
-      WHERE id = ?
-    `)
+      WHERE id = ? AND execution_uid = ?
+    `
+    )
     .run(
+      result &&
+        typeof result === 'object' &&
+        'isError' in result &&
+        result.isError === true
+        ? 'failed'
+        : 'succeeded',
       new Date(completedAt).toISOString(),
       completedAt - execution.startedAt,
       JSON.stringify(result),
       diagnostics?.stderr ?? null,
       diagnostics?.exitCode ?? null,
       diagnostics?.entrypoint ?? null,
-      execution.id
+      execution.id,
+      execution.executionUid
     );
 }
 
@@ -136,10 +169,7 @@ export function failToolExecution(
   const completedAt = Date.now();
 
   const message =
-    error instanceof Error
-      ? error.stack ??
-        error.message
-      : String(error);
+    error instanceof Error ? (error.stack ?? error.message) : String(error);
 
   getDatabase()
     .query<
@@ -151,9 +181,11 @@ export function failToolExecution(
         string | null,
         number | null,
         string | null,
-        number
+        number,
+        string
       ]
-    >(`
+    >(
+      `
       UPDATE tool_executions
       SET
         status = 'failed',
@@ -163,8 +195,9 @@ export function failToolExecution(
         stderr_text = ?,
         exit_code = ?,
         entrypoint = COALESCE(?, entrypoint)
-      WHERE id = ?
-    `)
+      WHERE id = ? AND execution_uid = ?
+    `
+    )
     .run(
       new Date(completedAt).toISOString(),
       completedAt - execution.startedAt,
@@ -172,6 +205,7 @@ export function failToolExecution(
       diagnostics?.stderr ?? null,
       diagnostics?.exitCode ?? null,
       diagnostics?.entrypoint ?? null,
-      execution.id
+      execution.id,
+      execution.executionUid
     );
 }
