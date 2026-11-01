@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createServer } from 'vite';
@@ -198,6 +198,24 @@ test('project native authoring exposes Node and Python over HTTP and recovers af
       content: 'throw new Error("deliberate startup failure");'
     });
     expect(failed.body.snapshot.status).toBe('failed');
+    const diagnostic = { action: 'diagnostics', id: 'js' };
+    expect((await action(diagnostic)).body.diagnostics).toContain(
+      'deliberate startup failure'
+    );
+    expect((await action(diagnostic, 'https://untrusted.example')).status).toBe(
+      403
+    );
+    expect(JSON.stringify(failed.body.snapshot)).not.toContain(
+      'deliberate startup failure'
+    );
+    expect(
+      JSON.parse(
+        await readFile(join(root, 'project/native/js/package.json'), 'utf8')
+      )
+    ).toMatchObject({
+      private: true,
+      type: 'module'
+    });
     const repaired = await action({
       action: 'save',
       id: 'js',
@@ -206,6 +224,41 @@ test('project native authoring exposes Node and Python over HTTP and recovers af
       content: file.content
     });
     expect(repaired.body.snapshot.status).toBe('ready');
+    // Editing an imported helper in an IDE must not silently test old code.
+    const sourceRoot = join(root, 'project/native/js');
+    const helper = join(sourceRoot, 'prefix.js');
+    await writeFile(helper, "export const prefix = 'First, ';");
+    const withImport =
+      "import {prefix} from './prefix.js';\n" +
+      file.content.replace("'Hello, '", 'prefix');
+    await writeFile(join(sourceRoot, 'handlers.mjs'), withImport);
+    const testGreet = {
+      action: 'invoke',
+      kind: 'tool',
+      id: 'js',
+      name: 'js_greet',
+      arguments: { name: 'Dev' }
+    };
+    const restart = async () => {
+      const response = await post('project/sources', {
+        projectId,
+        generation,
+        action: 'reload'
+      });
+      expect(response.status).toBe(200);
+      generation = response.body.generation;
+    };
+    expect((await action(testGreet)).status).toBe(409);
+    await restart();
+    expect((await action(testGreet)).body.result.content[0].text).toBe(
+      'First, Dev!'
+    );
+    await writeFile(helper, "export const prefix = 'Updated, ';");
+    expect((await action(testGreet)).status).toBe(409);
+    await restart();
+    expect((await action(testGreet)).body.result.content[0].text).toBe(
+      'Updated, Dev!'
+    );
     const disabled = await action({ action: 'disable', id: 'py' });
     expect(
       disabled.body.snapshot.sources.find((item: any) => item.id === 'py')

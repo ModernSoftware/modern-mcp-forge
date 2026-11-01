@@ -29,6 +29,8 @@ Native item editing now keeps Definition, Code and Test together. Visual field
 edits save directly; new items generate a single named handler. PR #18 remains
 open for review on `feat/external-mcp-sources`.
 
+The [November 1 walkthrough](reviews/2026-11-01-ux-plan.md) tracks the IDE edit/reload fixes, source-local npm setup and agent connection flow. It includes a replay recipe for the SQLite quote tool.
+
 ## Continue in a fresh chat
 
 Use ModernSoftware/modern-mcp-forge, base v0.10.0, working branch
@@ -42,7 +44,7 @@ assume future items above are implemented.
 - Search recent projects; open into the unified workspace.
 - Create one native capability in a new source, a new worker in an existing source,
   or bind an existing worker handler. Node and Python use MCPack 0.9.0.
-- Edit metadata and full definitions; tool schemas also have an explicit simple-field builder.
+- Edit tool metadata in either input-schema mode. Use visual fields for simple schemas, JSON for advanced rules and Advanced source files for the full manifest.
 - Filter/search capabilities and disable them without removing their code.
 - Configuration links to the same editors, shows configured workers, and manages sources.
 - Retire standalone preview selection. Close protects dirty drafts, stops sources and disables MCP.

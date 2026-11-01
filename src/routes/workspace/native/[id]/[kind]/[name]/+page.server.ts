@@ -30,6 +30,10 @@ export const load: PageServerLoad = ({ params }) => {
     codeError = failure instanceof Error ? failure.message : String(failure);
   }
   return {
+    runtime: manifest.workers?.[definition.worker]?.runtime as
+      string | undefined,
+    sourceFolder: document.files[0].split('/').slice(0, -1).join('/') || '.',
+    sourceEnabled: document.source.enabled,
     disabled:
       document.source.disabledCapabilities?.some(
         (item) => item.kind === params.kind && item.name === params.name

@@ -40,12 +40,28 @@ export function schemaFields(schema: any): SchemaField[] | null {
       ))
   )
     return null;
+  if (typeof schema.additionalProperties === 'object') return null;
   const fields: SchemaField[] = [];
   for (const [name, value] of Object.entries(schema.properties)) {
     if (!value || typeof value !== 'object' || Array.isArray(value))
       return null;
     const field = value as Record<string, unknown>;
     if (!scalarTypes.includes(String(field.type))) return null;
+    if (
+      [
+        '$ref',
+        '$dynamicRef',
+        'oneOf',
+        'anyOf',
+        'allOf',
+        'not',
+        'if',
+        'then',
+        'else',
+        'contentSchema'
+      ].some((key) => Object.hasOwn(field, key))
+    )
+      return null;
     fields.push({
       name,
       type: String(field.type),

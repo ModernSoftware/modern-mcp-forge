@@ -80,7 +80,8 @@ test('partial startup rolls back all adapters, including the failing one', async
     definition('good'),
     definition('broken')
   ]);
-  expect(failed.error).toBe('deliberate failure');
+  expect(failed.error).toBe('Source broken: deliberate failure');
+  expect(failed.sources.map((source) => source.status)).toEqual(['stopped', 'failed']);
   expect(failed.status).toBe('failed');
   expect(closed.sort()).toEqual(['broken', 'good']);
   expect(

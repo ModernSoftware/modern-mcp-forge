@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { reloadProjectSources } from '$lib/client/reload-project-sources';
   import { goto, invalidateAll } from '$app/navigation';
   import type { ProjectSource } from '$lib/server/sources/schema';
   import type { ProjectSourceManager } from '$lib/server/sources/manager';
@@ -43,13 +44,8 @@
     busy = true;
     error = '';
     try {
-      const response = await fetch('/api/project/sources', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ action: 'reload', projectId })
-      });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error);
+      const result = await reloadProjectSources(projectId, snapshot.generation);
+      if (result.error) throw new Error(result.error);
     } catch (failure) {
       error = failure instanceof Error ? failure.message : String(failure);
     } finally {

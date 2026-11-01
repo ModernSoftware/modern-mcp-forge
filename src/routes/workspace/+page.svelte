@@ -1,7 +1,35 @@
 <script lang="ts">
+  import { page } from '$app/state';
+  import { reloadProjectSources } from '$lib/client/reload-project-sources';
   import { invalidateAll } from '$app/navigation';
   let { data } = $props();
   let busy = $state(false);
+  let endpoint = $derived(new URL('/mcp', page.url).href);
+  let copyNotice = $state('');
+  async function reload() {
+    busy = true;
+    actionError = '';
+    try {
+      const result = await reloadProjectSources(
+        data.project.id,
+        data.snapshot.generation
+      );
+      if (result.error) throw new Error(result.error);
+    } catch (error) {
+      actionError = error instanceof Error ? error.message : String(error);
+    } finally {
+      await invalidateAll();
+      busy = false;
+    }
+  }
+  async function copyEndpoint() {
+    try {
+      await navigator.clipboard.writeText(endpoint);
+      copyNotice = 'Copied.';
+    } catch {
+      copyNotice = 'Select the URL and copy it.';
+    }
+  }
   let actionError = $state('');
   async function toggle(
     id: string,
@@ -112,7 +140,10 @@
     role="alert"
   >
     {data.snapshot.error || data.catalogError}
-    <a href="/project">Review sources</a>
+    <button class="secondary-button" disabled={busy} onclick={reload}
+      >{busy ? 'Reloading…' : 'Reload project sources'}</button
+    >
+    <a href="/project">Review configuration</a>
   </p>{/if}
 {#each data.sources.filter((entry) => entry.error) as entry}<p
     role="alert"
@@ -192,13 +223,37 @@
         >{/if}
     </div>{/each}
 </section>
-<p class="workflow-muted">
-  Endpoint: <code>/mcp</code> ·
-  <a href="/project">Configure sources and inspect workers</a>. Reconnect
-  clients after changing definitions.
-</p>
+<section class="glass-card connect-agent" aria-label="Connect an agent">
+  <h2>Connect an agent</h2>
+  <p>
+    With this project open and its sources ready, connect your MCP client using
+    Streamable HTTP.
+  </p>
+  <div class="workflow-toolbar">
+    <code>{endpoint}</code>
+    <button onclick={copyEndpoint}>Copy URL</button><span role="status"
+      >{copyNotice}</span
+    >
+  </div>
+  <p>
+    Reconnect your client after restarting sources. <a href="/project"
+      >Configure sources</a
+    >
+  </p>
+</section>
 
 <style>
+  .connect-agent {
+    margin-top: 1rem;
+    padding: 1rem 1.5rem;
+  }
+  .connect-agent code {
+    overflow-wrap: anywhere;
+  }
+  .connect-agent .workflow-toolbar {
+    align-items: center;
+  }
+
   .source-badge.external {
     color: var(--teal);
     background: color-mix(in srgb, var(--teal) 12%, transparent);

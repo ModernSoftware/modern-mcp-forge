@@ -22,6 +22,9 @@ const identity = { projectId: z.string(), id: z.string().min(1) };
 const generation = { generation: z.number().int().nonnegative() };
 const Input = z.discriminatedUnion('action', [
   z
+    .object({ ...identity, ...generation, action: z.literal('diagnostics') })
+    .strict(),
+  z
     .object({
       ...identity,
       ...generation,
@@ -133,9 +136,18 @@ export const POST: RequestHandler = async ({ request }) => {
       }
       return project;
     };
+    if (input.action === 'diagnostics') {
+      current();
+      return json(
+        { diagnostics: projectSources.diagnostics(input.projectId, input.id) },
+        {
+          headers: { 'cache-control': 'no-store' }
+        }
+      );
+    }
     if (input.action === 'invoke') {
       current();
-      const result = await projectSources.invoke(
+      const result = await projectSources.testNative(
         input.projectId,
         input.generation,
         input.id,

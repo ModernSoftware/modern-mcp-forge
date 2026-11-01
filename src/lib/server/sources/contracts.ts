@@ -12,7 +12,15 @@ export interface SourceAdapter {
   start(): Promise<void>;
   discover(): Promise<SourceCatalog>;
   invoke(call: SourceCall): Promise<unknown>;
-  health(): { status: 'starting' | 'ready' | 'failed' | 'stopped'; error?: string };
+  health(): {
+    status: 'starting' | 'ready' | 'failed' | 'stopped';
+    error?: string;
+  };
+  assertTestFilesCurrent?(): Promise<void>;
+  diagnostics?(): string;
   close(): Promise<void>;
 }
-export type SourceFactory = (root: string, source: ProjectSource) => SourceAdapter;
+export type SourceFactory = (
+  root: string,
+  source: ProjectSource
+) => SourceAdapter;

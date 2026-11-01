@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { reloadProjectSources } from '$lib/client/reload-project-sources';
   import { onMount, tick } from 'svelte';
   import {
     registerProjectLeaveGuard,
@@ -12,10 +13,37 @@
     type SchemaField
   } from '$lib/authoring/schema-fields';
   let { data } = $props();
-  let tab = $state<'definition' | 'code' | 'test'>('definition');
+  const tabs = ['Definition', 'Code', 'Test'] as const;
+  type EditorTab = (typeof tabs)[number];
+  let tab = $state<EditorTab>('Definition');
+  function navigateTabs(event: KeyboardEvent, index: number) {
+    const offset =
+      event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
+    if (!offset && event.key !== 'Home' && event.key !== 'End') return;
+    event.preventDefault();
+    const next =
+      event.key === 'Home'
+        ? 0
+        : event.key === 'End'
+          ? tabs.length - 1
+          : (index + offset + tabs.length) % tabs.length;
+    tab = tabs[next];
+    document.getElementById(`cap-tab-${tab}`)?.focus();
+  }
   let mode = $state<'fields' | 'json'>('fields');
   let content = $state('');
   let original = $state('');
+  let schemaText = $state('');
+  let visualAvailability = $derived.by(() => {
+    if (data.kind !== 'tools' || mode !== 'json') return '';
+    try {
+      return schemaFields(JSON.parse(schemaText)) === null
+        ? 'This schema uses nested fields or advanced rules. Edit it in JSON.'
+        : '';
+    } catch {
+      return 'Finish the JSON syntax before switching to visual fields.';
+    }
+  });
   let revision = $state('');
   let fields = $state<SchemaField[]>([]);
   let originalFields = $state('[]');
@@ -28,6 +56,22 @@
   let codeRevision = $state('');
   let codePath = $state('');
   let argumentsText = $state('{}');
+  let diagnostics = $state<string | null>(null);
+  let diagnosticGeneration = $state(-1);
+  async function showDiagnostics() {
+    if (busy) return;
+    const generation = data.snapshot.generation;
+    busy = true;
+    try {
+      const payload = await request({ action: 'diagnostics' });
+      diagnostics = payload.diagnostics;
+      diagnosticGeneration = generation;
+    } catch (failure) {
+      error = failure instanceof Error ? failure.message : String(failure);
+    } finally {
+      busy = false;
+    }
+  }
   let result = $state('');
   let definition = $derived.by(() => {
     try {
@@ -39,7 +83,13 @@
   let fieldsDirty = $derived(
     mode === 'fields' && JSON.stringify(fields) !== originalFields
   );
-  let definitionDirty = $derived(content !== original || fieldsDirty);
+  let definitionDirty = $derived(
+    content !== original ||
+      fieldsDirty ||
+      (data.kind === 'tools' &&
+        mode === 'json' &&
+        schemaText !== JSON.stringify(definition?.inputSchema, null, 2))
+  );
   let codeDirty = $derived(code !== originalCode);
   let dirty = $derived(definitionDirty || codeDirty);
   let source = $derived(
@@ -50,6 +100,7 @@
   function resetDefinition() {
     content = original = JSON.stringify(data.definition, null, 2);
     revision = data.revision;
+    schemaText = JSON.stringify(data.definition.inputSchema ?? {}, null, 2);
     const loaded =
       data.kind === 'tools' ? schemaFields(data.definition.inputSchema) : [];
     fields = loaded ?? [];
@@ -64,7 +115,8 @@
       code = originalCode = data.handlerFile?.content ?? '';
       codeRevision = data.handlerFile?.revision ?? '';
       codePath = data.handlerFile?.path ?? '';
-      tab = 'definition';
+      tab = 'Definition';
+      diagnostics = null;
       error = '';
       notice = '';
       result = '';
@@ -87,28 +139,33 @@
     const value = JSON.parse(content);
     if (!value || typeof value !== 'object' || Array.isArray(value))
       throw new Error('Definition must be a JSON object.');
-    if (mode === 'fields' && data.kind === 'tools')
-      value.inputSchema = fieldsSchema(fields, value.inputSchema);
+    if (data.kind === 'tools') {
+      if (mode === 'json') value.inputSchema = JSON.parse(schemaText);
+      else if (fieldsDirty)
+        value.inputSchema = fieldsSchema(fields, value.inputSchema);
+    }
     return value;
   }
-  function changeMode(next: 'fields' | 'json') {
+  function changeMode(select: HTMLSelectElement) {
+    const next = select.value as 'fields' | 'json';
     if (next === mode) return;
     error = '';
     try {
-      if (next === 'json') content = JSON.stringify(draftDefinition(), null, 2);
-      else {
-        const value = JSON.parse(content);
-        const loaded =
-          data.kind === 'tools' ? schemaFields(value.inputSchema) : [];
-        if (loaded === null)
-          throw new Error(
-            'This schema uses nested fields or advanced rules. Keep editing in JSON mode; no rules have been removed.'
-          );
-        fields = loaded;
-        originalFields = JSON.stringify(fields);
+      const value = draftDefinition();
+      if (data.kind === 'tools') {
+        if (next === 'json')
+          schemaText = JSON.stringify(value.inputSchema, null, 2);
+        else {
+          const loaded = schemaFields(value.inputSchema);
+          if (!loaded) throw new Error(visualAvailability);
+          fields = loaded;
+          originalFields = JSON.stringify(fields);
+        }
       }
+      content = JSON.stringify(value, null, 2);
       mode = next;
     } catch (failure) {
+      select.value = mode;
       error = failure instanceof Error ? failure.message : String(failure);
     }
   }
@@ -159,11 +216,15 @@
         revision
       });
       content = original = JSON.stringify(value, null, 2);
+      if (data.kind === 'tools' && mode === 'fields')
+        fields = schemaFields(value.inputSchema) ?? [];
       originalFields = JSON.stringify(fields);
+      schemaText = JSON.stringify(value.inputSchema ?? {}, null, 2);
       revision = payload.file.revision;
       result = '';
-      notice =
-        'Definition saved. Project sources restarted; reconnect external MCP clients.';
+      notice = payload.snapshot.error
+        ? 'Definition saved. Source startup failed. Inspect diagnostics to repair the worker.'
+        : 'Definition saved. Project sources restarted; reconnect external MCP clients.';
       if (value.name !== data.definition.name)
         destination = `/workspace/native/${encodeURIComponent(data.sourceId)}/${data.kind}/${encodeURIComponent(value.name)}`;
       else {
@@ -197,8 +258,9 @@
       code = originalCode = payload.file.content;
       codeRevision = payload.file.revision;
       result = '';
-      notice =
-        'Code saved. Project sources restarted; reconnect external MCP clients.';
+      notice = payload.snapshot.error
+        ? 'Code saved. Source startup failed. Inspect diagnostics to repair the worker.'
+        : 'Code saved. Project sources restarted; reconnect external MCP clients.';
       await refresh();
     } catch (failure) {
       error = failure instanceof Error ? failure.message : String(failure);
@@ -218,15 +280,24 @@
       return;
     busy = true;
     error = '';
+    notice = '';
+    result = '';
     try {
+      const snapshot = await reloadProjectSources(
+        data.projectId,
+        data.snapshot.generation
+      );
       await refresh();
       resetDefinition();
       code = originalCode = data.handlerFile?.content ?? '';
       codeRevision = data.handlerFile?.revision ?? '';
       codePath = data.handlerFile?.path ?? '';
-      result = '';
+      if (snapshot.error) throw new Error(snapshot.error);
+      notice =
+        'Files reloaded and project sources restarted. Reconnect any external MCP clients.';
     } catch (failure) {
       error = failure instanceof Error ? failure.message : String(failure);
+      await refresh();
     } finally {
       busy = false;
     }
@@ -235,6 +306,7 @@
     if (busy || dirty || disabled) return;
     busy = true;
     error = '';
+    notice = '';
     result = '';
     try {
       const args = data.kind === 'resources' ? {} : JSON.parse(argumentsText);
@@ -291,58 +363,53 @@
     >Advanced source files</a
   >
 </section>
-<nav class="editor-tabs" aria-label="Capability editor">
-  <button
-    class:chosen={tab === 'definition'}
-    aria-current={tab === 'definition' ? 'page' : undefined}
-    onclick={() => (tab = 'definition')}
-    >Definition{definitionDirty ? ' *' : ''}</button
+<div class="editor-tabs" role="tablist" aria-label="Capability editor">
+  {#each tabs as item, index}
+    <button
+      role="tab"
+      id={`cap-tab-${item}`}
+      aria-controls="cap-panel"
+      aria-selected={item === tab}
+      tabindex={item === tab ? 0 : -1}
+      onclick={() => (tab = item)}
+      onkeydown={(event) => navigateTabs(event, index)}
+    >
+      {item}{(item === 'Definition' && definitionDirty) ||
+      (item === 'Code' && codeDirty)
+        ? ' *'
+        : ''}
+    </button>
+  {/each}
+</div>
+<div class="runtime-bar">
+  <span>Source <strong>{source?.status ?? 'stopped'}</strong></span>
+  <button class="secondary-button" disabled={busy} onclick={reload}
+    >Reload files &amp; restart sources</button
   >
-  <button
-    class:chosen={tab === 'code'}
-    aria-current={tab === 'code' ? 'page' : undefined}
-    onclick={() => (tab = 'code')}>Code{codeDirty ? ' *' : ''}</button
+  <button class="secondary-button" disabled={busy} onclick={showDiagnostics}
+    >Show worker diagnostics</button
   >
-  <button
-    class:chosen={tab === 'test'}
-    aria-current={tab === 'test' ? 'page' : undefined}
-    onclick={() => (tab = 'test')}>Test</button
+  <small
+    >Use reload after editing the worker or its imports outside Forge.</small
   >
-</nav>
+</div>
+{#if diagnostics !== null && diagnosticGeneration === data.snapshot.generation}
+  <pre class="code-block" aria-live="polite">{diagnostics ||
+      'No worker output for this source.'}</pre>
+{/if}
 {#if error || data.snapshot.error}<p role="alert" class="workflow-error">
     {error || data.snapshot.error}
   </p>{/if}
 {#if notice}<p role="status">{notice}</p>{/if}
-<section class="glass-card editor-panel">
-  {#if tab === 'definition'}
-    <div class="workflow-toolbar">
-      <h2>Definition</h2>
-      <label
-        >Editor mode<select
-          value={mode}
-          disabled={busy}
-          onchange={(event) =>
-            changeMode(event.currentTarget.value as 'fields' | 'json')}
-          ><option value="fields">Visual fields</option><option value="json"
-            >JSON definition</option
-          ></select
-        ></label
-      >
-    </div>
-    {#if mode === 'json'}
-      <p class="workflow-muted">
-        Edit the full definition, including nested input schemas and worker
-        bindings. Advanced schemas stay in JSON mode without losing validation
-        rules.
-      </p>
-      <MonacoEditor
-        value={content}
-        language="json"
-        readOnly={busy}
-        onChange={(value) => (content = value)}
-        onSave={saveDefinition}
-      />
-    {:else if definition}
+<div
+  class="glass-card editor-panel"
+  role="tabpanel"
+  id="cap-panel"
+  aria-labelledby={`cap-tab-${tab}`}
+>
+  {#if tab === 'Definition'}
+    <h2>Definition</h2>
+    {#if definition && (data.kind === 'tools' || mode === 'fields')}
       <div class="workflow-form">
         <label
           >Name<input
@@ -359,6 +426,41 @@
               setProperty('description', event.currentTarget.value)}
           ></textarea></label
         >
+      </div>
+    {/if}
+    <div class="workflow-toolbar mode-toolbar">
+      <label
+        >Editor mode<select
+          value={mode}
+          disabled={busy}
+          onchange={(event) => changeMode(event.currentTarget)}
+          ><option value="fields" disabled={Boolean(visualAvailability)}
+            >Visual fields</option
+          ><option value="json"
+            >{data.kind === 'tools' ? 'JSON schema' : 'JSON definition'}</option
+          ></select
+        ></label
+      >
+    </div>
+    {#if mode === 'json'}
+      <p class="workflow-muted">
+        {visualAvailability ||
+          (data.kind === 'tools'
+            ? 'Edit the input schema for this tool.'
+            : 'Edit the complete capability definition.')}
+      </p>
+      <MonacoEditor
+        value={data.kind === 'tools' ? schemaText : content}
+        language="json"
+        readOnly={busy}
+        onChange={(value) => {
+          if (data.kind === 'tools') schemaText = value;
+          else content = value;
+        }}
+        onSave={saveDefinition}
+      />
+    {:else if definition}
+      <div class="workflow-form">
         {#if data.kind === 'tools'}
           <h3>Input fields</h3>
           <p class="workflow-muted">
@@ -394,12 +496,14 @@
                 /></label
               >
               <button
+                class="secondary-button"
                 disabled={busy}
                 onclick={() => (fields = fields.filter((_, i) => i !== index))}
                 >Remove</button
               >
             </div>{/each}
           <button
+            class="secondary-button"
             disabled={busy}
             onclick={() =>
               (fields = [
@@ -446,16 +550,33 @@
       <button disabled={busy || !definitionDirty} onclick={resetDefinition}
         >Discard definition changes</button
       >
-      <button disabled={busy} onclick={reload}>Reload from disk</button>
       <span>{definitionDirty ? 'Unsaved definition' : 'Definition saved'}</span>
     </div>
-  {:else if tab === 'code'}
+  {:else if tab === 'Code'}
     <h2>Code</h2>
     <p>
       Handler <code>{String(data.definition.handler)}</code> in
       <code>{codePath}</code>. This module may be shared by other items in the
       same worker.
     </p>
+    {#if data.runtime === 'node'}
+      <details class="dependencies">
+        <summary>Node dependencies</summary>
+        <p>
+          Open a terminal in <code>{data.sourceFolder}</code> within the
+          project. Install a third-party package with
+          <code>npm install &lt;package-name&gt;</code>. Commit the package
+          manifest and lockfile. For a fresh checkout with a lockfile, run
+          <code>npm ci</code>, then reload the sources.
+        </p>
+        <p>
+          Node provides <code>node:crypto</code>, <code>node:path</code> and
+          <code>node:sqlite</code>. Built-in modules use the worker's Node
+          version. Older sources without a package manifest can use
+          <code>npm init -y</code> first.
+        </p>
+      </details>
+    {/if}
     {#if codePath}
       <MonacoEditor
         value={code}
@@ -476,7 +597,7 @@
         ><button
           disabled={busy || !codeDirty}
           onclick={() => (code = originalCode)}>Discard code changes</button
-        ><button disabled={busy} onclick={reload}>Reload from disk</button>
+        >
       </div>
     {:else}<p role="alert">
         {data.codeError || 'No worker module available.'} Use Advanced source files
@@ -492,8 +613,17 @@
         Save or discard your definition and code changes before testing.
       </p>{/if}
     {#if disabled}<p role="status">
-        This item or its source is disabled or unavailable. Enable or repair it
-        before testing.
+        {#if !data.sourceEnabled}
+          This source is disabled. <a href="/project">Open Configuration</a> to enable it.
+        {:else if data.disabled}
+          This capability is disabled. <a href="/workspace">Open the workspace</a> to enable it.
+        {:else if data.snapshot.status === 'failed' || source?.status === 'failed'}
+          Startup failed. Inspect worker diagnostics, repair the files, then
+          reload the sources.
+        {:else}
+          The project is open and its workers are stopped. Use Reload files
+          &amp; restart sources above to start testing.
+        {/if}
       </p>{/if}
     <details>
       <summary>Saved definition</summary>
@@ -513,21 +643,43 @@
     {#if result}<h3>Result</h3>
       <pre aria-live="polite">{result}</pre>{/if}
   {/if}
-</section>
+</div>
 
 <style>
   .editor-tabs {
     display: flex;
-    gap: 8px;
-    margin: 20px 0;
+    border-bottom: 1px solid var(--border);
+    margin: 20px 0 12px;
+  }
+  .mode-toolbar label:first-child {
+    flex: none;
+    min-width: 0;
   }
   .editor-tabs button {
     flex: 1;
     padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px 8px 0 0;
+    background: transparent;
+    font: inherit;
+    font-weight: 650;
+    color: var(--text);
+    cursor: pointer;
   }
-  button.chosen {
+  .editor-tabs button[aria-selected='true'] {
     border-color: var(--accent);
     background: var(--accent-soft);
+    box-shadow: inset 0 -3px var(--accent);
+  }
+  .runtime-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .runtime-bar small {
+    color: var(--muted);
   }
   .editor-panel {
     padding: 24px;
@@ -539,17 +691,64 @@
   }
   .field-row {
     display: grid;
-    grid-template-columns: minmax(100px, 1fr) 110px minmax(
-        140px,
-        1fr
-      ) 75px auto;
+    grid-template-columns:
+      minmax(100px, 1fr) 110px minmax(140px, 1fr)
+      75px auto;
     gap: 12px;
     align-items: end;
     margin: 14px 0;
   }
-  .required input {
-    width: 20px;
-    min-height: 24px;
+  .field-row label {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+    font-size: 0.85rem;
+  }
+  .field-row input,
+  .field-row select {
+    width: 100%;
+    min-width: 0;
+  }
+  .field-row .required input {
+    appearance: none;
+    width: 2.65rem;
+    height: 1.5rem;
+    min-height: 0;
+    padding: 2px;
+    border-radius: 1rem;
+    background: var(--surface-3);
+    border: 1px solid var(--muted);
+    cursor: pointer;
+  }
+  .required input::before {
+    content: '';
+    display: block;
+    width: 1.1rem;
+    height: 1.1rem;
+    border-radius: 50%;
+    background: var(--muted);
+  }
+  .required input:checked {
+    background: var(--accent-soft);
+    border-color: var(--accent);
+  }
+  .required input:checked::before {
+    background: var(--text);
+    transform: translateX(1.1rem);
+  }
+  .editor-tabs button:focus-visible,
+  .required input:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  @media (max-width: 520px) {
+    .editor-panel .field-row {
+      grid-template-columns: 1fr;
+    }
+    .field-row {
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 12px;
+    }
   }
   .save-bar {
     margin-top: 20px;

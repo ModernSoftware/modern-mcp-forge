@@ -199,6 +199,18 @@ export function createNativeSource(
   mkdirSync(folder);
   try {
     const starter = initial ?? nativeStarter(id, runtime);
+    if (runtime === 'node') {
+      const pkg = {
+        name: `forge-${id.toLowerCase()}`,
+        private: true,
+        type: 'module'
+      };
+      writeFileSync(
+        join(folder, 'package.json'),
+        JSON.stringify(pkg, null, 2) + '\n',
+        { flag: 'wx' }
+      );
+    }
     writeFileSync(join(folder, starter.module), starter.code, { flag: 'wx' });
     writeFileSync(
       join(folder, 'mcpack.json'),

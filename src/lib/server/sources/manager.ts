@@ -25,8 +25,28 @@ export class ProjectSourceManager {
   private adapters = new Map<string, SourceAdapter>();
   private catalogs = new Map<string, SourceCatalog>();
   private error?: string;
+  private failedSource?: { id: string; diagnostics: string };
+
+  // Local authoring only. Worker output must never enter the public MCP catalog.
+  diagnostics(project: string, source: string) {
+    if (this.project !== project) return '';
+    if (this.failedSource?.id === source) return this.failedSource.diagnostics;
+    return this.adapters.get(source)?.diagnostics?.() ?? '';
+  }
 
   constructor(private factory: SourceFactory = nativeFactory) {}
+
+  async testNative(
+    project: string,
+    generation: number,
+    source: string,
+    call: SourceCall
+  ) {
+    if (project !== this.project || generation !== this.generation)
+      throw new Error('Project sources changed. Refresh before testing.');
+    await this.adapters.get(source)?.assertTestFilesCurrent?.();
+    return this.invoke(project, generation, source, call);
+  }
 
   private exclusive<T>(operation: () => Promise<T>) {
     const result = this.pending.then(operation);
@@ -45,7 +65,7 @@ export class ProjectSourceManager {
         ...(this.adapters.get(definition.id)?.health() ?? {
           status: !definition.enabled
             ? 'disabled'
-            : this.error
+            : this.failedSource?.id === definition.id
               ? 'failed'
               : 'stopped'
         }),
@@ -114,8 +134,11 @@ export class ProjectSourceManager {
       this.definitions = sources;
       this.error = undefined;
       this.status = 'starting';
+      this.failedSource = undefined;
+      let startingId = '';
       try {
         for (const source of sources.filter((source) => source.enabled)) {
+          startingId = source.id;
           const adapter = this.factory(root, source);
           this.adapters.set(source.id, adapter);
           await adapter.start();
@@ -123,7 +146,12 @@ export class ProjectSourceManager {
         }
         this.status = 'ready';
       } catch (error) {
-        this.error = error instanceof Error ? error.message : String(error);
+        this.failedSource = {
+          id: startingId,
+          diagnostics: this.adapters.get(startingId)?.diagnostics?.() ?? ''
+        };
+        const message = error instanceof Error ? error.message : String(error);
+        this.error = `Source ${startingId}: ${message}`;
         await this.stop();
         this.status = 'failed';
       }
@@ -135,6 +163,7 @@ export class ProjectSourceManager {
     return this.exclusive(async () => {
       await this.stop();
       this.project = undefined;
+      this.failedSource = undefined;
       this.definitions = [];
       this.error = undefined;
     });
