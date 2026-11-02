@@ -14,6 +14,7 @@
     "test": "svelte-kit sync && bun test --max-concurrency=1 tests/unit tests/integration",
     "test:unit": "svelte-kit sync && bun test --max-concurrency=1 tests/unit",
     "test:integration": "svelte-kit sync && bun test --max-concurrency=1 tests/integration",
+    "test:deployment": "svelte-kit sync && bun test tests/deployment",
     "test:e2e": "svelte-kit sync && bun test --max-concurrency=1 tests/e2e",
     "test:coverage": "svelte-kit sync && bun test --max-concurrency=1 tests/unit tests/integration --coverage",
     "test:all": "bun run check && bun run test && bun run test:e2e && bun run build",

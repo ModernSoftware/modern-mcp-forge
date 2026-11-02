@@ -42,7 +42,7 @@ jobs:
       - run: node examples/bridges/compatibility-lab/setup.mjs
       - run: bun test examples/bridges/compatibility-lab/tests/compatibility.test.mjs
       - name: Clean-install and call an exported native pack
-        run: bun test tests/deployment
+        run: bun run test:deployment
       - name: Verify workspace navigation and export download in Chrome
         run: |
           npm ci --prefix tests/browser
@@ -64,4 +64,4 @@ jobs:
           python-version: '3.13'
       - run: bun install --frozen-lockfile
       - name: Clean-install and call an exported native pack on Windows
-        run: bun test tests/deployment
+        run: bun run test:deployment
