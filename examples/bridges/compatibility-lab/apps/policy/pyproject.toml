@@ -1,0 +1,5 @@
+[project]
+name = "forge-example-policy"
+version = "1.0.0"
+requires-python = ">=3.11,<3.15"
+dependencies = ["fastmcp==3.4.11", "mcp==1.29.0"]

@@ -74,3 +74,7 @@ This version supports tools, listed static resources and prompts. Resource templ
 Choose **Group by source type** to see an expandable Native, External or Bridged group with counts for the current filters. Expand a group to manage a source or select a capability. **Detailed list** shows individual capabilities and includes configured sources with empty catalogs.
 
 The workbench keeps the selected capability after a request. Tools accept a JSON argument object, static resource reads need only their URI, and prompts have text fields for their declared string arguments. Required fields must be filled before the prompt is submitted.
+
+## Try a mixed-language project
+
+The [compatibility lab](../examples/bridges/compatibility-lab/README.md) opens as one Forge project. Its native Node and Python workers run alongside five independently packaged framework applications. The guide includes setup, Inspector inputs and a direct-versus-Forge integration test.
