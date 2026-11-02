@@ -1,11 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import { NativeProjectError } from '../mcpack/session';
-import type { prepareExternalChange } from './authoring';
-import type { ExternalSourceAdapter } from './external';
+import type { prepareConnectionChange } from './authoring';
+import type { SourceAdapter } from './contracts';
+import type { UpstreamKind } from './upstream';
 
-export interface VerifiedExternalChange {
-  change: ReturnType<typeof prepareExternalChange>;
-  adapter?: ExternalSourceAdapter;
+export interface VerifiedConnectionChange {
+  change: ReturnType<typeof prepareConnectionChange>;
+  kind: UpstreamKind;
+  adapter?: SourceAdapter;
 }
 
 // Discovery may finish after the HTTP client disappears. Only a second request
@@ -15,7 +17,7 @@ const drafts = new Map<
   {
     projectId: string;
     generation: number;
-    verified: VerifiedExternalChange;
+    verified: VerifiedConnectionChange;
     timer: ReturnType<typeof setTimeout>;
   }
 >();
@@ -28,10 +30,10 @@ async function discard(id: string) {
   await draft.verified.adapter?.close();
 }
 
-export async function stageExternalDraft(
+export async function stageConnectionDraft(
   projectId: string,
   generation: number,
-  verified: VerifiedExternalChange
+  verified: VerifiedConnectionChange
 ) {
   if (drafts.size >= 8) await discard(drafts.keys().next().value!);
   const id = randomUUID();
@@ -43,16 +45,18 @@ export async function stageExternalDraft(
   return id;
 }
 
-export function takeExternalDraft(
+export function takeConnectionDraft(
   projectId: string,
   generation: number,
-  id: string
+  id: string,
+  kind: UpstreamKind
 ) {
   const draft = drafts.get(id);
   if (
     !draft ||
     draft.projectId !== projectId ||
-    draft.generation !== generation
+    draft.generation !== generation ||
+    draft.verified.kind !== kind
   )
     throw new NativeProjectError(
       'Connection preview expired or the project changed. Connect again.',
@@ -63,6 +67,6 @@ export function takeExternalDraft(
   return draft.verified;
 }
 
-export async function discardExternalDrafts() {
+export async function discardConnectionDrafts() {
   await Promise.allSettled([...drafts.keys()].map(discard));
 }

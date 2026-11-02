@@ -52,3 +52,5 @@ Once those exist, this file can act as the permanent documentation index.
 - [Project workflow and continuation guide](project-workflow.md): UX decisions, current scope and next steps.
 
 - [External MCP sources](external-sources.md): connect trusted HTTP endpoints and test their capabilities.
+
+- [Local bridges](bridged-sources.md) for project-owned Node and Python stdio servers.

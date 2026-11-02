@@ -29,7 +29,7 @@ or rewrite the source's tool schemas. IDs must be unique within the project; up 
 Native manifest paths must resolve inside the project, including symlinks. Opening
 a configured project executes its trusted local handlers; processes are not sandboxes.
 
-Reserved descriptors for later adapters:
+Example disabled connections:
 
 ```json
 [
@@ -49,7 +49,7 @@ Reserved descriptors for later adapters:
 ]
 ```
 
-Bridge descriptors **must stay disabled** until bridge dispatch is implemented.
+Node and Python bridges run a project-owned adapter with Forge’s host when mode is `adapter`. Earlier descriptors launch their existing stdio script. See [Local bridges](bridged-sources.md) for setup, environment forwarding and lifecycle.
 External descriptors now support Streamable HTTP and optional bearer credentials
 through an environment-variable reference; see [External sources](external-sources.md).
 External URL credentials, query strings and fragments are rejected.

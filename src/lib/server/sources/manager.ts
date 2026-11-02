@@ -12,15 +12,15 @@ import {
   tryLogExecution
 } from '../mcp/execution-log';
 import { NativeProjectError } from '../mcpack/session';
-import { discardExternalDrafts } from './external-drafts';
+import { discardConnectionDrafts } from './connection-drafts';
+import { BridgeSourceAdapter } from './bridge';
 import { ExternalSourceAdapter } from './external';
 import { NativeSourceAdapter } from './native';
 import { ProjectSourcesSchema, type ProjectSource } from './schema';
 
 const nativeFactory: SourceFactory = (root, source) => {
   if (source.kind === 'external') return new ExternalSourceAdapter(source);
-  if (source.kind !== 'native')
-    throw new Error(`${source.kind} sources are not implemented.`);
+  if (source.kind === 'bridge') return new BridgeSourceAdapter(root, source);
   return new NativeSourceAdapter(root, source.manifest);
 };
 
@@ -35,7 +35,7 @@ export class ProjectSourceManager {
   private catalogs = new Map<string, SourceCatalog>();
   private published: ReturnType<typeof publishCatalogs> = new Map();
   private error?: string;
-  private externalFailures = new Map<string, string>();
+  private sourceFailures = new Map<string, string>();
   private failedSource?: { id: string; diagnostics: string };
 
   // Local authoring only. Worker output must never enter the public MCP catalog.
@@ -77,19 +77,19 @@ export class ProjectSourceManager {
       error: this.error,
       sources: this.definitions.map((definition) => {
         const health = this.adapters.get(definition.id)?.health();
-        const externalError = this.externalFailures.get(definition.id);
+        const sourceError = this.sourceFailures.get(definition.id);
         const status =
           health?.status ??
           (!definition.enabled
             ? 'disabled'
-            : externalError || this.failedSource?.id === definition.id
+            : sourceError || this.failedSource?.id === definition.id
               ? 'failed'
               : 'stopped');
         return {
           ...definition,
           status,
           error:
-            externalError ??
+            sourceError ??
             health?.error ??
             (definition.kind === 'external' && status === 'failed'
               ? 'Connection lost. Reload or edit this connection.'
@@ -163,7 +163,10 @@ export class ProjectSourceManager {
         )
         .map((s) => ({
           id: s.id,
-          flexible: s.kind === 'external' && s.naming === 'collisions',
+          flexible:
+            s.kind !== 'native' &&
+            (s.naming ?? (s.kind === 'bridge' ? 'collisions' : 'always')) ===
+              'collisions',
           catalog: this.visibleCatalog(
             s,
             s.id === replacement?.id ? replacement.catalog : undefined
@@ -178,7 +181,7 @@ export class ProjectSourceManager {
     this.status = 'stopped';
     this.catalogs.clear();
     this.published.clear();
-    await discardExternalDrafts();
+    await discardConnectionDrafts();
     const entries = [...this.adapters.entries()];
     const results = await Promise.allSettled(
       entries.map(([, adapter]) => adapter.close())
@@ -217,7 +220,7 @@ export class ProjectSourceManager {
         throw error;
       }
       if (prepared) this.adapters.set(prepared.id, prepared.adapter);
-      this.externalFailures.clear();
+      this.sourceFailures.clear();
       this.project = project;
       this.definitions = sources;
       this.error = undefined;
@@ -245,10 +248,10 @@ export class ProjectSourceManager {
             }
             this.catalogs.set(source.id, await adapter.discover());
           } catch (error) {
-            if (source.kind !== 'external') throw error;
+            if (source.kind === 'native') throw error;
             await adapter.close();
             this.adapters.delete(source.id);
-            this.externalFailures.set(
+            this.sourceFailures.set(
               source.id,
               error instanceof Error ? error.message : 'Connection failed.'
             );
@@ -276,7 +279,7 @@ export class ProjectSourceManager {
       this.project = undefined;
       this.failedSource = undefined;
       this.definitions = [];
-      this.externalFailures.clear();
+      this.sourceFailures.clear();
       this.error = undefined;
     });
   }

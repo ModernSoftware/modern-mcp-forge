@@ -3,6 +3,9 @@
   "version": "0.10.0-alpha.1",
   "private": true,
   "type": "module",
+  "imports": {
+    "#forge-bridges/*": "./runners/bridges/*"
+  },
   "scripts": {
     "dev": "bun --bun vite dev",
     "build": "bun --bun vite build",

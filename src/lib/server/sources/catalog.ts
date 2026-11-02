@@ -38,7 +38,7 @@ export function projectCatalog(
       ? snapshot.sources.filter(
           (source) =>
             source.enabled &&
-            !(source.kind === 'external' && source.status === 'failed')
+            !(source.kind !== 'native' && source.status === 'failed')
         )
       : [];
   validateCatalogNames(manifest, catalogs);

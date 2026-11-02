@@ -473,14 +473,15 @@ export function setCapabilityEnabled(
   atomicWrite(projectFile(project), JSON.stringify(manifest, null, 2) + '\n');
 }
 
-type ExternalChange =
+type ConnectionChange =
   | { action: 'create' | 'update'; source: ProjectSource }
   | { action: 'enable' | 'disable' | 'remove'; id: string };
 
 /** Build the proposed manifest without writing it while discovery is in flight. */
-export function prepareExternalChange(
+export function prepareConnectionChange(
   project: RegisteredProject,
-  change: ExternalChange
+  change: ConnectionChange,
+  sourceKind: 'bridge' | 'external'
 ) {
   const path = projectFile(project);
   const original = read(path);
@@ -491,13 +492,13 @@ export function prepareExternalChange(
   let source = sources[index];
   if (change.action === 'create') {
     if (index !== -1) throw new NativeProjectError('Source ID already exists.');
-  } else if (!source || source.kind !== 'external') {
-    throw new NativeProjectError('External source not found.');
+  } else if (!source || source.kind !== sourceKind) {
+    throw new NativeProjectError(`Source ${id} is not a ${sourceKind} source.`);
   }
   if ('source' in change) {
     source = change.source;
-    if (source.kind !== 'external')
-      throw new NativeProjectError('Expected an external source.');
+    if (source.kind !== sourceKind)
+      throw new NativeProjectError(`Expected a ${sourceKind} source.`);
     if (change.action === 'create') sources.push(source);
     else sources[index] = source;
   } else if (change.action === 'remove') sources.splice(index, 1);
@@ -506,7 +507,7 @@ export function prepareExternalChange(
   return {
     manifest,
     candidate:
-      change.action !== 'remove' && source.kind === 'external' && source.enabled
+      change.action !== 'remove' && source.kind !== 'native' && source.enabled
         ? source
         : undefined,
     commit() {

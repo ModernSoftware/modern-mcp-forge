@@ -11,5 +11,9 @@ export async function reloadProjectSources(
   const snapshot = await response.json();
   if (!response.ok && snapshot.status !== 'failed')
     throw new Error(snapshot.error ?? 'Reload failed.');
-  return snapshot as { status: string; error?: string };
+  return snapshot as {
+    status: string;
+    error?: string;
+    sources: { id: string; status: string }[];
+  };
 }

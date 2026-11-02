@@ -32,7 +32,7 @@ export class NativeNodeTransport implements Transport {
   ) {}
 
   async start(): Promise<void> {
-    if (this.child) throw new Error('Native transport is already started.');
+    if (this.child || this.closing) throw new Error('The stdio transport cannot be started again.');
     const child = (this.child = spawn(this.options.command, this.options.args, {
       cwd: this.options.cwd,
       env: this.options.env,

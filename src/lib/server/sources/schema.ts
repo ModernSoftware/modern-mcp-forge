@@ -9,7 +9,8 @@ const projectPath = z
       !value.split(/[\\/]/).includes('..'),
     'Use a project-relative path without parent traversal.'
   );
-const identity = { id: z.string().regex(/^[A-Za-z][A-Za-z0-9_-]{0,63}$/) };
+export const sourceId = z.string().regex(/^[A-Za-z][A-Za-z0-9_-]{0,63}$/);
+const identity = { id: sourceId };
 
 export const ProjectSourceSchema = z.discriminatedUnion('kind', [
   z
@@ -30,16 +31,31 @@ export const ProjectSourceSchema = z.discriminatedUnion('kind', [
         .optional()
     })
     .strict(),
-  // Reserved configuration only. These adapters are intentionally not executable yet.
   z
     .object({
       ...identity,
       kind: z.literal('bridge'),
-      enabled: z.literal(false),
+      enabled: z.boolean().default(false),
       runtime: z.enum(['node', 'python']),
-      entrypoint: projectPath
+      entrypoint: projectPath,
+      mode: z.enum(['adapter', 'stdio']).optional(),
+      checkoutEnv: z
+        .string()
+        .regex(/^[A-Za-z_][A-Za-z0-9_]*$/)
+        .optional(),
+      cwd: projectPath.optional(),
+      args: z.array(z.string().max(2048)).max(32).optional(),
+      inheritEnv: z
+        .array(z.string().regex(/^[A-Za-z_][A-Za-z0-9_]*$/))
+        .max(64)
+        .optional(),
+      naming: z.enum(['always', 'collisions']).optional()
     })
-    .strict(),
+    .strict()
+    .refine((source) => !source.checkoutEnv || source.mode === 'adapter', {
+      path: ['checkoutEnv'],
+      message: 'Checkout variables apply only to adapter modules.'
+    }),
   z
     .object({
       ...identity,

@@ -31,6 +31,7 @@ RUN bun install --frozen-lockfile --production \
     && mkdir -p /data /workspace
 
 COPY --from=build /app/build ./build
+COPY --from=build /app/runners/bridges ./runners/bridges
 
 VOLUME ["/data"]
 EXPOSE 3000

@@ -1,33 +1,24 @@
 <script lang="ts">
   import { afterConfirmingProjectLeave } from '$lib/navigation/project-leave';
+  import { page } from '$app/state';
   import { goto, invalidateAll } from '$app/navigation';
+  import ConnectionTester from '$lib/components/ConnectionTester.svelte';
+  import ReloadProjectSources from '$lib/components/ReloadProjectSources.svelte';
   import ExpandableDescription from '$lib/components/ExpandableDescription.svelte';
-  import ExternalConnection from '$lib/components/ExternalConnection.svelte';
+  import SourceConnection from '$lib/components/SourceConnection.svelte';
   let { data } = $props();
   const categories = ['tools', 'resources', 'prompts'] as const;
   let busy = $state(false);
   let error = $state('');
-  let result = $state('');
-  let kind = $state<'tool' | 'resource' | 'prompt'>('tool');
-  let name = $state('');
-  let args = $state('{}');
   let sourceState = $derived(
     data.snapshot.sources.find((source) => source.id === data.source.id)
-  );
-  let capabilities = $derived(
-    kind === 'tool'
-      ? (sourceState?.catalog.tools ?? [])
-      : kind === 'resource'
-        ? (sourceState?.catalog.resources ?? [])
-        : (sourceState?.catalog.prompts ?? [])
   );
   async function action(body: object) {
     if (busy) return;
     busy = true;
     error = '';
-    result = '';
     try {
-      const response = await fetch('/api/project/external', {
+      const response = await fetch(`/api/project/${data.source.kind}`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
@@ -39,7 +30,6 @@
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error);
-      if (payload.result) result = JSON.stringify(payload.result, null, 2);
       if (!('action' in body) || body.action !== 'remove')
         await invalidateAll();
     } catch (failure) {
@@ -48,24 +38,21 @@
       busy = false;
     }
   }
-  function invoke() {
-    try {
-      const argumentsValue = kind === 'resource' ? {} : JSON.parse(args);
-      void action({ action: 'invoke', kind, name, arguments: argumentsValue });
-    } catch {
-      error = 'Arguments must be valid JSON.';
-    }
-  }
 </script>
 
 <svelte:head
-  ><title>{data.source.id} · External MCP · Modern MCP Forge</title
+  ><title
+    >{data.source.id} · {data.source.kind === 'bridge'
+      ? 'Bridged MCP'
+      : 'External MCP'} · Modern MCP Forge</title
   ></svelte:head
 >
 <a href="/workspace">← Workspace</a>
 <section class="page-heading">
   <div>
-    <div class="eyebrow">EXTERNAL MCP</div>
+    <div class="eyebrow">
+      {data.source.kind === 'bridge' ? 'BRIDGED MCP' : 'EXTERNAL MCP'}
+    </div>
     <h1>{data.source.id}</h1>
     <p>
       {sourceState?.status ?? 'stopped'} · Source definitions and schemas are owned
@@ -80,6 +67,11 @@
     {error || sourceState?.error || data.snapshot.error || data.catalogError}
   </p>{/if}
 <div class="workflow-toolbar">
+  <ReloadProjectSources
+    projectId={data.project.id}
+    generation={data.snapshot.generation}
+    bind:busy
+  />
   <button
     disabled={busy}
     onclick={() =>
@@ -97,9 +89,11 @@
     }}>Remove connection</button
   >
 </div>
-{#key data.source.id}<ExternalConnection
+<p class="workflow-muted">Reload reads saved files and restarts all enabled project sources.</p>
+{#key data.source.kind + '/' + data.source.id}<SourceConnection
     projectId={data.project.id}
     generation={data.snapshot.generation}
+    kind={data.source.kind}
     source={data.source}
   />{/key}
 <section class="glass-card workflow-form">
@@ -110,6 +104,13 @@
     sources. Resource templates, subscriptions, sampling and elicitation are not
     relayed.
   </p>
+  {#if data.source.kind === 'bridge' && data.source.mode === 'adapter' && sourceState?.status === 'ready' && categories.every((c) => !sourceState?.catalog[c].length)}
+    <p role="status">
+      The adapter is connected and returned an empty catalog. Wire the discovery
+      hooks in <code>{data.source.entrypoint}</code>, then reload project
+      sources.
+    </p>
+  {/if}
   {#each categories as category}
     {@const items = sourceState?.catalog[category] ?? []}
     <details open>
@@ -127,39 +128,19 @@
     </details>
   {/each}
 </section>
-<section class="glass-card workflow-form">
-  <h2>Test an external capability</h2>
-  <label
-    >Kind<select
-      bind:value={kind}
-      onchange={() => {
-        name = '';
-        result = '';
-      }}
-      ><option value="tool">Tool</option><option value="resource"
-        >Resource</option
-      ><option value="prompt">Prompt</option></select
-    ></label
-  >
-  <label
-    >Capability<select bind:value={name}
-      ><option value="">Select a capability</option
-      >{#each capabilities as capability}<option
-          value={'uri' in capability ? String(capability.uri) : capability.name}
-          >{capability.name}</option
-        >{/each}</select
-    ></label
-  >
-  {#if kind !== 'resource'}<label
-      >Arguments (JSON)<textarea bind:value={args} rows="5"></textarea></label
-    >{/if}
-  <button
-    class="primary-button"
-    disabled={busy || sourceState?.status !== 'ready' || !name}
-    onclick={invoke}>{busy ? 'Running…' : 'Run request'}</button
-  >
-  {#if result}<pre class="external-json">{result}</pre>{/if}
-</section>
+{#key JSON.stringify( [data.project.id, data.source.kind, data.source.id, page.url.search] )}
+  <ConnectionTester
+    projectId={data.project.id}
+    sourceId={data.source.id}
+    sourceKind={data.source.kind}
+    generation={data.snapshot.generation}
+    catalog={sourceState?.catalog}
+    ready={sourceState?.status === 'ready'}
+    initialKind={page.url.searchParams.get('kind')}
+    initialName={page.url.searchParams.get('name')}
+    bind:busy
+  />
+{/key}
 
 <style>
   .external-json {

@@ -27,6 +27,8 @@ Run the fast automated suite:
 bun run test
 ```
 
+The end-to-end suite runs the Forge Python adapter against an existing FastMCP application. Install the tested SDK with `python -m pip install "mcp==1.29.0"` in the Python environment used for testing. Node uses the installed Forge SDK dependencies.
+
 Run one layer:
 
 ```bash
