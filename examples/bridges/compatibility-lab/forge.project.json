@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 1,
+  "project": {
+    "id": "6478addc-a666-4467-a5a3-703b41b94944",
+    "name": "Multilanguage integration lab"
+  },
+  "server": {
+    "name": "forge-integration-lab",
+    "version": "1.0.0"
+  },
+  "sources": [
+    {
+      "id": "order-desk",
+      "kind": "native",
+      "manifest": "native/mcpack.json",
+      "enabled": true
+    },
+    {
+      "id": "returns",
+      "kind": "bridge",
+      "mode": "adapter",
+      "runtime": "python",
+      "enabled": true,
+      "entrypoint": "bridges/returns.py",
+      "cwd": "apps/returns"
+    },
+    {
+      "id": "policy",
+      "kind": "bridge",
+      "mode": "adapter",
+      "runtime": "python",
+      "enabled": true,
+      "entrypoint": "bridges/policy.py",
+      "cwd": "apps/policy"
+    },
+    {
+      "id": "deploy",
+      "kind": "bridge",
+      "mode": "adapter",
+      "runtime": "node",
+      "enabled": true,
+      "entrypoint": "bridges/deploy.mjs",
+      "cwd": "apps/deploy"
+    },
+    {
+      "id": "fulfillment",
+      "kind": "bridge",
+      "mode": "adapter",
+      "runtime": "node",
+      "enabled": true,
+      "entrypoint": "bridges/fulfillment.mjs",
+      "cwd": "apps/fulfillment"
+    },
+    {
+      "id": "warehouse",
+      "kind": "bridge",
+      "mode": "adapter",
+      "runtime": "node",
+      "enabled": true,
+      "entrypoint": "bridges/warehouse.mjs",
+      "cwd": "apps/warehouse"
+    }
+  ],
+  "tools": [],
+  "resources": [],
+  "prompts": []
+}
