@@ -61,7 +61,7 @@ jobs:
           node-version: '24.22.1'
       - uses: actions/setup-python@v7
         with:
-          python-version: '3.12.14'
+          python-version: '3.13'
       - run: bun install --frozen-lockfile
       - name: Clean-install and call an exported native pack on Windows
         run: bun test tests/deployment
