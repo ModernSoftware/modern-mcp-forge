@@ -10,7 +10,7 @@ Target branch: `v0.10.0`. Unified workspace merged in PR #16; external source in
 - Native capabilities execute exclusively through MCPack 0.9.0. Node and Python are supported.
 - Bridge adapters and external servers contribute complete catalogs, not individual imported tools. Their code and schemas remain owned by the source; later local aliases must preserve routing identity.
 - New external connections can keep unique upstream names and qualify collisions. Existing connections keep their prefix policy. Resource URIs carry the source identity.
-- Native export will include only native code, manifests and dependency declarations. No secrets or remote/bridge capabilities.
+- Export one enabled native source with its worker modules, selected assets and dependency files. [Native deployment](native-deployment.md) covers the archive and exposure settings.
 - Runtime controls currently operate on sources; do not represent source status as per-worker telemetry.
 - Preserve theme switching. Keep legacy data recognizable; never silently relabel it native.
 
@@ -65,8 +65,7 @@ Source controls restart all sources after configuration edits. Native, bridged a
 
 PR #18 adds trusted Streamable HTTP connections, bearer authentication through environment variables, and routing alongside native capabilities.
 See [External sources](external-sources.md) for supported behavior and limits.
-External metadata overrides, OAuth login, and native-only
-export remain subsequent work. Do not treat their UI placeholders as implemented.
+External metadata overrides and OAuth login remain subsequent work.
 
 ## Local bridges
 

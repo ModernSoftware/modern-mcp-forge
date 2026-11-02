@@ -1,0 +1,17 @@
+{
+  "name": "forge-native-deployment",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "validate": "mcpack validate pack/mcpack.json",
+    "start": "mcpack serve pack/mcpack.json --transport http",
+    "start:stdio": "mcpack serve pack/mcpack.json"
+  },
+  "dependencies": {
+    "@modern-software/mcpack": "0.9.0"
+  }
+}

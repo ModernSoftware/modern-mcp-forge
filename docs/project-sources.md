@@ -111,4 +111,4 @@ A native source may include `disabledCapabilities`, for example:
 These are Forge exposure settings, separate from the MCPack manifest. Disabling a
 capability filters discovery and rejects direct invocation through Forge. It does
 not stop a worker shared by other capabilities. Reconnect clients after changing
-exposure. Deployment/export semantics will be handled in the native export slice.
+exposure. The [native export](native-deployment.md) applies these selections to a copy of the pack manifest.

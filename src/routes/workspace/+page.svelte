@@ -1,6 +1,10 @@
 <script lang="ts">
   import ExpandableDescription from '$lib/components/ExpandableDescription.svelte';
   import { page } from '$app/state';
+  import {
+    readWorkspaceView,
+    saveWorkspaceView
+  } from '$lib/client/workspace-view';
   import ReloadProjectSources from '$lib/components/ReloadProjectSources.svelte';
   import { invalidateAll } from '$app/navigation';
   let { data } = $props();
@@ -67,6 +71,25 @@
   let search = $state('');
   let kind = $state('all');
   let sourceKind = $state('all');
+  let expanded = $state({ native: false, bridge: false, external: false });
+  let restoredProject = $state('');
+  $effect(() => {
+    const id = data.project.id;
+    const saved = readWorkspaceView(id);
+    ({ view, search, kind, sourceKind, expanded } = saved);
+    restoredProject = id;
+  });
+  $effect(() => {
+    if (restoredProject === data.project.id) {
+      saveWorkspaceView(restoredProject, {
+        view,
+        search,
+        kind,
+        sourceKind,
+        expanded: { ...expanded }
+      });
+    }
+  });
   let rows = $derived(
     data.sources.flatMap((entry) =>
       (['tools', 'resources', 'prompts'] as const).flatMap((category) =>
@@ -148,9 +171,7 @@
   <a class="secondary-button" href="/workspace/connect?kind=bridge"
     >Bridge existing implementation</a
   >
-  <button disabled title="Native-only export is a subsequent step"
-    >Export native · Soon</button
-  >
+  <a class="secondary-button" href="/workspace/export">Export native pack</a>
 </div>
 <section class="connect-agent" aria-label="Connect an agent">
   <h2>Connect an agent</h2>
@@ -309,7 +330,7 @@
   {#each sourceTypes as type (type)}
     {@const entries = sources.filter((e) => e.source.kind === type)}
     {#if entries.length}
-      <details class="glass-card catalog-group">
+      <details class="glass-card catalog-group" bind:open={expanded[type]}>
         <summary
           ><strong>{sourceLabels[type]}</strong>
           <span
