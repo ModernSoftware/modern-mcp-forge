@@ -80,10 +80,16 @@ test('native export enforces the preview and includes only selected deployable f
       'off/pack.json',
       'server.key',
       'node_modules/debug.js'
-    ])
+    ]) {
+      expect(
+        preview.files.map((f) => f.path),
+        path
+      ).not.toContain(path);
       await expect(
-        exportPack(dir, project, 'local', preview.revision, [path])
+        exportPack(dir, project, 'local', preview.revision, [path]),
+        path
       ).rejects.toThrow();
+    }
     await expect(previewExport(dir, project, 'off')).rejects.toThrow(
       'enabled native'
     );

@@ -47,3 +47,21 @@ jobs:
         run: |
           npm ci --prefix tests/browser
           bun tests/browser/workspace-export.mjs
+
+  windows-export:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24.22.1'
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12.14'
+      - run: bun install --frozen-lockfile
+      - name: Clean-install and call an exported native pack on Windows
+        run: bun test tests/deployment

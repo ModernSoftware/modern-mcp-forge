@@ -35,7 +35,15 @@ export function exportSources(project: ForgeProjectManifest) {
   );
 }
 
+// Compare source paths in the same namespace. Windows temp directories can have
+// a short (8.3) alias, and drive-letter casing differs between filesystem APIs.
+function pathKey(path: string) {
+  const normalized = resolve(path);
+  return process.platform === 'win32' ? normalized.toLowerCase() : normalized;
+}
+
 function candidates(folder: string, blocked: Set<string>) {
+  const excludedPaths = new Set([...blocked].map(pathKey));
   const result = new Map<string, { size: number; mtime: number }>();
   let visited = 0;
   function walk(dir: string) {
@@ -46,7 +54,7 @@ function candidates(folder: string, blocked: Set<string>) {
         name.startsWith('.') ||
         /[\\:\x00-\x1f]/.test(name) ||
         excluded.test(name) ||
-        blocked.has(path)
+        excludedPaths.has(pathKey(path))
       )
         continue;
       if (++visited > maxEntries)
@@ -74,11 +82,12 @@ async function prepare(
 ) {
   const source = exportSources(project).find((s) => s.id === id);
   if (!source) throw new NativeProjectError('Choose an enabled native source.');
-  root = realpathSync(root);
+  root = realpathSync.native(root);
   const filename = containedFile(root, source.manifest);
   if (statSync(filename).size > 2 * 1024 * 1024)
     throw new NativeProjectError('Native manifest exceeds 2 MiB.');
-  const { manifest, root: folder } = await loadProject(filename);
+  const { manifest, root: packRoot } = await loadProject(filename);
+  const folder = realpathSync.native(packRoot);
   const used = new Set<string>();
   for (const kind of ['tools', 'resources', 'prompts'] as const) {
     const hidden = new Set(
@@ -105,7 +114,7 @@ async function prepare(
       delete manifest.workers[id];
       continue;
     }
-    worker.module = slash(relative(folder, worker.module));
+    worker.module = slash(relative(folder, realpathSync.native(worker.module)));
     required.add(worker.module);
     worker.inheritEnv = [
       ...new Set([...worker.inheritEnv, ...Object.keys(worker.env)])
@@ -126,7 +135,7 @@ async function prepare(
     }
   }
   const blocked = new Set([
-    filename,
+    realpathSync.native(filename),
     join(folder, 'mcpack.json'),
     join(root, 'bridges')
   ]);
@@ -145,11 +154,11 @@ async function prepare(
       (s.kind === 'native' ? s.manifest : s.entrypoint).replaceAll('\\', '/')
     );
     blocked.add(path);
-    if (dirname(path) !== folder && dirname(path) !== root)
+    if (relative(dirname(path), folder) && relative(dirname(path), root))
       blocked.add(dirname(path));
     if (s.kind === 'bridge' && s.cwd && !s.checkoutEnv) {
       const cwd = resolve(root, s.cwd.replaceAll('\\', '/'));
-      if (cwd !== folder) blocked.add(cwd);
+      if (relative(cwd, folder)) blocked.add(cwd);
     }
   }
   const inventory = candidates(folder, blocked);
@@ -228,7 +237,7 @@ export async function exportPack(
         'The selected files exceed the 32 MiB export limit.'
       );
     const full = containedFile(folder, path);
-    if (full !== join(folder, path))
+    if (relative(realpathSync.native(full), join(folder, path)))
       throw new NativeProjectError(
         'A selected path changed. Review the export again.',
         409
