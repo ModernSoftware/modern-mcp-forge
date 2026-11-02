@@ -2,34 +2,21 @@
   import { afterConfirmingProjectLeave } from '$lib/navigation/project-leave';
   import { page } from '$app/state';
   import { goto, invalidateAll } from '$app/navigation';
+  import ConnectionTester from '$lib/components/ConnectionTester.svelte';
+  import ReloadProjectSources from '$lib/components/ReloadProjectSources.svelte';
   import ExpandableDescription from '$lib/components/ExpandableDescription.svelte';
   import SourceConnection from '$lib/components/SourceConnection.svelte';
   let { data } = $props();
   const categories = ['tools', 'resources', 'prompts'] as const;
   let busy = $state(false);
   let error = $state('');
-  let result = $state('');
-  let kind = $derived.by((): 'tool' | 'resource' | 'prompt' => {
-    const selected = page.url.searchParams.get('kind');
-    return selected === 'resource' || selected === 'prompt' ? selected : 'tool';
-  });
-  let name = $derived(page.url.searchParams.get('name') ?? '');
-  let args = $state('{}');
   let sourceState = $derived(
     data.snapshot.sources.find((source) => source.id === data.source.id)
-  );
-  let capabilities = $derived(
-    kind === 'tool'
-      ? (sourceState?.catalog.tools ?? [])
-      : kind === 'resource'
-        ? (sourceState?.catalog.resources ?? [])
-        : (sourceState?.catalog.prompts ?? [])
   );
   async function action(body: object) {
     if (busy) return;
     busy = true;
     error = '';
-    result = '';
     try {
       const response = await fetch(`/api/project/${data.source.kind}`, {
         method: 'POST',
@@ -43,21 +30,12 @@
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error);
-      if (payload.result) result = JSON.stringify(payload.result, null, 2);
       if (!('action' in body) || body.action !== 'remove')
         await invalidateAll();
     } catch (failure) {
       error = failure instanceof Error ? failure.message : String(failure);
     } finally {
       busy = false;
-    }
-  }
-  function invoke() {
-    try {
-      const argumentsValue = kind === 'resource' ? {} : JSON.parse(args);
-      void action({ action: 'invoke', kind, name, arguments: argumentsValue });
-    } catch {
-      error = 'Arguments must be valid JSON.';
     }
   }
 </script>
@@ -89,6 +67,11 @@
     {error || sourceState?.error || data.snapshot.error || data.catalogError}
   </p>{/if}
 <div class="workflow-toolbar">
+  <ReloadProjectSources
+    projectId={data.project.id}
+    generation={data.snapshot.generation}
+    bind:busy
+  />
   <button
     disabled={busy}
     onclick={() =>
@@ -106,6 +89,7 @@
     }}>Remove connection</button
   >
 </div>
+<p class="workflow-muted">Reload reads saved files and restarts all enabled project sources.</p>
 {#key data.source.kind + '/' + data.source.id}<SourceConnection
     projectId={data.project.id}
     generation={data.snapshot.generation}
@@ -144,41 +128,19 @@
     </details>
   {/each}
 </section>
-<section class="glass-card workflow-form">
-  <h2>
-    Test {data.source.kind === 'bridge' ? 'a bridged' : 'an external'} capability
-  </h2>
-  <label
-    >Kind<select
-      bind:value={kind}
-      onchange={() => {
-        name = '';
-        result = '';
-      }}
-      ><option value="tool">Tool</option><option value="resource"
-        >Resource</option
-      ><option value="prompt">Prompt</option></select
-    ></label
-  >
-  <label
-    >Capability<select aria-label="Capability" bind:value={name}
-      ><option value="">Select a capability</option
-      >{#each capabilities as capability}<option
-          value={'uri' in capability ? String(capability.uri) : capability.name}
-          >{capability.name}</option
-        >{/each}</select
-    ></label
-  >
-  {#if kind !== 'resource'}<label
-      >Arguments (JSON)<textarea bind:value={args} rows="5"></textarea></label
-    >{/if}
-  <button
-    class="primary-button"
-    disabled={busy || sourceState?.status !== 'ready' || !name}
-    onclick={invoke}>{busy ? 'Running…' : 'Run request'}</button
-  >
-  {#if result}<pre class="external-json">{result}</pre>{/if}
-</section>
+{#key JSON.stringify( [data.project.id, data.source.kind, data.source.id, page.url.search] )}
+  <ConnectionTester
+    projectId={data.project.id}
+    sourceId={data.source.id}
+    sourceKind={data.source.kind}
+    generation={data.snapshot.generation}
+    catalog={sourceState?.catalog}
+    ready={sourceState?.status === 'ready'}
+    initialKind={page.url.searchParams.get('kind')}
+    initialName={page.url.searchParams.get('name')}
+    bind:busy
+  />
+{/key}
 
 <style>
   .external-json {

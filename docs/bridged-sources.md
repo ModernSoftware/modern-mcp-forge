@@ -5,17 +5,17 @@ Use a bridge when a developer already has tools, resources or prompts in an appl
 ## Create the adapter
 
 1. Open **Workspace → Bridge existing implementation**. Select **Wire an existing implementation**, give the source a name and choose Node.js or Python.
-2. Choose **Create adapter file**. Forge creates `bridges/<name>/adapter.mjs` or `bridges/<name>/adapter.py`. Open it in your editor. Its discovery hooks initially return empty lists.
+2. Under **Adapter setup**, choose **Create an adapter file**. Check the generated path and click **Create adapter file**. To attach a file you already have, choose **Use an existing adapter file** and enter its project-relative path instead. The generated file is `bridges/<name>/adapter.mjs` or `bridges/<name>/adapter.py`. Open it in your editor. Its discovery hooks initially return empty lists.
 3. Wire the hooks to the existing application's registry, factory or dispatcher. Import it once if initialization is expensive. Use the normal dispatcher when you need the same validation, middleware and errors as the production server.
-4. Choose **Attach bridge**. To keep a work in progress in Git before its dependencies or application are ready, clear **Start and discover on save** and choose **Save disabled bridge**. Enable it from its connection page when ready.
+4. Choose **Attach bridge**. To keep a work in progress in Git before its dependencies or application are ready, clear **Start and discover on save** and choose **Save disabled bridge**. In the workspace, filter **Source type → Bridged** and choose **Manage bridge** to enable it. Empty and disabled bridges have their own entries before any capabilities are discovered.
 5. Commit **both** `forge.project.json` and the generated `bridges/<name>/` directory. This keeps the adapter, Python requirement (where applicable) and connection definition together. Generated files are never overwritten.
-6. Use **Inspect & test** on a workspace capability or connect Inspector to the workspace’s agent URL. After editing the adapter or application, reload project sources and reconnect clients to rediscover changes.
+6. Use **Inspect & test** on a workspace capability or connect Inspector to the workspace’s agent URL. After editing the adapter or application, choose **Reload project sources** from the workspace or connection definition. This restarts all enabled project sources using their saved settings. Use **Save connection and reload** after changing the connection settings. Reconnect clients to rediscover changes.
 
 If the application already serves MCP over stdio, **Launch an existing stdio server** accepts its project-relative startup script. Previous bridge connections continue to use this mode. A running Streamable HTTP endpoint can be attached through **Connect external server**.
 
 ## Same repository or separate checkouts
 
-For an application inside the Forge project, leave **Application checkout variable** empty. The application root is the Forge project directory. For a separate repository, enter an environment-variable name such as `ORDERS_CHECKOUT`. Each developer sets its value to the absolute directory of their local checkout in the environment that launches Forge. In Docker, mount that checkout and set the variable to the path inside the container.
+Under **Application location**, choose **Inside this Forge project** when the application lives alongside its Forge manifest. The application root is the Forge project directory. For another repository, choose **In a separate checkout** and enter an environment-variable name such as `ORDERS_CHECKOUT`. Each developer sets its value to the absolute directory of their local checkout in the environment that launches Forge. In Docker, mount that checkout and set the variable to the path inside the container.
 
 For example, the committed source descriptor can contain:
 
@@ -68,3 +68,9 @@ Unique names keep their spelling by default. On a collision, use the name shown 
 Discovery and attachment verify a candidate before saving an enabled connection. A failed preview preserves the saved manifest. Explicitly generated adapter files remain for repair. A failed saved bridge is isolated from healthy sources. Disabling, detaching or closing stops its process. Detaching keeps the adapter files. Discovery has a 30-second deadline and calls have a 20-second timeout. Forge never replays an interrupted write. The adapter owns any child processes it starts.
 
 This version supports tools, listed static resources and prompts. Resource templates, subscriptions, sampling, elicitation and native-pack deployment of bridged code are outside the bridge contract.
+
+## Workspace views and test inputs
+
+Choose **Group by source type** to see an expandable Native, External or Bridged group with counts for the current filters. Expand a group to manage a source or select a capability. **Detailed list** shows individual capabilities and includes configured sources with empty catalogs.
+
+The workbench keeps the selected capability after a request. Tools accept a JSON argument object, static resource reads need only their URI, and prompts have text fields for their declared string arguments. Required fields must be filled before the prompt is submitted.

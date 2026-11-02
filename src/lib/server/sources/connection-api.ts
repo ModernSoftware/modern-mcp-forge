@@ -93,12 +93,28 @@ export async function handleConnectionRequest(
     };
     if (input.action === 'invoke') {
       current();
-      if (
-        !projectSources
-          .snapshot()
-          .sources.some((entry) => entry.id === input.id && entry.kind === kind)
-      )
-        throw new NativeProjectError(`Unknown ${kind} source.`);
+      const source = projectSources
+        .snapshot()
+        .sources.find((entry) => entry.id === input.id && entry.kind === kind);
+      if (!source) throw new NativeProjectError(`Unknown ${kind} source.`);
+      if (input.kind === 'prompt') {
+        const prompt = source.catalog.prompts.find(
+          (item) => item.name === input.name
+        );
+        const missing = prompt?.arguments?.find(
+          (arg) => arg.required && !Object.hasOwn(input.arguments, arg.name)
+        );
+        if (missing)
+          throw new NativeProjectError(
+            `Prompt ${input.name} requires the ${missing.name} argument.`
+          );
+        if (
+          Object.values(input.arguments).some(
+            (value) => typeof value !== 'string'
+          )
+        )
+          throw new NativeProjectError('Prompt arguments must be strings.');
+      }
       return json({
         result: await projectSources.invoke(
           input.projectId,

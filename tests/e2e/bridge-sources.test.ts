@@ -222,6 +222,17 @@ test('Node and Python bridges attach, serve the mixed catalog and stop with the 
     });
     expect(unwired.value.error).toBeUndefined();
     expect(await manifest()).toBe(saved);
+    const empty = await bridge({
+      action: 'create',
+      source: { ...python, id: 'unwired' }
+    });
+    expect(empty.status).toBe(200);
+    const emptyWorkspace = await (await fetch(base + '/workspace')).text();
+    expect(emptyWorkspace).toContain('href="/project/bridge/unwired"');
+    expect(emptyWorkspace).toContain('This source has an empty catalog.');
+    expect((await bridge({ action: 'remove', id: 'unwired' })).status).toBe(
+      200
+    );
     await copyFile(
       resolve('examples/bridges/adapters/fastmcp_adapter.py'),
       join(folder, python.entrypoint)
@@ -233,6 +244,22 @@ test('Node and Python bridges attach, serve the mixed catalog and stop with the 
       (await bridge({ generation: stale, action: 'remove', id: 'shipping' }))
         .status
     ).toBe(409);
+    const promptRequest = {
+      action: 'invoke',
+      id: 'shipping',
+      kind: 'prompt',
+      name: 'review_shipping'
+    };
+    expect(
+      (await bridge({ ...promptRequest, arguments: {} })).value.error
+    ).toBe('Prompt review_shipping requires the region argument.');
+    expect(
+      (await bridge({ ...promptRequest, arguments: { region: 4 } })).value.error
+    ).toBe('Prompt arguments must be strings.');
+    expect(
+      (await bridge({ ...promptRequest, arguments: { region: 'local' } })).value
+        .result.messages[0].content.text
+    ).toBe('Review shipping for local');
     await client.connect(
       new StreamableHTTPClientTransport(new URL(base + '/mcp'))
     );

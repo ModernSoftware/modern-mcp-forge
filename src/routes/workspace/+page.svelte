@@ -1,7 +1,7 @@
 <script lang="ts">
   import ExpandableDescription from '$lib/components/ExpandableDescription.svelte';
   import { page } from '$app/state';
-  import { reloadProjectSources } from '$lib/client/reload-project-sources';
+  import ReloadProjectSources from '$lib/components/ReloadProjectSources.svelte';
   import { invalidateAll } from '$app/navigation';
   let { data } = $props();
   const callKind = {
@@ -12,22 +12,6 @@
   let busy = $state(false);
   let endpoint = $derived(new URL('/mcp', page.url).href);
   let copyNotice = $state('');
-  async function reload() {
-    busy = true;
-    actionError = '';
-    try {
-      const result = await reloadProjectSources(
-        data.project.id,
-        data.snapshot.generation
-      );
-      if (result.error) throw new Error(result.error);
-    } catch (error) {
-      actionError = error instanceof Error ? error.message : String(error);
-    } finally {
-      await invalidateAll();
-      busy = false;
-    }
-  }
   async function copyEndpoint() {
     try {
       await navigator.clipboard.writeText(endpoint);
@@ -68,11 +52,18 @@
       busy = false;
     }
   }
-  let unavailable = $derived(
-    data.snapshot.sources.filter(
-      (s) => s.kind !== 'native' && s.status === 'failed'
-    )
-  );
+  const manageLabels = {
+    native: 'Manage source',
+    bridge: 'Manage bridge',
+    external: 'Manage connection'
+  };
+  const sourceLabels = {
+    native: 'Native',
+    bridge: 'Bridged',
+    external: 'External'
+  };
+  const sourceTypes = ['native', 'bridge', 'external'] as const;
+  let view = $state('detailed');
   let search = $state('');
   let kind = $state('all');
   let sourceKind = $state('all');
@@ -102,6 +93,39 @@
           .includes(search.toLowerCase())
     )
   );
+  let sources = $derived(
+    data.sources
+      .map(({ source }) => {
+        const state =
+          data.snapshot.project === data.project.id
+            ? data.snapshot.sources.find((s) => s.id === source.id)
+            : undefined;
+        const items = visible.filter((row) => row.source.id === source.id);
+        const total = rows.filter((row) => row.source.id === source.id).length;
+        return {
+          source,
+          items,
+          total,
+          status: state?.status ?? (source.enabled ? 'stopped' : 'disabled'),
+          error: state?.error
+        };
+      })
+      .filter(
+        ({ source, items, total }) =>
+          (sourceKind === 'all' || source.kind === sourceKind) &&
+          (items.length ||
+            (!total && source.id.toLowerCase().includes(search.toLowerCase())))
+      )
+  );
+  function counts(items: typeof rows) {
+    const n = { tools: 0, resources: 0, prompts: 0 };
+    for (const item of items) n[item.category]++;
+    return [
+      `${n.tools} ${n.tools === 1 ? 'tool' : 'tools'}`,
+      `${n.resources} ${n.resources === 1 ? 'resource' : 'resources'}`,
+      `${n.prompts} ${n.prompts === 1 ? 'prompt' : 'prompts'}`
+    ].join(' · ');
+  }
 </script>
 
 <svelte:head><title>{data.project.name} · Modern MCP Forge</title></svelte:head>
@@ -159,6 +183,13 @@
       >
     </select></label
   >
+  <label
+    >View<select aria-label="Workspace view" bind:value={view}>
+      <option value="detailed">Detailed list</option><option value="grouped"
+        >Group by source type</option
+      >
+    </select></label
+  >
 </div>
 {#if data.legacyCount}<p class="workflow-notice" role="status">
     This project also contains {data.legacyCount} legacy definitions. They have not
@@ -170,22 +201,8 @@
     role="alert"
   >
     {actionError || data.snapshot.error || data.catalogError}
-    <button class="secondary-button" disabled={busy} onclick={reload}
-      >{busy ? 'Reloading…' : 'Reload project sources'}</button
-    >
     <a href="/project">Review configuration</a>
   </p>{/if}
-{#each unavailable as source (source.id)}
-  <p class="workflow-error" role="alert">
-    <strong>{source.id}</strong> · {source.error}
-    <a href={`/project/${source.kind}/${encodeURIComponent(source.id)}`}
-      >Manage connection</a
-    >
-    <button class="secondary-button" disabled={busy} onclick={reload}
-      >Reload project sources</button
-    >
-  </p>
-{/each}
 {#each data.sources.filter((entry) => entry.error) as entry}<p
     role="alert"
     class="workflow-error"
@@ -195,84 +212,202 @@
       >Repair source files</a
     >
   </p>{/each}
-<section class="glass-card workflow-list">
-  {#each visible as row (`${row.source.id}/${row.category}/${row.definition.name}`)}
-    {@const target = new URLSearchParams({
-      kind: callKind[row.category],
-      name:
-        'uri' in row.definition
-          ? String(row.definition.uri)
-          : row.definition.name
-    })}
-    {@const detail =
-      row.source.kind === 'native'
-        ? `/workspace/native/${encodeURIComponent(row.source.id)}/${row.category}/${encodeURIComponent(row.definition.name)}`
-        : `/project/${row.source.kind}/${encodeURIComponent(row.source.id)}?${target}`}
-    {@const disabled =
-      row.source.kind === 'native' &&
-      row.source.disabledCapabilities?.some(
-        (entry) =>
-          entry.kind === row.category && entry.name === row.definition.name
-      )}
-    <article class="workflow-row">
-      <div>
-        <span
-          class="source-badge"
-          class:external={row.source.kind === 'external'}
-          >{row.source.kind === 'external'
-            ? 'External'
-            : row.source.kind === 'bridge'
-              ? 'Bridged'
-              : 'Native'}</span
+{#snippet capability(row: (typeof rows)[number])}
+  {@const target = new URLSearchParams({
+    kind: callKind[row.category],
+    name:
+      'uri' in row.definition ? String(row.definition.uri) : row.definition.name
+  })}
+  {@const detail =
+    row.source.kind === 'native'
+      ? `/workspace/native/${encodeURIComponent(row.source.id)}/${row.category}/${encodeURIComponent(row.definition.name)}`
+      : `/project/${row.source.kind}/${encodeURIComponent(row.source.id)}?${target}`}
+  {@const disabled =
+    row.source.kind === 'native' &&
+    row.source.disabledCapabilities?.some(
+      (entry) =>
+        entry.kind === row.category && entry.name === row.definition.name
+    )}
+  <article class="workflow-row">
+    <div>
+      <span class="source-badge" class:external={row.source.kind === 'external'}
+        >{row.source.kind === 'external'
+          ? 'External'
+          : row.source.kind === 'bridge'
+            ? 'Bridged'
+            : 'Native'}</span
+      >
+      <span class="workflow-muted">
+        {row.category} ·
+        <a
+          href={`/project/${row.source.kind}/${encodeURIComponent(row.source.id)}`}
+          >{row.source.id}</a
         >
-        <span class="workflow-muted"
-          >{row.category} · {row.source.id}{!row.source.enabled
-            ? ' · Disabled source'
-            : disabled
-              ? ' · Disabled capability'
-              : ''}</span
-        >
-        <h2>
-          <a href={detail}>{row.definition.name}</a>
-        </h2>
-        <ExpandableDescription text={row.definition.description} />
-      </div>
-      <div class="workflow-toolbar">
-        {#if row.source.kind === 'native'}<button
-            disabled={busy}
-            onclick={() =>
-              toggle(
-                row.source.id,
-                row.category,
-                row.definition.name,
-                Boolean(disabled)
-              )}>{disabled ? 'Enable' : 'Disable'}</button
-          >{/if}<a class="secondary-button" href={detail}
-          >{row.source.kind !== 'native' ? 'Inspect & test' : 'Open editor'}</a
-        >
-      </div>
-    </article>
-  {:else}<div class="workflow-empty">
+        {!row.source.enabled
+          ? ' · Disabled source'
+          : disabled
+            ? ' · Disabled capability'
+            : ''}
+      </span>
       <h2>
-        {rows.length
-          ? 'No matching capabilities'
-          : 'Add a tool, resource or prompt'}
+        <a href={detail}>{row.definition.name}</a>
       </h2>
-      <p>
-        {sourceKind === 'bridge' &&
-        !rows.some((row) => row.source.kind === 'bridge')
-          ? 'Attach a local Node or Python bridge to see its capabilities here.'
-          : rows.length
-            ? 'Change your search or filter.'
-            : 'Add a tool, resource or prompt backed by a Node or Python worker.'}
-      </p>
-      {#if !rows.length}<a class="primary-button" href="/workspace/new"
-          >Add your first tool</a
-        >{/if}
-    </div>{/each}
-</section>
+      <ExpandableDescription text={row.definition.description} />
+    </div>
+    <div class="workflow-toolbar">
+      {#if row.source.kind === 'native'}<button
+          disabled={busy}
+          onclick={() =>
+            toggle(
+              row.source.id,
+              row.category,
+              row.definition.name,
+              Boolean(disabled)
+            )}>{disabled ? 'Enable' : 'Disable'}</button
+        >{/if}<a class="secondary-button" href={detail}
+        >{row.source.kind !== 'native' ? 'Inspect & test' : 'Open editor'}</a
+      >
+    </div>
+  </article>
+{/snippet}
+
+{#snippet sourceHeading(entry: (typeof sources)[number])}
+  <div class="source-line">
+    <div>
+      <strong>{entry.source.id}</strong>
+      <span class="workflow-muted"
+        >{sourceLabels[entry.source.kind]} · {entry.status}</span
+      >
+      {#if entry.error}<p class="workflow-error" role="alert">{entry.error}</p>
+      {:else if !entry.total}<p class="workflow-muted">
+          {entry.status === 'disabled'
+            ? 'Enable this source to discover its capabilities.'
+            : entry.status === 'ready'
+              ? 'This source has an empty catalog. After wiring its implementation, reload project sources.'
+              : 'Reload project sources to discover its catalog.'}
+        </p>{/if}
+    </div>
+    <a
+      class="secondary-button"
+      href={`/project/${entry.source.kind}/${encodeURIComponent(entry.source.id)}`}
+      >{manageLabels[entry.source.kind]}<span class="sr-only">
+        {entry.source.id}</span
+      ></a
+    >
+  </div>
+{/snippet}
+
+<div class="catalog-heading">
+  <h2>{view === 'grouped' ? 'Sources by type' : 'Project capabilities'}</h2>
+  <ReloadProjectSources
+    projectId={data.project.id}
+    generation={data.snapshot.generation}
+    bind:busy
+  />
+</div>
+{#if view === 'grouped' && sources.length}
+  {#each sourceTypes as type (type)}
+    {@const entries = sources.filter((e) => e.source.kind === type)}
+    {#if entries.length}
+      <details class="glass-card catalog-group">
+        <summary
+          ><strong>{sourceLabels[type]}</strong>
+          <span
+            >{counts(entries.flatMap((e) => e.items))} · {entries.length}
+            {entries.length === 1 ? 'source' : 'sources'}</span
+          ></summary
+        >
+        {#each entries as entry (entry.source.id)}
+          {@render sourceHeading(entry)}
+          {#each entry.items as row (row.category + '/' + row.definition.name)}{@render capability(
+              row
+            )}{/each}
+        {/each}
+      </details>
+    {/if}
+  {/each}
+{:else}
+  {#each sources.filter((e) => !e.total) as entry (entry.source.id)}
+    <section class="glass-card empty-source" aria-label={entry.source.id}>
+      {@render sourceHeading(entry)}
+    </section>
+  {/each}
+  {#if visible.length || !sources.length}
+    <section class="glass-card workflow-list">
+      {#each visible as row (`${row.source.id}/${row.category}/${row.definition.name}`)}
+        {@render capability(row)}
+      {:else}<div class="workflow-empty">
+          <h2>
+            {data.sources.length
+              ? 'No matching capabilities'
+              : 'Add a tool, resource or prompt'}
+          </h2>
+          <p>
+            {data.sources.length
+              ? 'Change your search or filters to see more sources and capabilities.'
+              : 'Create a native capability or connect a source to this project.'}
+          </p>
+          {#if !data.sources.length}<a
+              class="primary-button"
+              href="/workspace/new">Add your first tool</a
+            >{/if}
+        </div>{/each}
+    </section>
+  {/if}
+{/if}
 
 <style>
+  .catalog-heading,
+  .source-line,
+  .catalog-group summary {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+  .catalog-heading {
+    margin: 1rem 0;
+  }
+  .catalog-heading h2 {
+    margin: 0 auto 0 0;
+    font-size: 1.1rem;
+  }
+  .source-line {
+    justify-content: space-between;
+    padding: 1rem 1.2rem;
+    overflow-wrap: anywhere;
+  }
+  .source-line strong {
+    margin-right: 0.55rem;
+  }
+  .source-line p {
+    margin: 0.4rem 0 0;
+  }
+  .catalog-group,
+  .empty-source {
+    margin: 0.75rem 0;
+  }
+  .catalog-group summary {
+    display: list-item;
+    cursor: pointer;
+    padding: 1rem 1.2rem;
+  }
+  .catalog-group summary span {
+    margin-left: 0.5rem;
+    color: var(--muted);
+  }
+  .catalog-group .source-line {
+    border-top: 1px solid var(--border);
+    background: var(--surface-2);
+  }
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
   .connect-agent {
     display: flex;
     flex-wrap: wrap;

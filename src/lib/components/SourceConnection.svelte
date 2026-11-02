@@ -53,6 +53,27 @@
   let entrypoint = $state(
     untrack(() => (source?.kind === 'bridge' ? source.entrypoint : ''))
   );
+  let adapterFileMode = $state<'create' | 'existing'>(
+    untrack(() => (source ? 'existing' : 'create'))
+  );
+  let location = $state<'project' | 'checkout'>(
+    untrack(() =>
+      source?.kind === 'bridge' && source.checkoutEnv ? 'checkout' : 'project'
+    )
+  );
+  let generatedPath = $state('');
+  let plannedPath = $derived(
+    id ? `bridges/${id}/adapter.${runtime === 'node' ? 'mjs' : 'py'}` : ''
+  );
+  let generatingFile = $derived(
+    kind === 'bridge' &&
+      mode === 'adapter' &&
+      adapterFileMode === 'create' &&
+      !source
+  );
+  let fileReady = $derived(
+    !generatingFile || Boolean(plannedPath && generatedPath === plannedPath)
+  );
   let cwd = $state(
     untrack(() => (source?.kind === 'bridge' ? (source.cwd ?? '') : ''))
   );
@@ -75,7 +96,9 @@
             naming,
             runtime,
             mode,
-            mode === 'adapter' ? checkoutEnv : '',
+            adapterFileMode,
+            location,
+            mode === 'adapter' && location === 'checkout' ? checkoutEnv : '',
             entrypoint,
             cwd,
             envNames,
@@ -127,7 +150,7 @@
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error);
-      entrypoint = payload.entrypoint;
+      entrypoint = generatedPath = payload.entrypoint;
       starterNotice = `Created ${entrypoint}. Wire its hooks in your editor, then save the connection. You can also save it disabled and wire it later.`;
     } catch (failure) {
       error = failure instanceof Error ? failure.message : String(failure);
@@ -136,13 +159,22 @@
     }
   }
   async function save() {
-    if (busy) return;
+    if (busy || !fileReady) return;
     busy = true;
     error = '';
     let navigate = false;
     pending = new AbortController();
     try {
-      const args: unknown = kind === 'bridge' ? JSON.parse(argv || '[]') : [];
+      let args: unknown = [];
+      if (kind === 'bridge') {
+        try {
+          args = JSON.parse(argv || '[]');
+        } catch {
+          throw new Error(
+            'Enter script arguments as a valid JSON array of strings.'
+          );
+        }
+      }
       if (
         !Array.isArray(args) ||
         args.some((value) => typeof value !== 'string')
@@ -167,8 +199,11 @@
                   runtime,
                   mode,
                   ...(mode === 'adapter' &&
+                    location === 'checkout' &&
                     checkoutEnv.trim() && { checkoutEnv: checkoutEnv.trim() }),
-                  entrypoint: entrypoint.trim(),
+                  entrypoint: generatingFile
+                    ? generatedPath
+                    : entrypoint.trim(),
                   ...(cwd.trim() && { cwd: cwd.trim() }),
                   ...(envNames.trim() && {
                     inheritEnv: envNames
@@ -282,91 +317,137 @@
         ></select
       ></label
     >
-    <label
-      >{mode === 'adapter' ? 'Adapter file' : 'Stdio entrypoint'}<input
-        bind:value={entrypoint}
-        required
-        disabled={busy}
-        placeholder={mode === 'adapter'
-          ? `bridges/my-source/adapter.${runtime === 'node' ? 'mjs' : 'py'}`
-          : 'Project-relative server script'}
-      /></label
-    >
-    {#if mode === 'adapter'}
-      <p class="workflow-muted">
-        Keep the adapter under this Forge project and commit it with
-        forge.project.json. Its hooks discover and call your existing tools,
-        resources and prompts.
-      </p>
-      {#if !source}
-        <div>
-          <button
-            type="button"
-            disabled={busy ||
-              !/^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(id) ||
-              Boolean(entrypoint)}
-            onclick={scaffold}>Create adapter file</button
-          >
-        </div>
-        {#if starterNotice}<p role="status">{starterNotice}</p>{/if}
-      {/if}
+    {#if mode === 'adapter' && !source}
       <label
-        >Application checkout variable (optional)<input
-          aria-label="Application checkout variable"
-          bind:value={checkoutEnv}
+        >Adapter setup<select
           disabled={busy}
-          placeholder="MY_APP_ROOT"
-          pattern="[A-Za-z_][A-Za-z0-9_]*"
+          bind:value={adapterFileMode}
+          aria-label="Adapter setup"
+        >
+          <option value="create">Create an adapter file</option><option
+            value="existing">Use an existing adapter file</option
+          >
+        </select></label
+      >
+    {/if}
+    {#if generatingFile}
+      <div class="scaffold">
+        <strong>Generated adapter path</strong>
+        <code>{plannedPath || 'Enter a bridge name to preview its path.'}</code>
+        <button
+          type="button"
+          class="secondary-button"
+          disabled={busy ||
+            !/^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(id) ||
+            fileReady}
+          onclick={scaffold}
+        >
+          {fileReady ? 'Adapter file created' : 'Create adapter file'}
+        </button>
+      </div>
+      {#if fileReady && starterNotice}<p role="status">{starterNotice}</p>{/if}
+    {:else}
+      <label
+        >{mode === 'adapter' ? 'Adapter file' : 'Stdio entrypoint'}<input
+          bind:value={entrypoint}
+          required
+          disabled={busy}
+          placeholder="Project-relative file path"
         /></label
       >
+    {/if}
+    {#if mode === 'adapter'}
       <p class="workflow-muted">
-        Leave blank when the application is in this project. For a separate
-        checkout, enter the name of an environment variable that points to its
-        folder on this machine.
+        The adapter stays in this Forge project. Edit its hooks to expose your
+        application's tools, resources and prompts.
       </p>
+      <label
+        >Application location<select
+          aria-label="Application location"
+          disabled={busy}
+          bind:value={location}
+        >
+          <option value="project">Inside this Forge project</option><option
+            value="checkout">In a separate checkout</option
+          >
+        </select></label
+      >
+      {#if location === 'checkout'}
+        <label
+          >Application checkout variable<input
+            aria-label="Application checkout variable"
+            required
+            bind:value={checkoutEnv}
+            disabled={busy}
+            placeholder="ORDERS_CHECKOUT"
+            pattern="[A-Za-z_][A-Za-z0-9_]*"
+          /></label
+        >
+        <p class="workflow-muted">
+          Enter the variable name, such as ORDERS_CHECKOUT. Set its value to the
+          application's absolute folder on the machine running Forge. The
+          project stores only the name.
+        </p>
+      {/if}
       {#if runtime === 'python'}<p class="workflow-muted">
           The Forge Python host uses the mcp dependency listed in
           requirements-forge.txt. Use the adapter’s .venv or the application’s
           Python environment.
         </p>{/if}
-      {#if !source}<label
-          ><input type="checkbox" bind:checked={startOnSave} disabled={busy} /> Start
-          and discover on save</label
-        >{/if}
+      {#if !source}
+        <label class="start-choice"
+          ><input
+            type="checkbox"
+            bind:checked={startOnSave}
+            disabled={busy}
+          />Start and discover on save</label
+        >
+        <p class="workflow-muted">
+          Clear this to save a disabled bridge while you wire the adapter. You
+          can enable it later from the workspace.
+        </p>
+      {/if}
     {:else}
       <p class="workflow-muted">
         Select a project-relative script that already serves MCP over stdio.
       </p>
     {/if}
-    <details>
+    <details class="launch-settings">
       <summary>Launch settings</summary>
-      <label
-        >Working directory<input
-          bind:value={cwd}
-          disabled={busy}
-          placeholder={mode === 'adapter'
-            ? 'Defaults to the application root'
-            : 'Defaults to the entrypoint folder'}
-        /></label
-      >
-      <label
-        >Environment variable names<input
-          bind:value={envNames}
-          disabled={busy}
-          placeholder="API_KEY, MODEL_NAME"
-        /></label
-      >
-      <p class="workflow-muted">
-        Enter names only. Forge reads their values from its own environment when
-        it launches the bridge.
-      </p>
-      <label
-        >Script arguments (JSON array)<input
-          bind:value={argv}
-          disabled={busy}
-          placeholder="[]"
-        /></label
-      >
+      <div class="launch-fields">
+        <label
+          >Working directory<input
+            bind:value={cwd}
+            disabled={busy}
+            placeholder={mode === 'adapter'
+              ? 'Defaults to the application root'
+              : 'Defaults to the entrypoint folder'}
+          /></label
+        >
+        <label
+          >Environment variable names<input
+            bind:value={envNames}
+            disabled={busy}
+            placeholder="API_KEY, MODEL_NAME"
+          /></label
+        >
+        <p class="workflow-muted">
+          Enter names only. Forge reads their values from its own environment
+          when it launches the bridge.
+        </p>
+        <label
+          >Script arguments (JSON array)<textarea
+            rows="4"
+            spellcheck="false"
+            bind:value={argv}
+            disabled={busy}></textarea></label
+        >
+        <small class="workflow-muted"
+          >Each string is one argument, for example <code
+            >{'["--profile", "development"]'}</code
+          >.</small
+        >
+      </div>
     </details>
     <p class="workflow-notice">
       Attaching or enabling a bridge starts trusted local code with your user
@@ -411,7 +492,7 @@
     </p>
   {/if}
   <div class="workflow-toolbar">
-    <button class="primary-button" disabled={busy}
+    <button class="primary-button" disabled={busy || !fileReady}
       >{busy
         ? committing
           ? 'Saving…'
@@ -432,3 +513,51 @@
     >
   </div>
 </form>
+
+<style>
+  .scaffold,
+  .launch-fields {
+    display: grid;
+    gap: 0.65rem;
+  }
+  .scaffold,
+  .launch-settings {
+    margin: 1rem 0;
+    padding: 1rem;
+    border: 1px solid var(--border);
+    border-radius: 0.6rem;
+  }
+  .scaffold code {
+    overflow-wrap: anywhere;
+  }
+  .scaffold button {
+    justify-self: start;
+  }
+  .launch-settings summary {
+    cursor: pointer;
+    font-weight: 600;
+  }
+  .launch-fields {
+    margin-top: 1rem;
+  }
+  .launch-fields label {
+    display: grid;
+    gap: 0.4rem;
+  }
+  .launch-fields textarea {
+    font-family: monospace;
+    resize: vertical;
+    min-width: 0;
+  }
+  .workflow-form > .start-choice {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    margin-bottom: 0.25rem;
+  }
+  .start-choice input {
+    inline-size: 1rem;
+    block-size: 1rem;
+    margin: 0;
+  }
+</style>
