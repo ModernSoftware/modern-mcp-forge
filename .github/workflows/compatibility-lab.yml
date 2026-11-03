@@ -19,6 +19,8 @@ on:
       - 'src/lib/testing/**'
       - 'src/lib/components/ToolArgument*.svelte'
       - 'src/lib/components/ConnectionTester.svelte'
+      - 'src/lib/components/Json*.svelte'
+      - 'src/lib/components/McpResult.svelte'
       - 'src/routes/workspace/native/**'
       - 'src/routes/project/native/**'
       - 'src/routes/workspace/+page.svelte'

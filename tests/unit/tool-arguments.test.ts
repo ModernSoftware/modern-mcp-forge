@@ -1,4 +1,5 @@
 import { expect, test } from 'bun:test';
+import { sampleArguments } from '../../src/lib/testing/sample-arguments';
 import {
   prepareArguments,
   readArguments,
@@ -62,4 +63,74 @@ test('edits preserve unknown properties, explicit values and omission', () => {
   expect(Object.hasOwn(userKey, '__proto__')).toBe(true);
   expect(Object.getPrototypeOf(userKey)).toBe(Object.prototype);
   expect(JSON.stringify(userKey)).toBe('{"__proto__":false}');
+});
+
+test('samples typed arguments and honors published examples and local references', () => {
+  for (const tool of pack.tools)
+    expect(JSON.parse(sampleArguments(tool.inputSchema)!)).toEqual(
+      tool.inputSchema.examples[0]
+    );
+  const schema = {
+    type: 'object',
+    additionalProperties: false,
+    $defs: { sku: { type: 'string', pattern: '^SKU-[0-9]{3}$' } },
+    properties: {
+      sku: { $ref: '#/$defs/sku' },
+      count: {
+        type: 'integer',
+        exclusiveMinimum: 5,
+        maximum: 15,
+        multipleOf: 3
+      },
+      weight: { type: 'number', minimum: 0.1, maximum: 0.9 },
+      flags: { type: 'array', minItems: 2, items: { type: 'boolean' } },
+      mode: { enum: ['fast', 'slow'] },
+      label: { type: 'string', minLength: 3, maxLength: 7 },
+      empty: { type: 'null' },
+      optionalField: { type: 'string', default: 'inventory' }
+    },
+    required: ['sku', 'count', 'weight', 'flags', 'mode', 'label', 'empty']
+  };
+  const text = sampleArguments(schema);
+  expect(text).toBeDefined();
+  const sample = JSON.parse(text!);
+  expect(prepareArguments(schema).validate?.(sample)).toBe(true);
+  expect(sample.optionalField).toBe('inventory');
+  expect(sample.sku).toMatch(/^SKU-[0-9]{3}$/);
+});
+
+test('ignores invalid examples and declines impossible or unresolved schemas', () => {
+  const schema = {
+    type: 'object',
+    properties: { x: { type: 'integer', default: 'wrong' } },
+    required: ['x'],
+    examples: [{ x: false }]
+  };
+  expect(typeof JSON.parse(sampleArguments(schema)!).x).toBe('number');
+  expect(sampleArguments({ type: 'object', not: {} })).toBeUndefined();
+  expect(
+    sampleArguments({ $ref: 'https://example.invalid/unavailable' })
+  ).toBeUndefined();
+});
+
+test('generates small samples for large allowed ranges and declines oversized minimums', () => {
+  const schema = {
+    type: 'object',
+    properties: {
+      id: { type: 'integer', minimum: 90000 },
+      label: { type: 'string', maxLength: 10_000_000 }
+    },
+    required: ['id', 'label']
+  };
+  const value = JSON.parse(sampleArguments(schema)!);
+  expect(value.id).toBeGreaterThanOrEqual(90000);
+  expect(value.label.length).toBeLessThanOrEqual(32);
+  expect(schema.properties.label.maxLength).toBe(10_000_000);
+  expect(
+    sampleArguments({
+      type: 'object',
+      properties: { x: { type: 'array', minItems: 100_000_000 } },
+      required: ['x']
+    })
+  ).toBeUndefined();
 });

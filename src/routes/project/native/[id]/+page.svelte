@@ -1,4 +1,5 @@
 <script lang="ts">
+  import McpResult from '$lib/components/McpResult.svelte';
   import ToolArguments from '$lib/components/ToolArguments.svelte';
   import { onMount } from 'svelte';
   import {
@@ -19,7 +20,7 @@
   let selected = $state('');
   let argumentsText = $state('{}');
   let editor = $state<ReturnType<typeof ToolArguments>>();
-  let result = $state('');
+  let result = $state.raw<unknown>(undefined);
   let dirty = $derived(file !== null && draft !== file.content);
   let source = $derived(
     data.snapshot.sources.find((item) => item.id === data.document.source.id)
@@ -45,7 +46,7 @@
       draft = '';
       selected = '';
       argumentsText = '{}';
-      result = '';
+      result = undefined;
       error = '';
     }
   });
@@ -104,7 +105,7 @@
       });
       file = payload.file;
       draft = file!.content;
-      result = '';
+      result = undefined;
       selected = '';
     });
   }
@@ -125,7 +126,7 @@
         name: selected,
         arguments: args
       });
-      result = JSON.stringify(payload.result, null, 2);
+      result = payload.result;
     });
   }
 </script>
@@ -222,7 +223,7 @@
           onchange={() => {
             selected = '';
             argumentsText = '{}';
-            result = '';
+            result = undefined;
           }}
           ><option value="tool">Tool</option><option value="resource"
             >Resource</option
@@ -235,7 +236,7 @@
           bind:value={selected}
           disabled={busy}
           onchange={() => {
-            result = '';
+            result = undefined;
             argumentsText = '{}';
           }}
           ><option value="">Select a capability</option
@@ -278,7 +279,7 @@
         (kind === 'tool' && !editor?.canRun())}
       onclick={invoke}>{busy ? 'Working…' : 'Run'}</button
     >
-    {#if result}<pre aria-live="polite">{result}</pre>{/if}
+    {#if result !== undefined}{#key result}<McpResult {result} />{/key}{/if}
     <p class="note">
       Nested tool arguments are validated by MCPack. Prompt values must be
       strings. Tests execute real handlers; calls are never automatically

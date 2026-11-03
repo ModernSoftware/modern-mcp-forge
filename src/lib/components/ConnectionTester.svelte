@@ -1,4 +1,5 @@
 <script lang="ts">
+  import McpResult from '$lib/components/McpResult.svelte';
   import ToolArguments from '$lib/components/ToolArguments.svelte';
   import { onDestroy, untrack } from 'svelte';
   import type { SourceCatalog } from '$lib/server/sources/contracts';
@@ -38,7 +39,7 @@
     catalog?.tools.find((tool) => tool.name === name)
   );
   let promptValues = $state<Record<string, string>>({});
-  let result = $state('');
+  let result = $state.raw<unknown>(undefined);
   let error = $state('');
   let pending: AbortController | undefined;
   const capabilities = $derived(
@@ -58,12 +59,14 @@
   function clearInputs() {
     args = '{}';
     promptValues = {};
-    result = error = '';
+    result = undefined;
+    error = '';
   }
   onDestroy(() => pending?.abort());
   async function invoke() {
     if (busy || !ready || !selected) return;
-    result = error = '';
+    result = undefined;
+    error = '';
     let values: unknown = {};
     if (kind === 'tool') {
       if (!editor?.canRun()) return;
@@ -103,7 +106,7 @@
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error);
-      result = JSON.stringify(payload.result, null, 2);
+      result = payload.result;
     } catch (failure) {
       if (!pending.signal.aborted)
         error = failure instanceof Error ? failure.message : String(failure);
@@ -192,15 +195,8 @@
       (kind === 'tool' && !editor?.canRun())}>Run request</button
   >
   {#if error}<p class="workflow-error" role="alert">{error}</p>{/if}
-  {#if result}<h3>Result · {name}</h3>
-    <pre aria-label="Request result">{result}</pre>{/if}
+  {#if result !== undefined}{#key result}<McpResult
+        {result}
+        heading={`Result · ${name}`}
+      />{/key}{/if}
 </form>
-
-<style>
-  pre {
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-    max-height: 25rem;
-    overflow: auto;
-  }
-</style>

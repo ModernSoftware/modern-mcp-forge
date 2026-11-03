@@ -1,4 +1,5 @@
 <script lang="ts">
+  import McpResult from '$lib/components/McpResult.svelte';
   import ToolArguments from '$lib/components/ToolArguments.svelte';
   import { reloadProjectSources } from '$lib/client/reload-project-sources';
   import { onMount, tick } from 'svelte';
@@ -74,7 +75,7 @@
       busy = false;
     }
   }
-  let result = $state('');
+  let result = $state.raw<unknown>(undefined);
   let definition = $derived.by(() => {
     try {
       return JSON.parse(content);
@@ -121,7 +122,7 @@
       diagnostics = null;
       error = '';
       notice = '';
-      result = '';
+      result = undefined;
       argumentsText = '{}';
     }
   });
@@ -223,7 +224,7 @@
       originalFields = JSON.stringify(fields);
       schemaText = JSON.stringify(value.inputSchema ?? {}, null, 2);
       revision = payload.file.revision;
-      result = '';
+      result = undefined;
       notice = payload.snapshot.error
         ? 'Definition saved. Source startup failed. Inspect diagnostics to repair the worker.'
         : 'Definition saved. Project sources restarted; reconnect external MCP clients.';
@@ -259,7 +260,7 @@
       });
       code = originalCode = payload.file.content;
       codeRevision = payload.file.revision;
-      result = '';
+      result = undefined;
       notice = payload.snapshot.error
         ? 'Code saved. Source startup failed. Inspect diagnostics to repair the worker.'
         : 'Code saved. Project sources restarted; reconnect external MCP clients.';
@@ -283,7 +284,7 @@
     busy = true;
     error = '';
     notice = '';
-    result = '';
+    result = undefined;
     try {
       const snapshot = await reloadProjectSources(
         data.projectId,
@@ -309,7 +310,7 @@
     busy = true;
     error = '';
     notice = '';
-    result = '';
+    result = undefined;
     try {
       const args =
         data.kind === 'tools'
@@ -333,7 +334,7 @@
             : data.definition.name,
         arguments: args
       });
-      result = JSON.stringify(payload.result, null, 2);
+      result = payload.result;
     } catch (failure) {
       error = failure instanceof Error ? failure.message : String(failure);
     } finally {
@@ -653,8 +654,7 @@
         (data.kind === 'tools' && !editor?.canRun())}
       onclick={run}>{busy ? 'Running…' : 'Run'}</button
     >
-    {#if result}<h3>Result</h3>
-      <pre aria-live="polite">{result}</pre>{/if}
+    {#if result !== undefined}{#key result}<McpResult {result} />{/key}{/if}
   {/if}
 </div>
 

@@ -1,4 +1,6 @@
 <script lang="ts">
+  import JsonInput from './JsonInput.svelte';
+  import ToolArgumentSample from './ToolArgumentSample.svelte';
   import ToolArgumentField from './ToolArgumentField.svelte';
   import {
     childPath,
@@ -56,14 +58,11 @@
     {#if prepared.limitation}<p class="hint">
         JSON editor · {prepared.limitation}
       </p>{/if}
+    {#if prepared.validate}
+      {#key schema}<ToolArgumentSample {schema} bind:text />{/key}
+    {/if}
     <label class="raw-label" for={id}>Arguments (JSON)</label>
-    <textarea
-      class="raw"
-      {id}
-      rows="8"
-      spellcheck="false"
-      bind:value={text}
-      aria-invalid={!!draft.errors.length}></textarea>
+    <JsonInput {id} bind:text invalid={!!draft.errors.length} />
   {:else if prepared.form}
     {#each entries as [key, field] (key)}
       <ToolArgumentField
@@ -184,17 +183,6 @@
     display: block;
     margin: 0.6rem 0 0.35rem;
     font-size: 0.85rem;
-  }
-  .raw {
-    width: 100%;
-    min-width: 0;
-    resize: vertical;
-    background: var(--surface-solid);
-    color: var(--text);
-    padding: 0.75rem;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    font-family: monospace;
   }
   .issues {
     padding: 0.55rem 0.8rem 0.55rem 1.7rem;

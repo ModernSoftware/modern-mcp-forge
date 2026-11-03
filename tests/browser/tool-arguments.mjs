@@ -10,7 +10,7 @@ import { getAvailablePort } from '../helpers/network';
 const dir = await mkdtemp(join(tmpdir(), 'forge tool arguments '));
 process.env.MCP_FORGE_DB_PATH = join(dir, 'forge.db');
 const lab = resolve('examples/bridges/compatibility-lab');
-const remote = externalServer();
+const remote = externalServer({ imageTool: true });
 const port = await getAvailablePort();
 const base = 'http://127.0.0.1:' + port;
 const vite = await createServer({
@@ -48,7 +48,8 @@ try {
     `export default {
     listTools() { return ${JSON.stringify([
       { name: 'reflect', inputSchema: reflected },
-      { name: 'variant', inputSchema: union }
+      { name: 'variant', inputSchema: union },
+      { name: 'impossible', inputSchema: { type: 'object', not: {} } }
     ])}; },
     callTool({arguments: args}) { return {content:[{type:'text',text:JSON.stringify(args)}]}; },
 
@@ -103,7 +104,9 @@ try {
   const run = page.getByRole('button', { name: /^Run( request)?$/ });
   const field = (role, name) =>
     editor.getByRole(role, { name: new RegExp('^' + name + '\\b') });
-  const invoke = async (source, args) => {
+  const output = page.getByRole('region', { name: 'Request result' });
+  const populate = editor.getByRole('button', { name: 'Populate sample' });
+  const invoke = async (source, args, capabilityKind = 'tool') => {
     const response = page.waitForResponse(
       (r) =>
         r.url() === base + '/api/project/' + source &&
@@ -114,10 +117,13 @@ try {
     assert.equal(r.status(), 200);
     assert.deepEqual(r.request().postDataJSON().arguments, args);
     const payload = await r.json();
-    const output = page
-      .locator('pre')
-      .filter({ hasText: JSON.stringify(payload.result, null, 2) });
-    await output.first().waitFor();
+    await output.waitFor();
+    if (capabilityKind === 'tool')
+      await output.getByRole('button', { name: 'Raw JSON' }).click();
+    const json = output.getByLabel('Result JSON');
+    assert.deepEqual(JSON.parse(await json.textContent()), payload.result);
+    if (capabilityKind === 'tool')
+      await output.getByRole('button', { name: 'Preview' }).click();
     return payload.result;
   };
 
@@ -139,8 +145,15 @@ try {
   assert.equal(await run.isDisabled(), true);
   assert.equal(await toggle.isDisabled(), true);
   assert.equal(await raw.inputValue(), '{"sku":');
-  await raw.fill(JSON.stringify(quote));
+  await populate.click();
+  await editor.getByRole('button', { name: 'Keep draft' }).click();
+  assert.equal(await raw.inputValue(), '{"sku":');
+  await populate.click();
+  await editor.getByRole('button', { name: 'Replace draft' }).click();
+  assert.deepEqual(JSON.parse(await raw.inputValue()), quote);
+  assert.ok((await editor.locator('pre[aria-hidden] span').count()) > 1);
   assert.deepEqual(await invoke('native', quote), result);
+  await output.getByRole('heading', { name: 'Structured content' }).waitFor();
   await toggle.uncheck();
   await editor.getByRole('button', { name: 'Omit tier' }).click();
   await toggle.check();
@@ -186,10 +199,24 @@ try {
   assert.equal(await toggle.isDisabled(), true);
   assert.equal(await raw.inputValue(), '{}');
   await editor.getByText(/uses oneOf/).waitFor();
+  await populate.click();
+  await editor.getByText(/Sample inserted/).waitFor();
+  const generated = JSON.parse(await raw.inputValue());
+  assert.ok(['number', 'string'].includes(typeof generated.value));
+  await invoke('bridge', generated);
   await raw.fill('{"value":false}');
   assert.equal(await run.isDisabled(), true);
   await raw.fill('{"value":0}');
   await invoke('bridge', { value: 0 });
+
+  await page
+    .getByLabel('Capability', { exact: true })
+    .selectOption('impossible');
+  await raw.fill('{"unfinished":');
+  await populate.click();
+  await editor.getByText(/could not generate a validated sample/).waitFor();
+  assert.equal(await raw.inputValue(), '{"unfinished":');
+  assert.equal(await run.isDisabled(), true);
 
   await go('/project/external/orders?kind=tool&name=lookup');
   await field('textbox', 'id').fill('42');
@@ -198,16 +225,41 @@ try {
   assert.equal(order.content[0].text, 'Order 42');
   await toggle.check();
   assert.deepEqual(await invoke('external', lookup), order);
+  await page.setViewportSize({ width: 390, height: 800 });
+  await page
+    .getByLabel('Capability', { exact: true })
+    .selectOption('thumbnail');
+  await invoke('external', {});
+  const image = output.getByRole('img');
+  await image.waitFor();
+  await page.waitForFunction(
+    (img) => img.complete && img.naturalWidth === 1,
+    await image.elementHandle()
+  );
+  assert.equal(await image.count(), 1);
+  await output.getByText('One pixel', { exact: true }).waitFor();
+  await output.getByText(/Image preview unavailable/).waitFor();
+  assert.ok(!(await output.textContent()).includes('iVBOR'));
+  await page.getByLabel('Kind', { exact: true }).selectOption('resource');
+  await page
+    .getByLabel('Capability', { exact: true })
+    .selectOption({ label: 'invoice' });
+  await invoke('external', {}, 'resource');
+  await page.setViewportSize({ width: 1280, height: 720 });
   await go('/project/native/order-desk');
   await page
     .getByLabel('Capability', { exact: true })
     .selectOption('get_quote_by_sku');
   await toggle.check();
-  await raw.fill(JSON.stringify(quote));
+  await populate.click();
+  await editor.getByText(/Sample inserted/).waitFor();
+  assert.deepEqual(JSON.parse(await raw.inputValue()), quote);
+  assert.ok((await editor.locator('pre[aria-hidden] span').count()) > 1);
   assert.deepEqual(await invoke('native', quote), result);
+  await output.getByRole('heading', { name: 'Structured content' }).waitFor();
   assert.deepEqual(errors, []);
   console.log(
-    'PASS: form and JSON send equivalent typed arguments through native, bridge and external routes.'
+    'PASS: native, bridge and external calls, sample generation and draft protection, highlighted JSON, structured results and image preview.'
   );
 } finally {
   await browser?.close();
