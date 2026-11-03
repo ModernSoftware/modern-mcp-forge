@@ -4,17 +4,23 @@
   let {
     projectId,
     generation,
+    cold = false,
+    onreload,
     busy = $bindable(false)
   } = $props<{
     projectId: string;
     generation: number;
+    cold?: boolean;
+    onreload?: () => void;
     busy?: boolean;
   }>();
+  let reloading = $state(false);
   let notice = $state('');
   let error = $state('');
   async function reload() {
     if (busy) return;
-    busy = true;
+    busy = reloading = true;
+    onreload?.();
     notice = error = '';
     try {
       const next = await reloadProjectSources(projectId, generation);
@@ -37,7 +43,7 @@
       } catch {
         error ||= 'Refresh this page to see the latest source status.';
       } finally {
-        busy = false;
+        busy = reloading = false;
       }
     }
   }
@@ -48,7 +54,11 @@
   disabled={busy}
   onclick={reload}
   title="Restart all enabled sources and read their saved files again"
-  >Reload project sources</button
+  >{reloading
+    ? 'Starting sources…'
+    : cold
+      ? 'Start project sources'
+      : 'Reload project sources'}</button
 >
 {#if notice}<span class="workflow-muted" role="status">{notice}</span>{/if}
 {#if error}<span class="workflow-error" role="alert">{error}</span>{/if}

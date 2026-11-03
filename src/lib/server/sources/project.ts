@@ -6,13 +6,13 @@ import { projectSources } from './manager';
 
 export async function startProjectSources(
   project: RegisteredProject,
-  createdNative?: string
+  options: { createdNative?: string; visibilityOnly?: string } = {}
 ) {
   const manifest = ForgeProjectManifestSchema.parse(
     JSON.parse(await readFile(join(project.path, 'forge.project.json'), 'utf8'))
   );
   return projectSources.open(project.id, project.path, manifest.sources ?? [], {
-    createdNative,
+    ...options,
     legacy: manifest
   });
 }

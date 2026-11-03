@@ -4,9 +4,8 @@ import { projectSources, type ProjectSourceManager } from './manager';
 /** Validate the names published for this generation before registering MCP handlers. */
 export function projectCatalog(
   manifest: ForgeProjectManifest,
-  manager: ProjectSourceManager = projectSources
+  snapshot = projectSources.snapshot()
 ) {
-  const snapshot = manager.snapshot();
   const enabled = (manifest.sources ?? []).filter((source) => source.enabled);
   if (
     enabled.length &&

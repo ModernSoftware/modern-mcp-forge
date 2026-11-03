@@ -75,16 +75,25 @@ export function nativeDocument(project: RegisteredProject, id: string) {
   const source = configuration(project).sources?.find((item) => item.id === id);
   if (!source || source.kind !== 'native')
     throw new NativeProjectError('Native source not found.');
+  const { files, error, manifestPath } = inspectNativeDocument(project, source);
+  return { source, files, error, manifestPath };
+}
+
+function inspectNativeDocument(
+  project: RegisteredProject,
+  source: Extract<ProjectSource, { kind: 'native' }>
+) {
   const manifestPath = containedFile(project.path, source.manifest);
   const content = read(manifestPath);
   const files = [
     relative(realpathSync(project.path), manifestPath).replaceAll('\\', '/')
   ];
   let error: string | undefined;
+  let parsed: Manifest | undefined;
   // A malformed manifest remains editable after failed startup or an external edit.
   try {
-    const manifest = ManifestSchema.parse(JSON.parse(content));
-    for (const worker of Object.values(manifest.workers)) {
+    parsed = ManifestSchema.parse(JSON.parse(content));
+    for (const worker of Object.values(parsed.workers)) {
       const path = containedFile(dirname(manifestPath), worker.module);
       const name = relative(realpathSync(project.path), path).replaceAll(
         '\\',
@@ -95,7 +104,7 @@ export function nativeDocument(project: RegisteredProject, id: string) {
   } catch (failure) {
     error = failure instanceof Error ? failure.message : String(failure);
   }
-  return { source, files, error, manifestPath };
+  return { files, error, manifestPath, parsed, content };
 }
 
 export function readNativeFile(
@@ -231,8 +240,10 @@ export function createNativeSource(
 export type CapabilityKind = 'tools' | 'resources' | 'prompts';
 
 /** Authoring reads disk, not discovery, so stopped/broken sources remain editable. */
-export function nativeWorkspace(project: RegisteredProject) {
-  const manifest = configuration(project);
+export function nativeWorkspace(
+  project: RegisteredProject,
+  manifest = configuration(project)
+) {
   return {
     project,
     legacyCount:
@@ -248,10 +259,12 @@ export function nativeWorkspace(project: RegisteredProject) {
           error: undefined as string | undefined
         };
       try {
-        const document = nativeDocument(project, source.id);
-        const parsed = ManifestSchema.parse(
-          JSON.parse(read(document.manifestPath))
-        );
+        const document = inspectNativeDocument(project, source);
+        const { parsed } = document;
+        if (!parsed)
+          throw new NativeProjectError(
+            document.error ?? 'Invalid native manifest.'
+          );
         const manifest = {
           tools: parsed.tools,
           resources: parsed.resources,
@@ -270,7 +283,7 @@ export function nativeWorkspace(project: RegisteredProject) {
         return {
           source,
           manifest,
-          revision: digest(read(document.manifestPath)),
+          revision: digest(document.content),
           error: document.error
         };
       } catch (error) {
@@ -461,9 +474,7 @@ export function setCapabilityEnabled(
   const source = manifest.sources?.find((item) => item.id === id);
   if (!source || source.kind !== 'native')
     throw new NativeProjectError('Native source not found.');
-  const native = nativeWorkspace(project).sources.find(
-    (entry) => entry.source.id === id
-  )?.manifest;
+  const native = inspectNativeDocument(project, source).parsed;
   if (!native?.[kind].some((item) => item.name === name))
     throw new NativeProjectError('Capability not found.');
   source.disabledCapabilities = (source.disabledCapabilities ?? []).filter(

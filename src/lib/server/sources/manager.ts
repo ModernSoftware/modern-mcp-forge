@@ -1,3 +1,4 @@
+import { isDeepStrictEqual } from 'node:util';
 import type {
   SourceAdapter,
   SourceCall,
@@ -198,6 +199,27 @@ export class ProjectSourceManager {
     }
   }
 
+  // Changing a binding's visibility only changes discovery. Keep running workers
+  // when their definitions still match the project and the edited pack is current.
+  private async canRepublish(
+    project: string,
+    sources: ProjectSource[],
+    id: string
+  ) {
+    if (project !== this.project || this.status !== 'ready') return false;
+    const next = sources.find((s) => s.id === id);
+    if (next?.kind !== 'native' || !next.enabled) return false;
+    const expected = this.definitions.map((s) =>
+      s.id === id
+        ? { ...s, disabledCapabilities: next.disabledCapabilities }
+        : s
+    );
+    if (!isDeepStrictEqual(expected, sources)) return false;
+    const adapter = this.adapters.get(id);
+    if (!adapter || adapter.health().status !== 'ready') return false;
+    return !(await adapter.filesChanged?.().catch(() => true));
+  }
+
   // A successfully previewed connection transfers ownership to this manager.
   open(
     project: string,
@@ -206,6 +228,7 @@ export class ProjectSourceManager {
     options: {
       prepared?: { id: string; adapter: SourceAdapter };
       createdNative?: string;
+      visibilityOnly?: string;
       legacy?: ReservedCatalog;
     } = {}
   ) {
@@ -214,6 +237,17 @@ export class ProjectSourceManager {
       let sources: ProjectSource[];
       try {
         sources = ProjectSourcesSchema.parse(input);
+        if (
+          options.visibilityOnly &&
+          !prepared &&
+          (await this.canRepublish(project, sources, options.visibilityOnly))
+        ) {
+          this.published = this.planNames(project, sources, options.legacy);
+          this.definitions = sources;
+          ++this.generation;
+          await discardConnectionDrafts();
+          return this.snapshot();
+        }
         await this.stop();
       } catch (error) {
         await prepared?.adapter.close();

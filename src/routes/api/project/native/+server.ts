@@ -228,7 +228,11 @@ export const POST: RequestHandler = async ({ request }) => {
         input.action === 'create-capability' || input.action === 'create'
           ? input.id
           : undefined;
-      const snapshot = await startProjectSources(project, createdNative);
+      const snapshot = await startProjectSources(project, {
+        createdNative,
+        visibilityOnly:
+          input.action === 'set-capability-enabled' ? input.id : undefined
+      });
       // Runtime failure does not discard saved work: files remain editable.
       return json({ file, snapshot });
     });

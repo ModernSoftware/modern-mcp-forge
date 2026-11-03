@@ -16,6 +16,7 @@
   projectId={data.project.id}
   sources={data.sources.map((entry) => entry.source)}
   snapshot={data.snapshot}
+  cold={data.cold}
   catalogError={data.catalogError}
 />
 {#each data.sources as entry}

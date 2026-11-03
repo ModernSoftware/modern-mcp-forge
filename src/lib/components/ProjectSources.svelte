@@ -3,15 +3,17 @@
   import { goto, invalidateAll } from '$app/navigation';
   import type { ProjectSource } from '$lib/server/sources/schema';
   import type { ProjectSourceManager } from '$lib/server/sources/manager';
-  let { projectId, sources, snapshot, catalogError } = $props<{
+  let { projectId, sources, snapshot, catalogError, cold } = $props<{
     projectId: string;
     sources: ProjectSource[];
     snapshot: ReturnType<ProjectSourceManager['snapshot']>;
+    cold: boolean;
     catalogError?: string;
   }>();
   let id = $state('');
   let manifest = $state('');
   let busy = $state(false);
+  let reloading = $state(false);
   let error = $state('');
 
   async function action(body: Record<string, unknown>) {
@@ -41,7 +43,8 @@
     }
   }
   async function reload() {
-    busy = true;
+    if (busy) return;
+    busy = reloading = true;
     error = '';
     try {
       const result = await reloadProjectSources(projectId, snapshot.generation);
@@ -49,8 +52,11 @@
     } catch (failure) {
       error = failure instanceof Error ? failure.message : String(failure);
     } finally {
-      busy = false;
-      await invalidateAll();
+      try {
+        await invalidateAll();
+      } finally {
+        busy = reloading = false;
+      }
     }
   }
 </script>
@@ -61,13 +67,22 @@
       <div class="eyebrow">PROJECT SOURCES</div>
       <h2>Sources</h2>
     </div>
-    <button disabled={busy} onclick={reload}>Reload sources</button>
+    <button disabled={busy} onclick={reload}
+      >{reloading
+        ? 'Starting sources…'
+        : cold
+          ? 'Start sources'
+          : 'Reload sources'}</button
+    >
   </div>
   <p>
     Author portable Node and Python capabilities, then test them through this
     project's <code>/mcp</code> endpoint.
   </p>
-  {#if error || snapshot.error || catalogError}<p role="alert" class="error">
+  {#if !busy && (error || snapshot.error || catalogError)}<p
+      role="alert"
+      class="error"
+    >
       {error || snapshot.error || catalogError}
     </p>{/if}
   {#each sources as source (source.id)}
