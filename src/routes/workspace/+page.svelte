@@ -139,6 +139,11 @@
           (items.length ||
             (!total && source.id.toLowerCase().includes(search.toLowerCase())))
       )
+      .sort(
+        (a, b) =>
+          sourceTypes.indexOf(a.source.kind) -
+          sourceTypes.indexOf(b.source.kind)
+      )
   );
   function counts(items: typeof rows) {
     const n = { tools: 0, resources: 0, prompts: 0 };
@@ -351,33 +356,38 @@
     {/if}
   {/each}
 {:else}
-  {#each sources.filter((e) => !e.total) as entry (entry.source.id)}
-    <section class="glass-card empty-source" aria-label={entry.source.id}>
-      {@render sourceHeading(entry)}
+  {#each sources as entry (entry.source.id)}
+    {#if entry.total}
+      <section class="glass-card workflow-list" aria-label={entry.source.id}>
+        {#each entry.items as row (row.category + '/' + row.definition.name)}
+          {@render capability(row)}
+        {/each}
+      </section>
+    {:else}
+      <section class="glass-card empty-source" aria-label={entry.source.id}>
+        {@render sourceHeading(entry)}
+      </section>
+    {/if}
+  {:else}
+    <section class="glass-card workflow-list">
+      <div class="workflow-empty">
+        <h2>
+          {data.sources.length
+            ? 'No matching capabilities'
+            : 'Add a tool, resource or prompt'}
+        </h2>
+        <p>
+          {data.sources.length
+            ? 'Change your search or filters to see more sources and capabilities.'
+            : 'Create a native capability or connect a source to this project.'}
+        </p>
+        {#if !data.sources.length}<a
+            class="primary-button"
+            href="/workspace/new">Add your first tool</a
+          >{/if}
+      </div>
     </section>
   {/each}
-  {#if visible.length || !sources.length}
-    <section class="glass-card workflow-list">
-      {#each visible as row (`${row.source.id}/${row.category}/${row.definition.name}`)}
-        {@render capability(row)}
-      {:else}<div class="workflow-empty">
-          <h2>
-            {data.sources.length
-              ? 'No matching capabilities'
-              : 'Add a tool, resource or prompt'}
-          </h2>
-          <p>
-            {data.sources.length
-              ? 'Change your search or filters to see more sources and capabilities.'
-              : 'Create a native capability or connect a source to this project.'}
-          </p>
-          {#if !data.sources.length}<a
-              class="primary-button"
-              href="/workspace/new">Add your first tool</a
-            >{/if}
-        </div>{/each}
-    </section>
-  {/if}
 {/if}
 
 <style>

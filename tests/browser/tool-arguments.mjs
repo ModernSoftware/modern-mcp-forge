@@ -56,7 +56,7 @@ try {
   };`
   );
   project.sources = [
-    project.sources.find((s) => s.kind === 'native'),
+    { id: 'offline', kind: 'external', enabled: false, url: remote.url },
     {
       id: 'mirror',
       kind: 'bridge',
@@ -71,15 +71,22 @@ try {
       enabled: true,
       naming: 'collisions',
       url: remote.url
-    }
+    },
+    project.sources.find((s) => s.kind === 'native')
   ];
   await writeFile(join(dir, 'forge.project.json'), JSON.stringify(project));
   await vite.listen();
   const opened = await post('projects/open', { folderPath: dir });
   assert.equal(opened.status, 200, await opened.text());
-  const state = await (await fetch(base + '/api/project/sources')).json();
+  const readSources = async () =>
+    (await fetch(base + '/api/project/sources')).json();
+  const state = await readSources();
   for (const source of state.sources)
-    assert.equal(source.status, 'ready', source.error);
+    assert.equal(
+      source.status,
+      source.enabled ? 'ready' : 'disabled',
+      source.error
+    );
   browser = await chromium.launch({
     executablePath:
       process.env.CHROME_BIN ||
@@ -88,7 +95,8 @@ try {
     headless: true,
     args: ['--disable-dev-shm-usage']
   });
-  const page = await browser.newPage();
+  const context = await browser.newContext();
+  const page = await context.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   const go = async (path) => {
@@ -126,6 +134,58 @@ try {
       await output.getByRole('button', { name: 'Preview' }).click();
     return payload.result;
   };
+
+  // Model the runtime after a host restart: the selection is still in SQLite,
+  // but every adapter and catalog is gone. Two previously active tabs resume it.
+  await go('/workspace');
+  const cards = page.locator('section.workflow-list, section.empty-source');
+  const expectedOrder = ['order-desk', 'mirror', 'offline', 'orders'];
+  const cardOrder = () =>
+    cards.evaluateAll((list) =>
+      list.map((item) => item.getAttribute('aria-label'))
+    );
+  assert.deepEqual(await cardOrder(), expectedOrder);
+  const view = page.getByLabel('Workspace view');
+  await view.selectOption('grouped');
+  const summaries = page.locator('.catalog-group summary');
+  const counts = await summaries.allTextContents();
+  const detail = await context.newPage();
+  await detail.goto(base + '/project/external/orders?kind=tool&name=lookup');
+  await detail
+    .getByRole('group', { name: 'Tool arguments', exact: true })
+    .waitFor();
+  const { projectSources } = await vite.ssrLoadModule(
+    '/src/lib/server/sources/manager.ts'
+  );
+  await projectSources.close();
+  const coldGeneration = projectSources.snapshot().generation;
+  const fresh = await context.newPage();
+  await fresh.goto(base + '/workspace');
+  await fresh.waitForLoadState('networkidle');
+  assert.equal(projectSources.snapshot().status, 'stopped');
+  await fresh.getByRole('button', { name: 'Start project sources' }).waitFor();
+  await fresh.close();
+
+  await Promise.all([page.reload(), detail.reload()]);
+  await detail
+    .getByRole('group', { name: 'Tool arguments', exact: true })
+    .waitFor();
+  await page.getByText(/2 tools · 1 resource · 1 prompt/).waitFor();
+  assert.deepEqual(await summaries.allTextContents(), counts);
+  assert.equal(
+    await detail.getByLabel('Capability', { exact: true }).inputValue(),
+    'lookup'
+  );
+  assert.equal(projectSources.snapshot().generation, coldGeneration + 1);
+  assert.deepEqual((await readSources()).sources, state.sources);
+  await detail.close();
+  await view.selectOption('detailed');
+  assert.deepEqual(await cardOrder(), expectedOrder);
+  await page.getByRole('link', { name: 'reflect', exact: true }).waitFor();
+  await page.getByRole('link', { name: 'lookup', exact: true }).waitFor();
+  await page.reload();
+  await page.waitForLoadState('networkidle');
+  assert.equal(projectSources.snapshot().generation, coldGeneration + 1);
 
   await go('/workspace/native/order-desk/tools/get_quote_by_sku');
   const definitionMode = page.getByRole('switch', { name: 'Edit as JSON' });

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { activateProject } from '$lib/client/activate-project';
   import ProjectOpening from '$lib/components/ProjectOpening.svelte';
   import { goto } from '$app/navigation';
 
@@ -28,25 +29,7 @@
     errorMessage = '';
 
     try {
-      const response = await fetch('/api/projects/activate', {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json'
-        },
-        body: JSON.stringify({
-          projectId,
-          resume
-        })
-      });
-
-      const payload = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          payload.error ?? `Could not open project (${response.status}).`
-        );
-      }
-
+      await activateProject(projectId, resume);
       navigating = true;
       await goto('/workspace', {
         invalidateAll: true
