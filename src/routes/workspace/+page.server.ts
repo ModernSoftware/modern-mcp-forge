@@ -7,15 +7,22 @@ import { projectSources } from '$lib/server/sources/manager';
 export const load = () => {
   const project = getActiveProjectRecord();
   if (!project) redirect(303, '/projects');
+  const manifest = loadProjectManifest();
+  const snapshot = projectSources.snapshot();
+  const cold =
+    snapshot.project === null &&
+    snapshot.status === 'stopped' &&
+    (manifest.sources ?? []).some((s) => s.enabled);
   let catalogError: string | undefined;
   try {
-    projectCatalog(loadProjectManifest());
+    if (!cold) projectCatalog(manifest, snapshot);
   } catch (error) {
     catalogError = error instanceof Error ? error.message : String(error);
   }
   return {
-    ...nativeWorkspace(project),
+    ...nativeWorkspace(project, manifest),
+    cold,
     catalogError,
-    snapshot: projectSources.snapshot()
+    snapshot
   };
 };

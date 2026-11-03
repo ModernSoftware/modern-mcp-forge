@@ -10,6 +10,7 @@ on:
       - 'src/lib/server/sources/**'
       - 'src/lib/server/mcpack/**'
       - 'src/routes/mcp/**'
+      - 'src/lib/deployment/**'
       - 'src/lib/server/deployment/**'
       - 'src/routes/workspace/export/**'
       - 'src/routes/api/project/export/**'

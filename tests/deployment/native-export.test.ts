@@ -61,6 +61,7 @@ test('download a mixed-project native export, clean-install it and call both wor
     const handbook = nativeStarter('manual', 'python');
     const packPath = join(project, 'native', 'mcpack.json');
     const pack = JSON.parse(await readFile(packPath, 'utf8'));
+    pack.tools.push({ ...pack.tools[0], name: 'internal_quote' });
     pack.workers.manual = handbook.manifest.workers.main;
     pack.resources = handbook.manifest.resources.map((item) => ({
       ...item,
@@ -99,9 +100,38 @@ test('download a mixed-project native export, clean-install it and call both wor
       projectId: manifest.project.id,
       id: 'order-desk',
       revision: preview.revision,
-      files: preview.files.filter((f) => f.suggested).map((f) => f.path)
+      capabilities: [
+        'tools/get_quote_by_sku',
+        'tools/estimate_delivery',
+        'resources/manual_guide',
+        'prompts/manual_welcome'
+      ],
+      files: []
     };
-    expect(input.files).toContain('catalog.json');
+    const deliveryOnly = await post('project/export', {
+      ...input,
+      capabilities: ['tools/estimate_delivery']
+    });
+    expect(deliveryOnly.status).toBe(200);
+    const deliveryFiles = await new Bun.Archive(
+      await deliveryOnly.blob()
+    ).files();
+    expect([...deliveryFiles.keys()].sort()).toEqual([
+      'README.md',
+      'pack/mcpack.json',
+      'pack/package-lock.json',
+      'pack/package.json',
+      'pack/shipping.py',
+      'package-lock.json',
+      'package.json'
+    ]);
+    const deliveryManifest = JSON.parse(
+      await deliveryFiles.get('pack/mcpack.json')!.text()
+    );
+    expect(Object.keys(deliveryManifest.workers)).toEqual(['shipping']);
+    expect(
+      deliveryManifest.tools.map((item: { name: string }) => item.name)
+    ).toEqual(['estimate_delivery']);
     expect(
       (await post('project/export', { ...input, projectId: 'different' }))
         .status

@@ -1,7 +1,13 @@
 <script lang="ts">
-  import { goto } from '$app/navigation';
+  import { goto, preloadCode } from '$app/navigation';
+  import { onMount } from 'svelte';
 
   import DirectoryPicker from '$lib/components/DirectoryPicker.svelte';
+
+  // Prepare the next screen while the user fills out the form.
+  onMount(() => {
+    void preloadCode('/workspace').catch(() => {});
+  });
 
   let folderPath = $state('');
   let name = $state('');

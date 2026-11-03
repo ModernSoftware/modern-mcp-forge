@@ -2,13 +2,13 @@
 
 In **Workspace → Export native pack**, choose an enabled native source. MCPack 0.9.0 serves one manifest per process. A project with several native sources offers a separate download for each. The workspace filters, search, view and expanded source groups are remembered per project for the current browser tab, including after a refresh. They are independent of the export selection.
 
-1. Review the counts of enabled native tools, static resources and prompts. Worker modules used by those capabilities are required.
-2. Select helper modules, dependency files and assets used by the workers. Root dependency declarations and files named directly in a worker's configuration are preselected. Dynamic imports, nested package dependencies and paths computed by your code may need manual selection. Review application code and configuration for secrets.
+1. Under **Capabilities to include**, choose the tools, static resources and prompts you want clients to discover. All enabled capabilities start selected. The selection applies only to this download.
+2. Open **Review deployment files** to see the worker modules, root dependency manifests and lockfiles, and files named directly in the selected workers’ configuration. Forge includes them automatically. Under **Additional files**, select helpers, nested dependencies or assets your code loads dynamically. Including a file cannot enable a tool. Review application code and configuration for secrets.
 3. Download the archive and extract it into an empty directory. The root contains the pinned MCPack host package, npm lockfile and a README. The pack's rewritten manifest, original module layout, selected files and dependency declarations live under `pack/`. Project and source files on disk stay unchanged.
 
 ## Run the compatibility lab export
 
-Choose **order-desk** from the compatibility lab. Include the two worker modules, `catalog.json`, `package.json` and `package-lock.json`. With Node.js 24 and Python 3 available, run the following from the extracted directory.
+Choose **order-desk** from the compatibility lab. Select both tools for the walkthrough below. To deploy shipping alone, select only `estimate_delivery`. The archive then contains `shipping.py` and the package files, and the deployed server lists one tool. With Node.js 24 and Python 3 available, run the following from the extracted directory.
 
 ```sh
 npm ci

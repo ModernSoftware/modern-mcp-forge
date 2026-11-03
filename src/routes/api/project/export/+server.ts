@@ -13,6 +13,7 @@ const selection = z
     projectId: z.string(),
     id: sourceId,
     revision: z.string().regex(/^[a-f0-9]{64}$/),
+    capabilities: z.array(z.string().min(1)).optional(),
     files: z.array(z.string().min(1).max(4096)).max(2048)
   })
   .strict();
@@ -33,7 +34,8 @@ export const POST: RequestHandler = async ({ request }) => {
       loadProjectManifest(),
       input.id,
       input.revision,
-      input.files
+      input.files,
+      input.capabilities
     );
     return new Response(blob, {
       headers: {

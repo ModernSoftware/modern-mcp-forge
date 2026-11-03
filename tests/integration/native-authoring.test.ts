@@ -164,16 +164,20 @@ test('project catalog rejects collisions and configuration drift', async () => {
   });
   try {
     await manager.open(manifest.project.id, '.', manifest.sources!);
-    expect(() => projectCatalog(manifest, manager)).toThrow('Duplicate tools');
+    expect(() => projectCatalog(manifest, manager.snapshot())).toThrow(
+      'Duplicate tools'
+    );
     manifest.sources![1].enabled = false;
-    expect(() => projectCatalog(manifest, manager)).toThrow(
+    expect(() => projectCatalog(manifest, manager.snapshot())).toThrow(
       'configuration changed'
     );
     await manager.open(manifest.project.id, '.', manifest.sources!);
-    expect(projectCatalog(manifest, manager).catalogs.length).toBe(1);
+    expect(projectCatalog(manifest, manager.snapshot()).catalogs.length).toBe(
+      1
+    );
     if (manifest.sources![0].kind === 'native')
       manifest.sources![0].manifest = 'changed/mcpack.json';
-    expect(() => projectCatalog(manifest, manager)).toThrow(
+    expect(() => projectCatalog(manifest, manager.snapshot())).toThrow(
       'configuration changed'
     );
   } finally {

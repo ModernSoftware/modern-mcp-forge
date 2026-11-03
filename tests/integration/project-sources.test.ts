@@ -145,6 +145,61 @@ test('close invalidates in-flight results and failed cleanup retains ownership f
   expect(manager.snapshot().project).toBeNull();
 });
 
+test('a visibility edit republishes a fresh generation without restarting workers unless the pack changed', async () => {
+  let starts = 0;
+  let changed = false;
+  const manager = new ProjectSourceManager(() => ({
+    async start() {
+      ++starts;
+    },
+    async discover() {
+      return {
+        ...empty,
+        tools: [{ name: 'lookup', inputSchema: { type: 'object' } }]
+      };
+    },
+    async invoke() {},
+    async filesChanged() {
+      return changed;
+    },
+    health() {
+      return { status: 'ready' as const };
+    },
+    async close() {}
+  }));
+  const original = definition('native');
+  const disabled = {
+    ...original,
+    disabledCapabilities: [{ kind: 'tools' as const, name: 'lookup' }]
+  };
+  try {
+    const before = await manager.open('one', '.', [
+      original,
+      definition('other')
+    ]);
+    const after = await manager.open(
+      'one',
+      '.',
+      [disabled, definition('other')],
+      { visibilityOnly: 'native' }
+    );
+    expect(after.generation).toBeGreaterThan(before.generation);
+    expect(after.sources[0].catalog.tools).toEqual([]);
+    expect(after.sources[1].catalog.tools).toHaveLength(1);
+    expect(starts).toBe(2);
+    changed = true;
+    await manager.open(
+      'one',
+      '.',
+      [{ ...original, disabledCapabilities: [] }, definition('other')],
+      { visibilityOnly: 'native' }
+    );
+    expect(starts).toBe(4);
+  } finally {
+    await manager.close();
+  }
+});
+
 test('queued transitions complete in order and disabled sources never launch', async () => {
   const events: string[] = [];
   const manager = new ProjectSourceManager((_root, source) => ({

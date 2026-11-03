@@ -59,7 +59,7 @@ Workspace → Disable/Enable → Edit details → change description → Close a
 searching recent projects, dark theme and a narrow viewport. No browser console
 errors should occur when editing JSON.
 
-Source controls restart all sources after configuration edits. Native, bridged and external tool calls appear in Execution history. Individual worker stop/restart is still pending.
+Toggling a native capability republishes the catalog and reuses the running workers when the pack and source definitions are current. Reload sources after editing implementation files. Native, bridged and external tool calls appear in Execution history. Individual worker stop/restart is still pending.
 
 ## External sources slice
 

@@ -1,3 +1,7 @@
+import {
+  capabilityKey,
+  exportContents
+} from '../../src/lib/deployment/selection';
 import { expect, test } from 'bun:test';
 import { mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -69,9 +73,30 @@ test('native export enforces the preview and includes only selected deployable f
     if (process.platform !== 'win32')
       symlinkSync(join(folder, '.env.local'), join(folder, 'innocent.txt'));
     const preview = await previewExport(dir, project, 'local');
-    expect(preview.counts).toEqual({ tools: 0, resources: 1, prompts: 1 });
-    expect(preview.files.filter((f) => f.required).map((f) => f.path)).toEqual([
+    const keys = preview.capabilities.map(capabilityKey);
+    expect(keys).toEqual(['resources/local_guide', 'prompts/local_welcome']);
+    expect([...exportContents(preview, keys).required]).toEqual([
       starter.module
+    ]);
+    for (const invalid of [[], ['tools/local_greet'], ['tools/unknown']]) {
+      await expect(
+        exportPack(dir, project, 'local', preview.revision, [], invalid)
+      ).rejects.toThrow();
+    }
+    const one = await exportPack(
+      dir,
+      project,
+      'local',
+      preview.revision,
+      [],
+      ['prompts/local_welcome']
+    );
+    const selected = JSON.parse(
+      await (await new Bun.Archive(one).files()).get('pack/mcpack.json')!.text()
+    );
+    expect(selected.resources).toEqual([]);
+    expect(selected.prompts.map((p: { name: string }) => p.name)).toEqual([
+      'local_welcome'
     ]);
     expect(preview.files.map((f) => f.path)).not.toContain('innocent.txt');
     for (const path of [

@@ -17,7 +17,7 @@
 
   let forgettingId = $state<string | null>(null);
 
-  async function openRecent(projectId: string) {
+  async function openRecent(projectId: string, resume: boolean) {
     if (openingId) {
       return;
     }
@@ -32,7 +32,8 @@
           'content-type': 'application/json'
         },
         body: JSON.stringify({
-          projectId
+          projectId,
+          resume
         })
       });
 
@@ -168,10 +169,8 @@
   {#if !matchingProjects.length}<p>No matching projects.</p>{/if}
   <div class="projects-grid">
     {#each matchingProjects as project}
-      <article
-        class="glass-card project-card"
-        class:active-project={data.activeProject?.id === project.id}
-      >
+      {@const active = data.activeProject?.id === project.id}
+      <article class="glass-card project-card" class:active-project={active}>
         <header>
           <div>
             <div class="project-name-row">
@@ -179,7 +178,7 @@
                 {project.name}
               </h2>
 
-              {#if data.activeProject?.id === project.id}
+              {#if active}
                 <span class="active-badge"> ● ACTIVE </span>
               {/if}
             </div>
@@ -222,22 +221,21 @@
               {forgettingId === project.id ? 'Forgetting…' : 'Forget'}
             </button>
 
-            {#if data.activeProject?.id === project.id}
-              <a class="secondary-button compact" href="/workspace">
-                Continue
-              </a>
-            {:else}
-              <button
-                class="primary-button compact"
-                type="button"
-                disabled={!project.available ||
-                  openingId !== null ||
-                  forgettingId !== null}
-                onclick={() => openRecent(project.id)}
-              >
-                {openingId === project.id ? 'Opening…' : 'Open'}
-              </button>
-            {/if}
+            <button
+              class:primary-button={!active}
+              class:secondary-button={active}
+              class="compact"
+              type="button"
+              disabled={!project.available ||
+                openingId !== null ||
+                forgettingId !== null}
+              onclick={() => openRecent(project.id, active)}
+              >{openingId === project.id
+                ? 'Opening…'
+                : active
+                  ? 'Continue'
+                  : 'Open'}</button
+            >
           </div>
         </footer>
       </article>

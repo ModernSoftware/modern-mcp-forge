@@ -1,6 +1,6 @@
 import { chromium } from 'playwright-core';
 import { createServer } from 'vite';
-import { mkdtemp, rm, readFile } from 'node:fs/promises';
+import { mkdtemp, rm, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import assert from 'node:assert/strict';
@@ -51,7 +51,40 @@ try {
   const page = await browser.newPage({ acceptDownloads: true });
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  await page.goto(base + '/workspace');
+  // A new Forge process retains the SQLite selection but owns no live workers.
+  const { projectSources } = await vite.ssrLoadModule(
+    '/src/lib/server/sources/manager.ts'
+  );
+  await projectSources.close();
+  await page.goto(base + '/projects');
+  await page.waitForLoadState('networkidle');
+  assert.equal(projectSources.snapshot().status, 'stopped');
+  const resume = async () => {
+    await page.getByRole('button', { name: 'Continue' }).click();
+    await page.waitForURL('**/workspace');
+    assert.equal(projectSources.snapshot().status, 'ready');
+    assert.equal(await page.getByRole('alert').count(), 0);
+  };
+  await resume();
+  const generation = projectSources.snapshot().generation;
+  await page.goto(base + '/projects');
+  await page.waitForLoadState('networkidle');
+  await resume();
+  assert.equal(projectSources.snapshot().generation, generation);
+  // A genuine failure remains visible and clears after a successful retry.
+  const worker = join(dir, 'demo', 'native', 'demo', 'handlers.mjs');
+  const original = await readFile(worker, 'utf8');
+  await writeFile(worker, 'throw new Error("broken fixture");');
+  await page.goto(base + '/project');
+  await page.waitForLoadState('networkidle');
+  await page.getByRole('button', { name: 'Reload sources' }).click();
+  await page.getByRole('alert').first().waitFor();
+  await writeFile(worker, original);
+  await page.getByRole('button', { name: 'Reload sources' }).click();
+  await page.getByRole('button', { name: 'Reload sources' }).waitFor();
+  assert.equal(projectSources.snapshot().status, 'ready');
+  assert.equal(await page.getByRole('alert').count(), 0);
+  await page.getByRole('link', { name: 'Open workspace' }).click();
   await page.getByRole('link', { name: 'Export native pack' }).waitFor();
   await page.waitForLoadState('networkidle');
   const kind = page.getByLabel('Capability type'),
@@ -80,6 +113,22 @@ try {
   await check();
   await page.getByRole('link', { name: 'Export native pack' }).click();
   await page.getByRole('heading', { name: 'Export native pack' }).waitFor();
+  const downloadButton = page.getByRole('button', { name: 'Download .tar.gz' });
+  for (const name of ['demo_greet', 'demo_guide', 'demo_welcome']) {
+    const box = page.getByRole('checkbox', { name, exact: true });
+    assert.equal(await box.isChecked(), true);
+    await box.uncheck();
+  }
+  assert.equal(await downloadButton.isDisabled(), true);
+  await page.getByRole('checkbox', { name: 'demo_guide', exact: true }).check();
+  await page.getByRole('button', { name: 'Refresh preview' }).click();
+  await page.waitForFunction(
+    () => !document.querySelector('.actions button')?.disabled
+  );
+  assert.equal(
+    await page.getByRole('checkbox', { name: 'demo_greet' }).isChecked(),
+    false
+  );
   const [download] = await Promise.all([
     page.waitForEvent('download'),
     page.getByRole('button', { name: 'Download .tar.gz' }).click()
@@ -89,6 +138,14 @@ try {
   await download.saveAs(output);
   const files = await new Bun.Archive(await readFile(output)).files();
   assert.ok(files.has('pack/handlers.mjs'));
+  assert.ok(files.has('pack/package.json'));
+  const manifest = JSON.parse(await files.get('pack/mcpack.json').text());
+  assert.deepEqual(manifest.tools, []);
+  assert.deepEqual(manifest.prompts, []);
+  assert.deepEqual(
+    manifest.resources.map((r) => r.name),
+    ['demo_guide']
+  );
   await page.getByRole('link', { name: '← Workspace' }).click();
   await check();
   await page.reload();

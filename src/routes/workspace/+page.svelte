@@ -217,7 +217,8 @@
     been converted to MCPack. <a href="/tools">Open legacy views</a> to review them;
     new capabilities use the native workflow.
   </p>{/if}
-{#if actionError || data.snapshot.error || data.catalogError}<p
+{#if data.cold}<p class="workflow-notice" role="status">This project was open when Forge stopped. Start its sources to test capabilities or connect an agent.</p>{/if}
+{#if !busy && (actionError || data.snapshot.error || data.catalogError)}<p
     class="workflow-error"
     role="alert"
   >
@@ -323,6 +324,8 @@
   <ReloadProjectSources
     projectId={data.project.id}
     generation={data.snapshot.generation}
+    cold={data.cold}
+    onreload={() => (actionError = '')}
     bind:busy
   />
 </div>

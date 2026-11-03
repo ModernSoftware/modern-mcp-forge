@@ -1,3 +1,8 @@
+import {
+  capabilityKey,
+  capabilityKinds,
+  exportContents
+} from '../../deployment/selection';
 import { createHash } from 'node:crypto';
 import {
   closeSync,
@@ -89,7 +94,7 @@ async function prepare(
   const { manifest, root: packRoot } = await loadProject(filename);
   const folder = realpathSync.native(packRoot);
   const used = new Set<string>();
-  for (const kind of ['tools', 'resources', 'prompts'] as const) {
+  for (const kind of capabilityKinds) {
     const hidden = new Set(
       source.disabledCapabilities
         ?.filter((c) => c.kind === kind)
@@ -106,25 +111,25 @@ async function prepare(
     throw new NativeProjectError(
       'Enable at least one native tool, resource or prompt before exporting.'
     );
-  const required = new Set<string>();
-  const envNames = new Set<string>();
-  const configuredFiles = new Set<string>();
+  const workers = [];
   for (const [id, worker] of Object.entries(manifest.workers)) {
     if (!used.has(id)) {
       delete manifest.workers[id];
       continue;
     }
     worker.module = slash(relative(folder, realpathSync.native(worker.module)));
-    required.add(worker.module);
     worker.inheritEnv = [
       ...new Set([...worker.inheritEnv, ...Object.keys(worker.env)])
     ];
     worker.env = {};
-    for (const value of Object.values(worker.config)) {
-      if (typeof value === 'string')
-        configuredFiles.add(value.replace(/^\.\//, ''));
-    }
-    for (const key of worker.inheritEnv) envNames.add(key);
+    workers.push({
+      id,
+      module: worker.module,
+      environment: worker.inheritEnv,
+      assets: Object.values(worker.config)
+        .filter((value): value is string => typeof value === 'string')
+        .map((value) => value.replace(/^\.\//, ''))
+    });
     // Let MCPack choose the target platform's Python interpreter. A local venv path is not portable.
     if (
       worker.runtime === 'python' &&
@@ -162,10 +167,12 @@ async function prepare(
     }
   }
   const inventory = candidates(folder, blocked);
-  for (const file of required) {
-    if (!inventory.has(file))
+  for (const worker of workers) {
+    worker.assets = worker.assets.filter((name) => inventory.has(name));
+    if (!inventory.has(worker.module))
       throw new NativeProjectError(
-        'A required worker module is outside the exportable files: ' + file
+        'A required worker module is outside the exportable files: ' +
+          worker.module
       );
   }
   const files = [...inventory]
@@ -173,11 +180,7 @@ async function prepare(
     .map(([path, info]) => ({
       path,
       size: info.size,
-      required: required.has(path),
-      suggested:
-        required.has(path) ||
-        dependencies.test(path) ||
-        configuredFiles.has(path)
+      dependency: dependencies.test(path)
     }));
   const revision = createHash('sha256')
     .update(json(manifest))
@@ -186,12 +189,15 @@ async function prepare(
   const preview = {
     revision,
     files,
-    environment: [...envNames].sort(),
-    counts: {
-      tools: manifest.tools.length,
-      resources: manifest.resources.length,
-      prompts: manifest.prompts.length
-    }
+    workers,
+    capabilities: capabilityKinds.flatMap((kind) =>
+      manifest[kind].map(({ name, worker, description }) => ({
+        kind,
+        name,
+        worker,
+        description
+      }))
+    )
   };
   return { folder, manifest, preview };
 }
@@ -209,17 +215,36 @@ export async function exportPack(
   project: ForgeProjectManifest,
   id: string,
   revision: string,
-  extras: string[]
+  extras: string[],
+  capabilities?: string[]
 ) {
   const { folder, manifest, preview } = await prepare(root, project, id);
   if (preview.revision !== revision)
     throw new NativeProjectError(
-      'The source changed. Refresh the file list and review the export again.',
+      'The source changed. Refresh the preview and review the export again.',
       409
     );
-  const files = new Set(extras);
+  const available = new Set(preview.capabilities.map(capabilityKey));
+  const selected = new Set(capabilities ?? available);
+  if (!selected.size)
+    throw new NativeProjectError('Select at least one capability to export.');
+  for (const key of selected)
+    if (!available.has(key))
+      throw new NativeProjectError(
+        'Select only enabled capabilities from this source.'
+      );
+  const contents = exportContents(preview, [...selected]);
+  for (const kind of capabilityKinds) {
+    for (let i = manifest[kind].length - 1; i >= 0; i--) {
+      if (!selected.has(capabilityKey({ kind, ...manifest[kind][i] })))
+        manifest[kind].splice(i, 1);
+    }
+  }
+  for (const worker of Object.keys(manifest.workers)) {
+    if (!contents.workers.has(worker)) delete manifest.workers[worker];
+  }
+  const files = new Set([...contents.required, ...extras]);
   const inventory = new Map(preview.files.map((f) => [f.path, f]));
-  for (const file of preview.files) if (file.required) files.add(file.path);
   let bytes = 0;
   const entries: Record<string, string | Uint8Array<ArrayBuffer>> = {
     'package.json': json(hostPackage),
@@ -258,7 +283,7 @@ export async function exportPack(
       closeSync(descriptor);
     }
   }
-  entries['README.md'] = deploymentGuide(id, files, preview.environment);
+  entries['README.md'] = deploymentGuide(id, files, contents.environment);
   return new Bun.Archive(entries, { compress: 'gzip' }).blob();
 }
 
