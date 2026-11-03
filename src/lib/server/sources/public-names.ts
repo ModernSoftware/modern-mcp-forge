@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import type { SourceCatalog } from './contracts';
+import type { ExposureRule } from './schema';
 import { qualifiedName } from './upstream';
 
 export type ReservedCatalog = {
@@ -16,6 +17,8 @@ function compare(a: string, b: string) {
 interface Entry {
   id: string;
   flexible: boolean;
+  rules?: ExposureRule[];
+  identity?: (kind: keyof SourceCatalog, route: string) => string;
   catalog: SourceCatalog;
 }
 
@@ -44,8 +47,27 @@ export function publishCatalogs(entries: Entry[], legacy?: ReservedCatalog) {
     }[] = [];
     const counts = new Map<string, number>();
     for (const entry of entries) {
-      for (const item of entry.catalog[kind]) {
-        if (!entry.flexible) {
+      const rules = new Map(
+        entry.rules?.filter((r) => r.kind === kind).map((r) => [r.identity, r])
+      );
+      const catalog = published.get(entry.id)!.catalog;
+      // Each entry owns a fresh catalog for this publication.
+      const visible = catalog[kind].filter((item) => {
+        const route = 'uri' in item ? item.uri : item.name;
+        return !rules.get(entry.identity?.(kind, route) ?? route)?.hidden;
+      });
+      Object.assign(catalog, { [kind]: visible });
+      for (const item of visible) {
+        const route = 'uri' in item ? item.uri : item.name;
+        const rule = rules.get(entry.identity?.(kind, route) ?? route);
+        if (rule?.description !== undefined)
+          item.description = rule.description;
+        if (rule?.alias) {
+          if (kind !== 'resources')
+            published.get(entry.id)![kind].set(rule.alias, item.name);
+          item.name = rule.alias;
+        }
+        if (rule?.alias || !entry.flexible) {
           taken.add(item.name);
           continue;
         }

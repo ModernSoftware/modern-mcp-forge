@@ -10,6 +10,32 @@ const projectPath = z
     'Use a project-relative path without parent traversal.'
   );
 export const sourceId = z.string().regex(/^[A-Za-z][A-Za-z0-9_-]{0,63}$/);
+export const ExposureRuleSchema = z
+  .object({
+    kind: z.enum(['tools', 'resources', 'prompts']),
+    identity: z.string().min(1).max(8192),
+    hidden: z.boolean().optional(),
+    alias: z
+      .string()
+      .regex(
+        /^[A-Za-z0-9_.-]{1,64}$/,
+        'Aliases use 1–64 letters, numbers, dots, hyphens or underscores.'
+      )
+      .optional(),
+    description: z.string().max(16000).optional()
+  })
+  .strict();
+export type ExposureRule = z.infer<typeof ExposureRuleSchema>;
+const exposure = z
+  .array(ExposureRuleSchema)
+  .max(6000)
+  .refine(
+    (rules) =>
+      new Set(rules.map((r) => JSON.stringify([r.kind, r.identity]))).size ===
+      rules.length,
+    'Duplicate exposure rule for an upstream capability.'
+  )
+  .optional();
 const identity = { id: sourceId };
 
 export const ProjectSourceSchema = z.discriminatedUnion('kind', [
@@ -35,6 +61,7 @@ export const ProjectSourceSchema = z.discriminatedUnion('kind', [
     .object({
       ...identity,
       kind: z.literal('bridge'),
+      exposure,
       enabled: z.boolean().default(false),
       runtime: z.enum(['node', 'python']),
       entrypoint: projectPath,
@@ -60,6 +87,7 @@ export const ProjectSourceSchema = z.discriminatedUnion('kind', [
     .object({
       ...identity,
       kind: z.literal('external'),
+      exposure,
       naming: z.enum(['always', 'collisions']).optional(),
       enabled: z.boolean().default(true),
       bearerTokenEnv: z

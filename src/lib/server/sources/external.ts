@@ -2,7 +2,7 @@ import {
   Client,
   StreamableHTTPClientTransport
 } from '@modelcontextprotocol/client';
-import type { SourceAdapter, SourceCall } from './contracts';
+import type { SourceAdapter, SourceCall, SourceCatalog } from './contracts';
 import type { ProjectSource } from './schema';
 import {
   DiscoveryError,
@@ -139,6 +139,9 @@ export class ExternalSourceAdapter implements SourceAdapter {
     }
   }
 
+  originalIdentity(kind: keyof SourceCatalog, route: string) {
+    return this.catalog?.originalIdentity(kind, route) ?? route;
+  }
   async discover() {
     return (
       this.catalog?.snapshot() ?? { tools: [], resources: [], prompts: [] }

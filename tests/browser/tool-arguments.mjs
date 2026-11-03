@@ -215,6 +215,22 @@ try {
   const quote = { sku: 'ACT-42', quantity: 3, tier: 'premium' };
   const result = await invoke('native', quote);
   assert.equal(result.structuredContent.total, '59.93');
+  await page.getByText('Named test cases', { exact: true }).click();
+  await page.getByRole('button', { name: 'Save as case' }).click();
+  await page.getByLabel('Case name').fill('Premium quote');
+  await page.getByLabel('Path in last result').fill('/structuredContent/total');
+  await page
+    .getByRole('button', { name: 'Use value from last result' })
+    .click();
+  assert.deepEqual(
+    JSON.parse(await page.getByLabel('Expected fields (JSON)').inputValue()),
+    [{ path: '/structuredContent/total', value: '59.93' }]
+  );
+  await page.getByRole('button', { name: 'Save case', exact: true }).click();
+  await page.getByText('Case saved to forge.cases.json.').waitFor();
+  page.once('dialog', (d) => d.accept());
+  await page.getByRole('button', { name: 'Run case', exact: true }).click();
+  await page.getByText('Premium quote · Passed', { exact: true }).waitFor();
   assert.equal(await output.locator('pre').count(), 1);
   await toggle.focus();
   await page.keyboard.press('Space');
@@ -339,9 +355,79 @@ try {
   assert.ok((await editor.locator('pre[aria-hidden] span').count()) > 1);
   assert.deepEqual(await invoke('native', quote), result);
   await output.getByRole('heading', { name: 'Structured content' }).waitFor();
+  await go('/project/bridge/mirror?kind=tool&name=reflect');
+  const reflect = page
+    .locator('article')
+    .filter({
+      has: page.getByRole('heading', { name: 'reflect', exact: true })
+    });
+  await reflect.getByText('Agent exposure', { exact: false }).click();
+  await reflect.getByLabel('Public alias').fill('echo_fixture');
+  await reflect.getByRole('button', { name: 'Save exposure' }).click();
+  await reflect.getByText('Agent exposure · echo_fixture').waitFor();
+  await go('/workspace');
+  await page.getByRole('link', { name: 'echo_fixture', exact: true }).click();
+  await editor.waitFor();
+  assert.equal(
+    await page.getByLabel('Capability', { exact: true }).inputValue(),
+    'reflect'
+  );
+  await invoke('bridge', {});
+  await page.getByText('Named test cases', { exact: true }).click();
+  await page.getByRole('button', { name: 'Save as case' }).click();
+  await page.getByLabel('Case name').fill('Mirror smoke');
+  await page.getByRole('button', { name: 'Save case', exact: true }).click();
+  await page.getByText('Case saved to forge.cases.json.').waitFor();
+  await reflect.getByText('Agent exposure · echo_fixture').click();
+  await reflect.getByLabel('Expose to agents').uncheck();
+  await reflect.getByRole('button', { name: 'Save exposure' }).click();
+  await reflect.getByText('Agent exposure · Hidden').waitFor();
+  await go('/workspace/cases');
+  const mirrorCase = page
+    .locator('.case-row')
+    .filter({ hasText: 'Mirror smoke' });
+  page.once('dialog', (d) => d.accept());
+  await mirrorCase.getByRole('button', { name: 'Run case' }).click();
+  await page.getByText('Mirror smoke · Passed', { exact: true }).waitFor();
+  const quoteCase = page
+    .locator('.case-row')
+    .filter({ hasText: 'Premium quote' });
+  await quoteCase.getByRole('link', { name: 'Open tester' }).click();
+  await page.getByRole('heading', { name: 'Test get_quote_by_sku' }).waitFor();
+  const adapterFile = join(dir, 'adapter.mjs');
+  const original = await readFile(adapterFile, 'utf8');
+  async function rediscover(code) {
+    await writeFile(adapterFile, code);
+    const before = await readSources();
+    const r = await post('project/sources', {
+      action: 'reload',
+      projectId: before.project,
+      generation: before.generation
+    });
+    assert.equal(r.status, 200, await r.text());
+    await go('/workspace/cases');
+  }
+  await rediscover(
+    original.replace('"label":{"type":"string"}', '"label":{"type":"integer"}')
+  );
+  await mirrorCase.getByText(/Input schema changed/).waitFor();
+  assert.equal(
+    await mirrorCase.getByRole('button', { name: 'Run case' }).isDisabled(),
+    true
+  );
+  await rediscover(original.replace('"name":"reflect"', '"name":"reflect_v2"'));
+  await mirrorCase.getByText(/Tool missing/).waitFor();
+  await go('/project/bridge/mirror');
+  await page.getByText(/Missing from upstream discovery/).waitFor();
+  await page.getByRole('button', { name: 'Remove rule' }).click();
+  await page
+    .getByText(/Missing from upstream discovery/)
+    .waitFor({ state: 'detached' });
+  await go('/workspace');
+  await page.getByRole('link', { name: 'reflect_v2', exact: true }).waitFor();
   assert.deepEqual(errors, []);
   console.log(
-    'PASS: native, bridge and external calls, sample generation and draft protection, highlighted JSON, structured results and image preview.'
+    'PASS: native, bridge and external testers, saved assertions, alias routing, hidden-tool cases and schema/identity drift.'
   );
 } finally {
   await browser?.close();

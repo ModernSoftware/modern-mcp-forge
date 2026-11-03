@@ -176,6 +176,7 @@
   <a class="secondary-button" href="/workspace/connect?kind=bridge"
     >Bridge existing implementation</a
   >
+  <a class="secondary-button" href="/workspace/cases">Named test cases</a>
   <a class="secondary-button" href="/workspace/export">Export native pack</a>
 </div>
 <section class="connect-agent" aria-label="Connect an agent">
@@ -222,7 +223,10 @@
     been converted to MCPack. <a href="/tools">Open legacy views</a> to review them;
     new capabilities use the native workflow.
   </p>{/if}
-{#if data.cold}<p class="workflow-notice" role="status">This project was open when Forge stopped. Start its sources to test capabilities or connect an agent.</p>{/if}
+{#if data.cold}<p class="workflow-notice" role="status">
+    This project was open when Forge stopped. Start its sources to test
+    capabilities or connect an agent.
+  </p>{/if}
 {#if !busy && (actionError || data.snapshot.error || data.catalogError)}<p
     class="workflow-error"
     role="alert"
@@ -310,7 +314,10 @@
           {entry.status === 'disabled'
             ? 'Enable this source to discover its capabilities.'
             : entry.status === 'ready'
-              ? 'This source has an empty catalog. After wiring its implementation, reload project sources.'
+              ? entry.source.kind !== 'native' &&
+                entry.source.exposure?.some((rule) => rule.hidden)
+                ? 'No capabilities are exposed. Review the source’s Agent exposure settings.'
+                : 'This source has an empty catalog. After wiring its implementation, reload project sources.'
               : 'Reload project sources to discover its catalog.'}
         </p>{/if}
     </div>

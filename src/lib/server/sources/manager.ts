@@ -125,6 +125,52 @@ export class ProjectSourceManager {
     };
   }
 
+  // The local tester addresses original identities, including hidden items. MCP
+  // registration and public invocation use only the published catalog.
+  inspect(source: string) {
+    const adapter = this.adapters.get(source);
+    const catalog = structuredClone(
+      (adapter?.health().status === 'ready'
+        ? this.catalogs.get(source)
+        : undefined) ?? { tools: [], resources: [], prompts: [] }
+    );
+    const publication = this.published.get(source);
+    const bindings: {
+      kind: keyof SourceCatalog;
+      identity: string;
+      publicKey?: string;
+      publicName?: string;
+    }[] = [];
+    for (const kind of ['tools', 'resources', 'prompts'] as const) {
+      const exposed = new Map(
+        (publication?.catalog[kind] ?? []).map((item) => [
+          'uri' in item
+            ? item.uri
+            : kind === 'resources'
+              ? item.name
+              : (publication?.[kind].get(item.name) ?? item.name),
+          item
+        ])
+      );
+      for (const item of catalog[kind]) {
+        const route = 'uri' in item ? item.uri : item.name;
+        const identity = adapter?.originalIdentity?.(kind, route) ?? route;
+        const publicItem = exposed.get(route);
+        bindings.push({
+          kind,
+          identity,
+          publicName: publicItem?.name,
+          publicKey:
+            publicItem &&
+            ('uri' in publicItem ? publicItem.uri : publicItem.name)
+        });
+        if ('uri' in item) item.uri = identity;
+        else item.name = identity;
+      }
+    }
+    return { catalog, bindings };
+  }
+
   private visibleCatalog(
     definition: ProjectSource,
     replacement?: SourceCatalog
@@ -166,7 +212,11 @@ export class ProjectSourceManager {
     project: string,
     sources: ProjectSource[],
     legacy?: ReservedCatalog,
-    replacement?: { id: string; catalog: SourceCatalog }
+    replacement?: {
+      id: string;
+      catalog: SourceCatalog;
+      adapter?: SourceAdapter;
+    }
   ) {
     return publishCatalogs(
       sources
@@ -179,6 +229,12 @@ export class ProjectSourceManager {
         )
         .map((s) => ({
           id: s.id,
+          rules: s.kind === 'native' ? undefined : s.exposure,
+          identity: (kind, route) =>
+            (s.id === replacement?.id
+              ? replacement.adapter
+              : this.adapters.get(s.id)
+            )?.originalIdentity?.(kind, route) ?? route,
           flexible:
             s.kind !== 'native' &&
             (s.naming ?? (s.kind === 'bridge' ? 'collisions' : 'always')) ===
@@ -223,12 +279,19 @@ export class ProjectSourceManager {
   ) {
     if (project !== this.project || this.status !== 'ready') return false;
     const next = sources.find((s) => s.id === id);
-    if (next?.kind !== 'native' || !next.enabled) return false;
-    const expected = this.definitions.map((s) =>
-      s.id === id
-        ? { ...s, disabledCapabilities: next.disabledCapabilities }
-        : s
-    );
+    if (!next || !next.enabled) return false;
+    const expected = this.definitions.map((s) => {
+      if (s.id !== id) return s;
+      if (s.kind === 'native' && next.kind === 'native')
+        return { ...s, disabledCapabilities: next.disabledCapabilities };
+      if (s.kind !== 'native' && next.kind !== 'native') {
+        const { exposure: _previous, ...settings } = s;
+        return next.exposure
+          ? { ...settings, exposure: next.exposure }
+          : settings;
+      }
+      return s;
+    });
     if (!isDeepStrictEqual(expected, sources)) return false;
     const adapter = this.adapters.get(id);
     if (!adapter || adapter.health().status !== 'ready') return false;
@@ -364,7 +427,8 @@ export class ProjectSourceManager {
     project: string,
     generation: number,
     source: string,
-    call: SourceCall
+    call: SourceCall,
+    inspectOriginal = false
   ) {
     const assertCurrent = () => {
       if (
@@ -383,21 +447,31 @@ export class ProjectSourceManager {
       throw new Error('Source is not ready.');
     const publication = this.published.get(source);
     if (!publication) throw new Error('Source catalog is unavailable.');
-    const { catalog } = publication;
-    const exposed =
+    const kind =
       call.kind === 'tool'
-        ? catalog.tools.some((item) => item.name === call.name)
+        ? 'tools'
         : call.kind === 'resource'
-          ? catalog.resources.some((item) => item.uri === call.name)
-          : catalog.prompts.some((item) => item.name === call.name);
-    if (!exposed)
+          ? 'resources'
+          : 'prompts';
+    const items = inspectOriginal
+      ? this.catalogs.get(source)?.[kind]
+      : publication.catalog[kind];
+    const item = items?.find((item) => {
+      const key = 'uri' in item ? item.uri : item.name;
+      return (
+        (inspectOriginal
+          ? (adapter.originalIdentity?.(kind, key) ?? key)
+          : key) === call.name
+      );
+    });
+    if (!item)
       throw new Error('Capability is disabled or not exposed by this source.');
     const name =
-      call.kind === 'resource'
-        ? call.name
-        : (publication[call.kind === 'tool' ? 'tools' : 'prompts'].get(
-            call.name
-          ) ?? call.name);
+      'uri' in item
+        ? item.uri
+        : inspectOriginal || kind === 'resources'
+          ? item.name
+          : (publication[kind].get(item.name) ?? item.name);
     const origin = call.origin;
     const execution =
       call.kind === 'tool' && origin

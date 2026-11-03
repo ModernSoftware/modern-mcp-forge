@@ -155,6 +155,15 @@ export class UpstreamCatalog {
       }))
     };
   }
+  originalIdentity(kind: keyof SourceCatalog, route: string) {
+    const routes =
+      kind === 'tools'
+        ? this.routes.tool
+        : kind === 'prompts'
+          ? this.routes.prompt
+          : this.routes.resource;
+    return routes.get(route) ?? route;
+  }
   snapshot() {
     return structuredClone(this.catalog);
   }

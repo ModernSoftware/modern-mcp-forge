@@ -11,6 +11,7 @@ export interface SourceCall {
 }
 export interface SourceAdapter {
   start(): Promise<void>;
+  originalIdentity?(kind: keyof SourceCatalog, route: string): string;
   discover(): Promise<SourceCatalog>;
   invoke(call: SourceCall): Promise<unknown>;
   health(): {
