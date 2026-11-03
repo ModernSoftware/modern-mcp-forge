@@ -1,4 +1,5 @@
 <script lang="ts">
+  import JsonModeSwitch from './JsonModeSwitch.svelte';
   import JsonInput from './JsonInput.svelte';
   import ToolArgumentSample from './ToolArgumentSample.svelte';
   import ToolArgumentField from './ToolArgumentField.svelte';
@@ -44,15 +45,13 @@
         ? 'Edit the argument object sent to the tool.'
         : 'Enter values for this test run.'}
     </p>
-    <label class="switch"
-      ><input
-        type="checkbox"
-        role="switch"
-        checked={raw}
-        disabled={!prepared.form || !draft.value}
-        onchange={(e) => (jsonMode = e.currentTarget.checked)}
-      /> Edit as JSON</label
-    >
+    <JsonModeSwitch
+      checked={raw}
+      disabled={!prepared.form || !draft.value}
+      onchange={(next) => {
+        jsonMode = next;
+      }}
+    />
   </div>
   {#if raw}
     {#if prepared.limitation}<p class="hint">
@@ -130,54 +129,6 @@
     color: var(--muted);
     font-size: 0.82rem;
     line-height: 1.5;
-  }
-  .switch {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    font-size: 0.83rem;
-    cursor: pointer;
-  }
-  .switch input {
-    appearance: none;
-    width: 2.4rem;
-    height: 1.35rem;
-    min-height: 0;
-    margin: 0;
-    padding: 2px;
-    border: 1px solid var(--muted);
-    border-radius: 1rem;
-    background: var(--surface-3);
-    cursor: pointer;
-  }
-  .switch input::before {
-    content: '';
-    display: block;
-    width: 0.95rem;
-    height: 0.95rem;
-    border-radius: 100%;
-    background: var(--muted);
-  }
-  .switch input:checked {
-    background: var(--accent-soft);
-    border-color: var(--accent);
-  }
-  .switch input:checked::before {
-    background: var(--accent);
-    transform: translateX(1rem);
-  }
-  .switch input:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-  }
-  .switch input:disabled {
-    cursor: default;
-    opacity: 0.6;
-  }
-  @media (forced-colors: active) {
-    .switch input {
-      appearance: auto;
-    }
   }
   .raw-label {
     display: block;

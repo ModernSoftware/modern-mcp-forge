@@ -70,6 +70,21 @@ export class ProjectSourceManager {
     return result;
   }
 
+  startupProgress() {
+    const enabled = this.definitions.filter((source) => source.enabled);
+    const done = (id: string) =>
+      this.catalogs.has(id) || this.sourceFailures.has(id);
+    return {
+      project: this.project ?? null,
+      status: this.status,
+      total: enabled.length,
+      finished: enabled.filter((source) => done(source.id)).length,
+      starting: enabled
+        .filter((source) => this.adapters.has(source.id) && !done(source.id))
+        .map((source) => source.id)
+    };
+  }
+
   snapshot() {
     return {
       project: this.project ?? null,
@@ -220,6 +235,37 @@ export class ProjectSourceManager {
     return !(await adapter.filesChanged?.().catch(() => true));
   }
 
+  private async startSource(
+    root: string,
+    source: ProjectSource,
+    staged?: SourceAdapter,
+    createdNative?: string
+  ) {
+    const adapter = staged ?? this.factory(root, source);
+    this.adapters.set(source.id, adapter);
+    try {
+      if (!staged) await adapter.start();
+      // Sync a newly scaffolded native pack if its files changed during startup.
+      if (
+        source.kind === 'native' &&
+        source.id === createdNative &&
+        (await adapter.filesChanged?.())
+      ) {
+        await adapter.close();
+        await adapter.start();
+      }
+      this.catalogs.set(source.id, await adapter.discover());
+    } catch (error) {
+      if (source.kind === 'native') throw error;
+      await adapter.close();
+      this.adapters.delete(source.id);
+      this.sourceFailures.set(
+        source.id,
+        error instanceof Error ? error.message : 'Connection failed.'
+      );
+    }
+  }
+
   // A successfully previewed connection transfers ownership to this manager.
   open(
     project: string,
@@ -260,46 +306,42 @@ export class ProjectSourceManager {
       this.error = undefined;
       this.status = 'starting';
       this.failedSource = undefined;
-      let startingId = '';
+      let failedId: string | undefined;
       try {
-        for (const source of sources.filter((source) => source.enabled)) {
-          startingId = source.id;
-          const staged =
-            source.id === prepared?.id ? prepared.adapter : undefined;
-          const adapter = staged ?? this.factory(root, source);
-          this.adapters.set(source.id, adapter);
-          try {
-            if (!staged) await adapter.start();
-            // Confirm the freshly scaffolded files were the ones the worker loaded.
-            // If they changed during startup, sync once before opening the editor.
-            if (
-              source.kind === 'native' &&
-              source.id === options.createdNative &&
-              (await adapter.filesChanged?.())
-            ) {
-              await adapter.close();
-              await adapter.start();
+        const enabled = sources.filter((source) => source.enabled);
+        // Keep process launches bounded. Settle the entire batch before rolling
+        // back so a slow adapter cannot start after its owner has closed it.
+        const batchSize = 3;
+        for (let i = 0; i < enabled.length; i += batchSize) {
+          const batch = enabled.slice(i, i + batchSize);
+          const outcomes = await Promise.allSettled(
+            batch.map((source) =>
+              this.startSource(
+                root,
+                source,
+                source.id === prepared?.id ? prepared.adapter : undefined,
+                options.createdNative
+              )
+            )
+          );
+          for (const [index, outcome] of outcomes.entries()) {
+            if (outcome.status === 'rejected') {
+              failedId = batch[index].id;
+              throw outcome.reason;
             }
-            this.catalogs.set(source.id, await adapter.discover());
-          } catch (error) {
-            if (source.kind === 'native') throw error;
-            await adapter.close();
-            this.adapters.delete(source.id);
-            this.sourceFailures.set(
-              source.id,
-              error instanceof Error ? error.message : 'Connection failed.'
-            );
           }
         }
         this.published = this.planNames(project, sources, options.legacy);
         this.status = 'ready';
       } catch (error) {
-        this.failedSource = {
-          id: startingId,
-          diagnostics: this.adapters.get(startingId)?.diagnostics?.() ?? ''
-        };
+        if (failedId) {
+          this.failedSource = {
+            id: failedId,
+            diagnostics: this.adapters.get(failedId)?.diagnostics?.() ?? ''
+          };
+        }
         const message = error instanceof Error ? error.message : String(error);
-        this.error = `Source ${startingId}: ${message}`;
+        this.error = failedId ? `Source ${failedId}: ${message}` : message;
         await this.stop();
         this.status = 'failed';
       }

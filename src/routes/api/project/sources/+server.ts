@@ -6,9 +6,16 @@ import { projectTransition } from '$lib/server/mcpack/project-transition';
 import { projectSources } from '$lib/server/sources/manager';
 import { startProjectSources } from '$lib/server/sources/project';
 
-export const GET: RequestHandler = ({ request }) => {
+export const GET: RequestHandler = ({ request, url }) => {
   const rejected = validateLocalRequest(request);
-  return rejected ?? json(projectSources.snapshot());
+  return (
+    rejected ??
+    json(
+      url.searchParams.has('progress')
+        ? projectSources.startupProgress()
+        : projectSources.snapshot()
+    )
+  );
 };
 
 export const POST: RequestHandler = async ({ request }) => {

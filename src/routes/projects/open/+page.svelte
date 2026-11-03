@@ -1,4 +1,5 @@
 <script lang="ts">
+  import ProjectOpening from '$lib/components/ProjectOpening.svelte';
   import { goto } from '$app/navigation';
 
   import DirectoryPicker from '$lib/components/DirectoryPicker.svelte';
@@ -8,6 +9,7 @@
   let browseOpen = $state(false);
   let opening = $state(false);
   let errorMessage = $state('');
+  let navigating = $state(false);
 
   async function openProject() {
     if (opening) {
@@ -42,6 +44,7 @@
         );
       }
 
+      navigating = true;
       await goto('/workspace', {
         invalidateAll: true
       });
@@ -49,6 +52,7 @@
       errorMessage = error instanceof Error ? error.message : String(error);
     } finally {
       opening = false;
+      navigating = false;
     }
   }
 </script>
@@ -56,6 +60,8 @@
 <svelte:head>
   <title>Modern MCP Forge · Open Project</title>
 </svelte:head>
+
+{#if opening}<ProjectOpening name={folderPath.trim()} {navigating} />{/if}
 
 <section class="page-heading">
   <div>
@@ -135,7 +141,7 @@
   </div>
 
   {#if errorMessage}
-    <div class="error-panel">
+    <div class="error-panel" role="alert">
       {errorMessage}
     </div>
   {/if}

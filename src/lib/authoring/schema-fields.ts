@@ -26,7 +26,14 @@ export function schemaFields(schema: any): SchemaField[] | null {
           'additionalProperties',
           'description',
           'title',
-          '$schema'
+          '$schema',
+          '$id',
+          '$comment',
+          'default',
+          'examples',
+          'deprecated',
+          'readOnly',
+          'writeOnly'
         ].includes(key)
     )
   )
@@ -46,7 +53,8 @@ export function schemaFields(schema: any): SchemaField[] | null {
     if (!value || typeof value !== 'object' || Array.isArray(value))
       return null;
     const field = value as Record<string, unknown>;
-    if (!scalarTypes.includes(String(field.type))) return null;
+    if (typeof field.type !== 'string' || !scalarTypes.includes(field.type))
+      return null;
     if (
       [
         '$ref',

@@ -7,6 +7,7 @@
     "#forge-bridges/*": "./runners/bridges/*"
   },
   "scripts": {
+    "predev": "bun install --frozen-lockfile",
     "dev": "bun --bun vite dev",
     "build": "bun --bun vite build",
     "preview": "bun --bun vite preview",

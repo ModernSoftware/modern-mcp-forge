@@ -128,6 +128,23 @@ try {
   };
 
   await go('/workspace/native/order-desk/tools/get_quote_by_sku');
+  const definitionMode = page.getByRole('switch', { name: 'Edit as JSON' });
+  assert.equal(await definitionMode.isChecked(), false);
+  assert.deepEqual(
+    await page
+      .getByLabel('Field name', { exact: true })
+      .evaluateAll((inputs) => inputs.map((input) => input.value)),
+    ['sku', 'quantity', 'tier']
+  );
+  await page.getByText(/Allowed values.*standard.*premium/).waitFor();
+  await definitionMode.focus();
+  await page.keyboard.press('Space');
+  assert.equal(await definitionMode.isChecked(), true);
+  await definitionMode.uncheck();
+  assert.equal(
+    await page.getByRole('button', { name: 'Save definition' }).isDisabled(),
+    true
+  );
   await page.getByRole('tab', { name: 'Test', exact: true }).click();
   assert.equal(await run.isDisabled(), true);
   await field('textbox', 'sku').fill('ACT-42');
@@ -164,6 +181,9 @@ try {
   });
 
   await go('/workspace/native/order-desk/tools/estimate_delivery');
+  assert.equal(await definitionMode.isChecked(), true);
+  assert.equal(await definitionMode.isDisabled(), true);
+  await page.getByText(/nested fields or advanced rules/).waitFor();
   await page.getByRole('tab', { name: 'Test', exact: true }).click();
   await field('textbox', 'orderedAtLocal').fill('2026-10-30T16:00');
   await field('combobox', 'service').selectOption({ label: 'express' });

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import ProjectOpening from '$lib/components/ProjectOpening.svelte';
   import { goto } from '$app/navigation';
 
   let { data } = $props();
@@ -14,6 +15,7 @@
   let openingId = $state<string | null>(null);
 
   let errorMessage = $state('');
+  let navigating = $state(false);
 
   let forgettingId = $state<string | null>(null);
 
@@ -45,6 +47,7 @@
         );
       }
 
+      navigating = true;
       await goto('/workspace', {
         invalidateAll: true
       });
@@ -52,6 +55,7 @@
       errorMessage = error instanceof Error ? error.message : String(error);
     } finally {
       openingId = null;
+      navigating = false;
     }
   }
 
@@ -105,6 +109,15 @@
   <title>Modern MCP Forge · Projects</title>
 </svelte:head>
 
+{#if openingId}
+  <ProjectOpening
+    projectId={openingId}
+    name={data.projects.find((project) => project.id === openingId)?.name ??
+      'project'}
+    {navigating}
+  />
+{/if}
+
 <section class="page-heading">
   <div>
     <div class="eyebrow">WORKSPACE</div>
@@ -123,7 +136,7 @@
 </section>
 
 {#if errorMessage}
-  <div class="error-panel">
+  <div class="error-panel" role="alert">
     {errorMessage}
   </div>
 {/if}
@@ -215,7 +228,7 @@
             <button
               class="forget-button compact"
               type="button"
-              disabled={forgettingId !== null}
+              disabled={openingId !== null || forgettingId !== null}
               onclick={() => forgetRecent(project.id, project.name)}
             >
               {forgettingId === project.id ? 'Forgetting…' : 'Forget'}

@@ -65,15 +65,32 @@ try {
     assert.equal(projectSources.snapshot().status, 'ready');
     assert.equal(await page.getByRole('alert').count(), 0);
   };
-  await resume();
+  // Keep the real worker in startup until the dialog has shown its source.
+  const worker = join(dir, 'demo', 'native', 'demo', 'handlers.mjs');
+  const original = await readFile(worker, 'utf8');
+  const gate = join(dir, 'startup-ready');
+  await writeFile(
+    worker,
+    `
+    import { existsSync } from 'node:fs';
+    const deadline = Date.now() + 12000;
+    while (!existsSync(${JSON.stringify(gate)}) && Date.now() < deadline)
+      await new Promise(resolve => setTimeout(resolve, 50));
+    ` + original
+  );
+  await page.getByRole('button', { name: 'Continue' }).click();
+  const opening = page.getByRole('dialog', { name: 'Opening Browser Demo' });
+  await opening.getByText(/Discovering capabilities from demo/).waitFor();
+  await writeFile(gate, '');
+  await page.waitForURL('**/workspace');
+  assert.equal(await opening.count(), 0);
+  assert.equal(projectSources.snapshot().status, 'ready');
   const generation = projectSources.snapshot().generation;
   await page.goto(base + '/projects');
   await page.waitForLoadState('networkidle');
   await resume();
   assert.equal(projectSources.snapshot().generation, generation);
   // A genuine failure remains visible and clears after a successful retry.
-  const worker = join(dir, 'demo', 'native', 'demo', 'handlers.mjs');
-  const original = await readFile(worker, 'utf8');
   await writeFile(worker, 'throw new Error("broken fixture");');
   await page.goto(base + '/project');
   await page.waitForLoadState('networkidle');
