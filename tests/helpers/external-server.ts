@@ -40,6 +40,7 @@ export function externalServer(
         async () => ({
           content: [
             { type: 'text', text: 'One pixel' },
+            { type: 'text', text: '{"id":9223372036854775807}' },
             {
               type: 'image',
               mimeType: 'image/png',

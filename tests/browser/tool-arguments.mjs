@@ -138,6 +138,7 @@ try {
   const quote = { sku: 'ACT-42', quantity: 3, tier: 'premium' };
   const result = await invoke('native', quote);
   assert.equal(result.structuredContent.total, '59.93');
+  assert.equal(await output.locator('pre').count(), 1);
   await toggle.focus();
   await page.keyboard.press('Space');
   assert.deepEqual(JSON.parse(await raw.inputValue()), quote);
@@ -238,6 +239,7 @@ try {
   );
   assert.equal(await image.count(), 1);
   await output.getByText('One pixel', { exact: true }).waitFor();
+  assert.ok((await output.textContent()).includes('9223372036854775807'));
   await output.getByText(/Image preview unavailable/).waitFor();
   assert.ok(!(await output.textContent()).includes('iVBOR'));
   await page.getByLabel('Kind', { exact: true }).selectOption('resource');

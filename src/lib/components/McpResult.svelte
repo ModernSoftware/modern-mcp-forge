@@ -11,13 +11,25 @@
   );
   let content = $derived((tool?.content ?? []) as unknown[]);
 
+  let structured = $derived(pretty(tool?.structuredContent));
+
   function pretty(value: unknown) {
     return JSON.stringify(value, null, 2);
   }
   function jsonText(text: string) {
     if (!/^\s*[\[{]/.test(text)) return;
     try {
-      return pretty(JSON.parse(text));
+      let preservesNumbers = true;
+      const value = JSON.parse(text, (_key, item: unknown) => {
+        if (
+          typeof item === 'number' &&
+          (!Number.isFinite(item) ||
+            (Number.isInteger(item) && !Number.isSafeInteger(item)))
+        )
+          preservesNumbers = false;
+        return item;
+      });
+      return preservesNumbers ? pretty(value) : text;
     } catch {
       return;
     }
@@ -58,16 +70,18 @@
   {#if raw || !tool}
     <pre aria-label="Result JSON"><JsonSyntax text={pretty(result)} /></pre>
   {:else}
-    {#if Object.hasOwn(tool, 'structuredContent')}
+    {#if structured !== undefined}
       <h4>Structured content</h4>
-      <pre><JsonSyntax text={pretty(tool.structuredContent)} /></pre>
+      <pre><JsonSyntax text={structured} /></pre>
     {/if}
     {#each content as block, index}
       {#if isObject(block) && block.type === 'text' && typeof block.text === 'string'}
         {@const json = jsonText(block.text)}
-        {#if json !== undefined}
+        {#if json === undefined}
+          <pre class="text">{block.text}</pre>
+        {:else if json !== structured}
           <pre><JsonSyntax text={json} /></pre>
-        {:else}<pre class="text">{block.text}</pre>{/if}
+        {/if}
       {:else if isObject(block) && block.type === 'image'}
         {@const src = imageSource(block)}
         <figure>
@@ -86,7 +100,7 @@
         <pre><JsonSyntax text={pretty(block)} /></pre>
       {/if}
     {/each}
-    {#if !content.length && !Object.hasOwn(tool, 'structuredContent')}
+    {#if !content.length && structured === undefined}
       <p class="empty">The tool returned no content.</p>
     {/if}
   {/if}
