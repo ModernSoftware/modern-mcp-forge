@@ -1,4 +1,7 @@
 <script lang="ts">
+  import JsonModeSwitch from '$lib/components/JsonModeSwitch.svelte';
+  import McpResult from '$lib/components/McpResult.svelte';
+  import ToolArguments from '$lib/components/ToolArguments.svelte';
   import { reloadProjectSources } from '$lib/client/reload-project-sources';
   import { onMount, tick } from 'svelte';
   import {
@@ -56,6 +59,7 @@
   let codeRevision = $state('');
   let codePath = $state('');
   let argumentsText = $state('{}');
+  let editor = $state<ReturnType<typeof ToolArguments>>();
   let diagnostics = $state<string | null>(null);
   let diagnosticGeneration = $state(-1);
   async function showDiagnostics() {
@@ -72,7 +76,7 @@
       busy = false;
     }
   }
-  let result = $state('');
+  let result = $state.raw<unknown>(undefined);
   let definition = $derived.by(() => {
     try {
       return JSON.parse(content);
@@ -119,7 +123,7 @@
       diagnostics = null;
       error = '';
       notice = '';
-      result = '';
+      result = undefined;
       argumentsText = '{}';
     }
   });
@@ -146,8 +150,8 @@
     }
     return value;
   }
-  function changeMode(select: HTMLSelectElement) {
-    const next = select.value as 'fields' | 'json';
+  function changeMode(json: boolean) {
+    const next = json ? 'json' : 'fields';
     if (next === mode) return;
     error = '';
     try {
@@ -165,8 +169,8 @@
       content = JSON.stringify(value, null, 2);
       mode = next;
     } catch (failure) {
-      select.value = mode;
       error = failure instanceof Error ? failure.message : String(failure);
+      return false;
     }
   }
   function setProperty(name: string, value: unknown) {
@@ -221,7 +225,7 @@
       originalFields = JSON.stringify(fields);
       schemaText = JSON.stringify(value.inputSchema ?? {}, null, 2);
       revision = payload.file.revision;
-      result = '';
+      result = undefined;
       notice = payload.snapshot.error
         ? 'Definition saved. Source startup failed. Inspect diagnostics to repair the worker.'
         : 'Definition saved. Project sources restarted; reconnect external MCP clients.';
@@ -257,7 +261,7 @@
       });
       code = originalCode = payload.file.content;
       codeRevision = payload.file.revision;
-      result = '';
+      result = undefined;
       notice = payload.snapshot.error
         ? 'Code saved. Source startup failed. Inspect diagnostics to repair the worker.'
         : 'Code saved. Project sources restarted; reconnect external MCP clients.';
@@ -281,7 +285,7 @@
     busy = true;
     error = '';
     notice = '';
-    result = '';
+    result = undefined;
     try {
       const snapshot = await reloadProjectSources(
         data.projectId,
@@ -307,9 +311,14 @@
     busy = true;
     error = '';
     notice = '';
-    result = '';
+    result = undefined;
     try {
-      const args = data.kind === 'resources' ? {} : JSON.parse(argumentsText);
+      const args =
+        data.kind === 'tools'
+          ? editor?.argumentsForRun()
+          : data.kind === 'resources'
+            ? {}
+            : JSON.parse(argumentsText);
       if (!args || typeof args !== 'object' || Array.isArray(args))
         throw new Error('Arguments must be a JSON object.');
       const payload = await request({
@@ -326,7 +335,7 @@
             : data.definition.name,
         arguments: args
       });
-      result = JSON.stringify(payload.result, null, 2);
+      result = payload.result;
     } catch (failure) {
       error = failure instanceof Error ? failure.message : String(failure);
     } finally {
@@ -428,19 +437,19 @@
         >
       </div>
     {/if}
-    <div class="workflow-toolbar mode-toolbar">
-      <label
-        >Editor mode<select
-          value={mode}
-          disabled={busy}
-          onchange={(event) => changeMode(event.currentTarget)}
-          ><option value="fields" disabled={Boolean(visualAvailability)}
-            >Visual fields</option
-          ><option value="json"
-            >{data.kind === 'tools' ? 'JSON schema' : 'JSON definition'}</option
-          ></select
-        ></label
+    <div class="mode-toolbar">
+      <span
+        >{mode === 'fields'
+          ? 'Visual fields'
+          : data.kind === 'tools'
+            ? 'JSON schema'
+            : 'JSON definition'}</span
       >
+      <JsonModeSwitch
+        checked={mode === 'json'}
+        disabled={busy || Boolean(visualAvailability)}
+        onchange={changeMode}
+      />
     </div>
     {#if mode === 'json'}
       <p class="workflow-muted">
@@ -480,8 +489,8 @@
                   ><option>string</option><option>number</option><option
                     >integer</option
                   ><option>boolean</option></select
-                ></label
-              >
+                >
+              </label>
               <label
                 >Description<input
                   bind:value={field.description}
@@ -501,6 +510,13 @@
                 onclick={() => (fields = fields.filter((_, i) => i !== index))}
                 >Remove</button
               >
+              {#if field.schema.type === field.type && Array.isArray(field.schema.enum)}
+                <small class="workflow-muted allowed-values"
+                  >Allowed values · {field.schema.enum
+                    .map((choice) => JSON.stringify(choice))
+                    .join(', ')}</small
+                >
+              {/if}
             </div>{/each}
           <button
             class="secondary-button"
@@ -623,7 +639,16 @@
       <summary>Saved definition</summary>
       <pre>{JSON.stringify(data.definition, null, 2)}</pre>
     </details>
-    {#if data.kind !== 'resources'}<label class="arguments"
+    {#if data.kind === 'tools'}
+      <ToolArguments
+        bind:this={editor}
+        schema={source?.catalog.tools.find(
+          (tool) => tool.name === data.definition.name
+        )?.inputSchema ?? data.definition.inputSchema}
+        bind:text={argumentsText}
+        disabled={busy}
+      />
+    {:else if data.kind === 'prompts'}<label class="arguments"
         >Arguments (JSON)<textarea
           rows="8"
           bind:value={argumentsText}
@@ -631,23 +656,28 @@
       >{/if}
     <button
       class="primary-button"
-      disabled={busy || dirty || disabled}
+      disabled={busy ||
+        dirty ||
+        disabled ||
+        (data.kind === 'tools' && !editor?.canRun())}
       onclick={run}>{busy ? 'Running…' : 'Run'}</button
     >
-    {#if result}<h3>Result</h3>
-      <pre aria-live="polite">{result}</pre>{/if}
+    {#if result !== undefined}{#key result}<McpResult {result} />{/key}{/if}
   {/if}
 </div>
 
 <style>
+  .mode-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin: 1rem 0;
+  }
   .editor-tabs {
     display: flex;
     border-bottom: 1px solid var(--border);
     margin: 20px 0 12px;
-  }
-  .mode-toolbar label:first-child {
-    flex: none;
-    min-width: 0;
   }
   .editor-tabs button {
     flex: 1;
@@ -691,6 +721,10 @@
     gap: 12px;
     align-items: end;
     margin: 14px 0;
+  }
+  .allowed-values {
+    grid-column: 1 / -1;
+    overflow-wrap: anywhere;
   }
   .field-row label {
     display: grid;

@@ -46,6 +46,7 @@
             "enum": ["standard", "premium"]
           }
         },
+        "examples": [{ "sku": "ACT-42", "quantity": 3, "tier": "premium" }],
         "required": ["sku", "quantity"],
         "additionalProperties": false
       }
@@ -83,6 +84,9 @@
             }
           }
         },
+        "examples": [
+          { "orderedAtLocal": "2026-10-30T16:00", "service": "express", "parcels": [{ "kg": 2 }] }
+        ],
         "required": ["orderedAtLocal", "service", "parcels"],
         "additionalProperties": false
       }

@@ -73,7 +73,7 @@ This version supports tools, listed static resources and prompts. Resource templ
 
 Choose **Group by source type** to see an expandable Native, External or Bridged group with counts for the current filters. Expand a group to manage a source or select a capability. **Detailed list** shows individual capabilities and includes configured sources with empty catalogs.
 
-The workbench keeps the selected capability after a request. Tools accept a JSON argument object, static resource reads need only their URI, and prompts have text fields for their declared string arguments. Required fields must be filled before the prompt is submitted.
+The workbench keeps the selected capability after a request. Tool tests open with fields based on the discovered input schema. Use **Edit as JSON** to edit the same argument object. Complex schemas open in JSON with an explanation. Static resource reads need only their URI, and prompts have text fields for their declared string arguments. Required fields must be filled before the prompt is submitted.
 
 ## Try a mixed-language project
 

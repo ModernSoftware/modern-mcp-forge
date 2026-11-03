@@ -8,6 +8,7 @@ export function externalServer(
     repeatedResource?: 'identical' | 'conflicting';
     paginated?: boolean;
     toolsOnly?: boolean;
+    imageTool?: boolean;
     description?: string;
   } = {}
 ) {
@@ -32,6 +33,24 @@ export function externalServer(
         ]
       })
     );
+    if (options.imageTool) {
+      server.registerTool(
+        'thumbnail',
+        { inputSchema: z.object({}) },
+        async () => ({
+          content: [
+            { type: 'text', text: 'One pixel' },
+            { type: 'text', text: '{"id":9223372036854775807}' },
+            {
+              type: 'image',
+              mimeType: 'image/png',
+              data: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII='
+            },
+            { type: 'image', mimeType: 'image/svg+xml', data: 'PHN2Zy8+' }
+          ]
+        })
+      );
+    }
     if (!options.toolsOnly) {
       server.registerResource(
         'invoice',

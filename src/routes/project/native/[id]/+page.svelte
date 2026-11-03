@@ -1,4 +1,6 @@
 <script lang="ts">
+  import McpResult from '$lib/components/McpResult.svelte';
+  import ToolArguments from '$lib/components/ToolArguments.svelte';
   import { onMount } from 'svelte';
   import {
     registerProjectLeaveGuard,
@@ -17,7 +19,8 @@
   let kind = $state<'tool' | 'resource' | 'prompt'>('tool');
   let selected = $state('');
   let argumentsText = $state('{}');
-  let result = $state('');
+  let editor = $state<ReturnType<typeof ToolArguments>>();
+  let result = $state.raw<unknown>(undefined);
   let dirty = $derived(file !== null && draft !== file.content);
   let source = $derived(
     data.snapshot.sources.find((item) => item.id === data.document.source.id)
@@ -31,6 +34,9 @@
           : source.catalog.prompts
       : []
   );
+  let tool = $derived(
+    source?.catalog.tools.find((item) => item.name === selected)
+  );
   let selectionKey = $state('');
   $effect(() => {
     const next = `${data.projectId}/${data.document.source.id}`;
@@ -39,7 +45,8 @@
       file = null;
       draft = '';
       selected = '';
-      result = '';
+      argumentsText = '{}';
+      result = undefined;
       error = '';
     }
   });
@@ -98,13 +105,18 @@
       });
       file = payload.file;
       draft = file!.content;
-      result = '';
+      result = undefined;
       selected = '';
     });
   }
   function invoke() {
     return perform(async () => {
-      const args = kind === 'resource' ? {} : JSON.parse(argumentsText);
+      const args =
+        kind === 'tool'
+          ? editor?.argumentsForRun()
+          : kind === 'resource'
+            ? {}
+            : JSON.parse(argumentsText);
       if (!args || typeof args !== 'object' || Array.isArray(args))
         throw new Error('Arguments must be a JSON object.');
       const payload = await request({
@@ -114,7 +126,7 @@
         name: selected,
         arguments: args
       });
-      result = JSON.stringify(payload.result, null, 2);
+      result = payload.result;
     });
   }
 </script>
@@ -210,7 +222,8 @@
           disabled={busy}
           onchange={() => {
             selected = '';
-            result = '';
+            argumentsText = '{}';
+            result = undefined;
           }}
           ><option value="tool">Tool</option><option value="resource"
             >Resource</option
@@ -219,9 +232,13 @@
       >
       <label class="grow"
         >Capability<select
+          aria-label="Capability"
           bind:value={selected}
           disabled={busy}
-          onchange={() => (result = '')}
+          onchange={() => {
+            result = undefined;
+            argumentsText = '{}';
+          }}
           ><option value="">Select a capability</option
           >{#each capabilities as capability}<option
               value={'uri' in capability
@@ -241,18 +258,28 @@
             2
           )}</pre>
       </details>{/if}
-    {#if kind !== 'resource'}<label
+    {#if kind === 'tool' && tool}
+      {#key selected}<ToolArguments
+          bind:this={editor}
+          schema={tool.inputSchema}
+          bind:text={argumentsText}
+          disabled={busy}
+        />{/key}
+    {:else if kind === 'prompt'}<label
         >Arguments (JSON)<textarea
           rows="6"
           bind:value={argumentsText}
-          disabled={busy}
-        ></textarea></label
+          disabled={busy}></textarea></label
       >{/if}
     <button
-      disabled={busy || dirty || source?.status !== 'ready' || !selected}
+      disabled={busy ||
+        dirty ||
+        source?.status !== 'ready' ||
+        !selected ||
+        (kind === 'tool' && !editor?.canRun())}
       onclick={invoke}>{busy ? 'Working…' : 'Run'}</button
     >
-    {#if result}<pre aria-live="polite">{result}</pre>{/if}
+    {#if result !== undefined}{#key result}<McpResult {result} />{/key}{/if}
     <p class="note">
       Nested tool arguments are validated by MCPack. Prompt values must be
       strings. Tests execute real handlers; calls are never automatically

@@ -73,8 +73,13 @@ Create/open/activate starts configured sources. Switching projects, closing,
 forgetting the active project close the old sources. A native startup failure rolls back started adapters and clears their catalogs. An unavailable external connection is reported on its own source and excluded from discovery. Healthy native and external sources can still serve requests. A cleanup failure retains failed owners for retry and prevents invocation.
 
 The owner survives Vite module reloads. After a Forge process restart, remembered
-SQLite selection alone does not execute source code. Choose **Continue** on the Projects screen to start its enabled sources. Continuing a running project reuses its workers. A direct workspace visit offers **Start project sources**. Native children use the existing stdio lifecycle and parent
-pipe closure on host exit.
+SQLite selection alone does not execute source code. Choose **Continue** on the
+Projects screen to start its enabled sources. An existing workspace or source
+tab remembers which project it was using. Reloading that tab resumes the same
+active project, shows startup progress, and rediscovers its catalogs. Concurrent
+tabs share one startup. A fresh tab without this history offers **Start project
+sources**. Continuing a running project reuses its workers. Native children use
+the existing stdio lifecycle and parent pipe closure on host exit.
 
 ## Inspect and reload
 

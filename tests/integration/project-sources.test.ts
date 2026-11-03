@@ -93,6 +93,58 @@ test('partial startup rolls back all adapters, including the failing one', async
   await manager.close();
 });
 
+test('startup overlaps three sources and settles pending starts before failure cleanup', async () => {
+  const starting: string[] = [];
+  const closed: string[] = [];
+  const allStarting = Promise.withResolvers<void>();
+  const release = Promise.withResolvers<void>();
+  const manager = new ProjectSourceManager((_root, source) => ({
+    async start() {
+      starting.push(source.id);
+      if (starting.length === 3) allStarting.resolve();
+      if (source.id === 'broken') throw new Error('fixture failure');
+      if (source.id === 'slow') await release.promise;
+    },
+    async discover() {
+      return empty;
+    },
+    async invoke() {},
+    health() {
+      return { status: 'ready' as const };
+    },
+    async close() {
+      closed.push(source.id);
+    }
+  }));
+  const opened = manager.open(
+    'project',
+    '.',
+    ['first', 'broken', 'slow', 'next'].map(definition)
+  );
+  try {
+    await allStarting.promise;
+    expect(starting).toEqual(['first', 'broken', 'slow']);
+    expect(manager.startupProgress()).toMatchObject({
+      project: 'project',
+      status: 'starting',
+      total: 4
+    });
+    expect(closed).toEqual([]);
+  } finally {
+    release.resolve();
+  }
+  const state = await opened;
+  expect(state.error).toBe('Source broken: fixture failure');
+  expect(starting).not.toContain('next');
+  expect(closed.sort()).toEqual(['broken', 'first', 'slow']);
+  expect(state.sources.map((s) => s.catalog)).toEqual([
+    empty,
+    empty,
+    empty,
+    empty
+  ]);
+});
+
 test('close invalidates in-flight results and failed cleanup retains ownership for retry', async () => {
   let finish!: (result: unknown) => void;
   let failClose = true;

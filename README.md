@@ -85,7 +85,9 @@ Run the development server:
 bun run dev
 ```
 
-Then open the local URL shown by Vite and create or open a Forge project.
+The development command checks Forge’s dependencies against `bun.lock` before starting Vite. After pulling an update, restart `bun run dev` from the Forge repository root. Project workers and bridge adapters use their own dependency setup.
+
+Open the local URL shown by Vite and create or open a Forge project.
 
 Run the complete local release gate:
 

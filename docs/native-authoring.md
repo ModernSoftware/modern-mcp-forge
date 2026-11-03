@@ -92,3 +92,16 @@ size limits, symlink containment, malformed-manifest repair, collisions and conf
 drift. Real HTTP tests exercise Node/Python tools, resources and prompts alongside
 classic resources, schema fidelity and validation, stale generations, source
 restarts and recovery after a deliberately broken handler.
+
+
+## Test tool arguments
+
+On **Definition**, a tool such as `get_quote_by_sku` opens with visual fields, including the allowed values for `tier`. Use **Edit as JSON** to edit its enum or published examples. Switching views preserves those rules. Nested schemas such as `estimate_delivery` open in JSON for authoring and still support a nested form for testing.
+
+Open a tool’s **Test** tab. The form uses the running tool’s input schema. For the compatibility lab, enter `ACT-42`, quantity `3` and tier `premium` in `get_quote_by_sku`, then run it to see a total of `59.93`. In `estimate_delivery`, add a parcel to enter its weight. **Omit** removes an optional property from the request.
+
+**Edit as JSON** shows the same arguments, including additional properties. An incomplete draft stays editable and disables Run. A validation error identifies its property or array index. Tools with unions, references or other unsupported form constructs open in JSON. If a schema cannot be validated locally, Forge explains that the server will validate the request.
+
+In the JSON editor, **Populate sample** builds an argument object from the tool’s schema. Forge uses valid published examples when available and checks generated values before inserting them. Choose **Replace draft** or **Keep draft** if you already have input. Review identifiers, URLs and other values specific to your application before selecting **Run**. If Forge cannot generate a valid sample, you can still edit the JSON yourself.
+
+After a call, **Preview** displays structured content, text and supported inline images. **Raw JSON** shows the complete response, including metadata and original image data. Try **Populate sample** on the compatibility lab’s `get_quote_by_sku` and run it to see the structured quote.

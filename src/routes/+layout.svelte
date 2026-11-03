@@ -5,6 +5,7 @@
 
   import '../app.css';
 
+  import RestoreProjectSources from '$lib/components/RestoreProjectSources.svelte';
   import ThemeSwitch from '$lib/components/ThemeSwitch.svelte';
 
   let { data, children } = $props();
@@ -145,7 +146,17 @@
       {#if closeError}<p class="workflow-error" role="alert">
           {closeError}
         </p>{/if}
-      {@render children()}
+      {#if data.activeProject && page.data.snapshot}
+        {#key data.activeProject.id}
+          <RestoreProjectSources
+            project={data.activeProject}
+            snapshot={page.data.snapshot}
+            cold={page.data.cold}
+          >{@render children()}</RestoreProjectSources>
+        {/key}
+      {:else}
+        {@render children()}
+      {/if}
     </main>
   </div>
 </div>
