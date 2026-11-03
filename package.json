@@ -36,6 +36,7 @@
     "@strands-agents/sdk": "^1.17.0",
     "ai": "^7.0.99",
     "ai-sdk-ollama": "^4.2.0",
+    "ajv": "8.20.0",
     "monaco-editor": "^0.56.0",
     "zod": "^4.0.0"
   },

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import ToolArguments from '$lib/components/ToolArguments.svelte';
   import { reloadProjectSources } from '$lib/client/reload-project-sources';
   import { onMount, tick } from 'svelte';
   import {
@@ -56,6 +57,7 @@
   let codeRevision = $state('');
   let codePath = $state('');
   let argumentsText = $state('{}');
+  let editor = $state<ReturnType<typeof ToolArguments>>();
   let diagnostics = $state<string | null>(null);
   let diagnosticGeneration = $state(-1);
   async function showDiagnostics() {
@@ -309,7 +311,12 @@
     notice = '';
     result = '';
     try {
-      const args = data.kind === 'resources' ? {} : JSON.parse(argumentsText);
+      const args =
+        data.kind === 'tools'
+          ? editor?.argumentsForRun()
+          : data.kind === 'resources'
+            ? {}
+            : JSON.parse(argumentsText);
       if (!args || typeof args !== 'object' || Array.isArray(args))
         throw new Error('Arguments must be a JSON object.');
       const payload = await request({
@@ -623,7 +630,16 @@
       <summary>Saved definition</summary>
       <pre>{JSON.stringify(data.definition, null, 2)}</pre>
     </details>
-    {#if data.kind !== 'resources'}<label class="arguments"
+    {#if data.kind === 'tools'}
+      <ToolArguments
+        bind:this={editor}
+        schema={source?.catalog.tools.find(
+          (tool) => tool.name === data.definition.name
+        )?.inputSchema ?? data.definition.inputSchema}
+        bind:text={argumentsText}
+        disabled={busy}
+      />
+    {:else if data.kind === 'prompts'}<label class="arguments"
         >Arguments (JSON)<textarea
           rows="8"
           bind:value={argumentsText}
@@ -631,7 +647,10 @@
       >{/if}
     <button
       class="primary-button"
-      disabled={busy || dirty || disabled}
+      disabled={busy ||
+        dirty ||
+        disabled ||
+        (data.kind === 'tools' && !editor?.canRun())}
       onclick={run}>{busy ? 'Running…' : 'Run'}</button
     >
     {#if result}<h3>Result</h3>

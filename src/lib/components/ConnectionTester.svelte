@@ -1,4 +1,5 @@
 <script lang="ts">
+  import ToolArguments from '$lib/components/ToolArguments.svelte';
   import { onDestroy, untrack } from 'svelte';
   import type { SourceCatalog } from '$lib/server/sources/contracts';
   type Kind = 'tool' | 'resource' | 'prompt';
@@ -32,6 +33,10 @@
   );
   let name = $state(untrack(() => initialName ?? ''));
   let args = $state('{}');
+  let editor = $state<ReturnType<typeof ToolArguments>>();
+  let selectedTool = $derived(
+    catalog?.tools.find((tool) => tool.name === name)
+  );
   let promptValues = $state<Record<string, string>>({});
   let result = $state('');
   let error = $state('');
@@ -61,16 +66,8 @@
     result = error = '';
     let values: unknown = {};
     if (kind === 'tool') {
-      try {
-        values = JSON.parse(args);
-      } catch {
-        error = 'Enter a valid JSON object for the tool arguments.';
-        return;
-      }
-      if (!values || typeof values !== 'object' || Array.isArray(values)) {
-        error = 'Tool arguments must be a JSON object.';
-        return;
-      }
+      if (!editor?.canRun()) return;
+      values = editor.argumentsForRun();
     } else if (kind === 'prompt') {
       const missing = promptFields.find(
         (f) =>
@@ -156,11 +153,13 @@
         >{/each}
     </select></label
   >
-  {#if selected && kind === 'tool'}
-    <label
-      >Arguments (JSON)<textarea rows="5" bind:value={args} disabled={busy}
-      ></textarea></label
-    >
+  {#if selectedTool && kind === 'tool'}
+    {#key name}<ToolArguments
+        bind:this={editor}
+        schema={selectedTool.inputSchema}
+        bind:text={args}
+        disabled={busy}
+      />{/key}
   {:else if selected && kind === 'prompt'}
     {#each promptFields as field (field.name)}
       <label
@@ -185,8 +184,12 @@
       </label>
     {:else}<p class="workflow-muted">This prompt takes no arguments.</p>{/each}
   {/if}
-  <button class="primary-button" disabled={busy || !ready || !selected}
-    >Run request</button
+  <button
+    class="primary-button"
+    disabled={busy ||
+      !ready ||
+      !selected ||
+      (kind === 'tool' && !editor?.canRun())}>Run request</button
   >
   {#if error}<p class="workflow-error" role="alert">{error}</p>{/if}
   {#if result}<h3>Result · {name}</h3>

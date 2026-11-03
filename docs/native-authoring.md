@@ -92,3 +92,10 @@ size limits, symlink containment, malformed-manifest repair, collisions and conf
 drift. Real HTTP tests exercise Node/Python tools, resources and prompts alongside
 classic resources, schema fidelity and validation, stale generations, source
 restarts and recovery after a deliberately broken handler.
+
+
+## Test tool arguments
+
+Open a tool’s **Test** tab. The form uses the running tool’s input schema. For the compatibility lab, enter `ACT-42`, quantity `3` and tier `premium` in `get_quote_by_sku`, then run it to see a total of `59.93`. In `estimate_delivery`, add a parcel to enter its weight. **Omit** removes an optional property from the request.
+
+**Edit as JSON** shows the same arguments, including additional properties. An incomplete draft stays editable and disables Run. A validation error identifies its property or array index. Tools with unions, references or other unsupported form constructs open in JSON. If a schema cannot be validated locally, Forge explains that the server will validate the request.
