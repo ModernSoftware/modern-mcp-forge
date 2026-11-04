@@ -261,6 +261,7 @@ export async function capture(page, name) {
       (await page.locator('html').getAttribute('data-theme')) || 'light';
     await page.screenshot({
       path: join(process.env.FORGE_UI_SCREENSHOTS, name + '-' + theme + '.png'),
+      animations: 'disabled',
       fullPage: true
     });
     await page
