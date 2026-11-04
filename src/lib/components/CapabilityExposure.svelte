@@ -31,7 +31,7 @@
   {#if open}
     <div class="workflow-form exposure-form">
       <dl class="identity">
-        <dt>Original name or URI</dt>
+        <dt>{kind === 'resources' ? 'Original URI' : 'Original name'}</dt>
         <dd><code>{identity}</code></dd>
         <dt>Published name</dt>
         <dd>{publicName ?? 'Hidden from agents'}</dd>
@@ -105,6 +105,11 @@
   .exposure-form {
     padding: 1rem;
     border-top: 1px solid var(--border);
+  }
+  .exposure-form input:not([type='checkbox']),
+  .exposure-form textarea {
+    width: 100%;
+    min-width: 0;
   }
   .identity {
     display: grid;

@@ -791,6 +791,10 @@
   .case-editor h3 {
     margin-top: 0;
   }
+  .case-editor :is(input, textarea, select) {
+    min-width: 0;
+    width: 100%;
+  }
   .run-progress {
     display: flex;
     flex-wrap: wrap;
