@@ -164,7 +164,7 @@
     <p>Build, edit and test your project's MCP capabilities.</p>
   </div>
 </section>
-<div class="workflow-toolbar" role="group" aria-label="Project actions">
+<div class="workflow-toolbar project-actions" role="group" aria-label="Project actions">
   <a class="primary-button" href="/workspace/new?kind=tools">＋ Add tool</a>
   <a class="secondary-button" href="/workspace/new?kind=resources"
     >Add resource</a
@@ -176,6 +176,7 @@
   <a class="secondary-button" href="/workspace/connect?kind=bridge"
     >Bridge existing implementation</a
   >
+  <a class="secondary-button" href="/workspace/cases">Named test cases</a>
   <a class="secondary-button" href="/workspace/export">Export native pack</a>
 </div>
 <section class="connect-agent" aria-label="Connect an agent">
@@ -222,7 +223,10 @@
     been converted to MCPack. <a href="/tools">Open legacy views</a> to review them;
     new capabilities use the native workflow.
   </p>{/if}
-{#if data.cold}<p class="workflow-notice" role="status">This project was open when Forge stopped. Start its sources to test capabilities or connect an agent.</p>{/if}
+{#if data.cold}<p class="workflow-notice" role="status">
+    This project was open when Forge stopped. Start its sources to test
+    capabilities or connect an agent.
+  </p>{/if}
 {#if !busy && (actionError || data.snapshot.error || data.catalogError)}<p
     class="workflow-error"
     role="alert"
@@ -310,7 +314,10 @@
           {entry.status === 'disabled'
             ? 'Enable this source to discover its capabilities.'
             : entry.status === 'ready'
-              ? 'This source has an empty catalog. After wiring its implementation, reload project sources.'
+              ? entry.source.kind !== 'native' &&
+                entry.source.exposure?.some((rule) => rule.hidden)
+                ? 'No capabilities are exposed. Review the source’s Agent exposure settings.'
+                : 'This source has an empty catalog. After wiring its implementation, reload project sources.'
               : 'Reload project sources to discover its catalog.'}
         </p>{/if}
     </div>
@@ -391,6 +398,27 @@
 {/if}
 
 <style>
+  .project-actions {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+  .project-actions a {
+    min-width: 0;
+    min-height: 3.4rem;
+    padding: 0.5rem;
+    font-size: 0.78rem;
+    line-height: 1.3;
+    text-align: center;
+    overflow-wrap: anywhere;
+  }
+  @media (max-width: 800px) {
+    .project-actions {
+      grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+    }
+  }
+
   .catalog-heading,
   .source-line,
   .catalog-group summary {

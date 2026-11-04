@@ -19,6 +19,11 @@ on:
       - 'src/lib/testing/**'
       - 'src/lib/components/ToolArgument*.svelte'
       - 'src/lib/components/ConnectionTester.svelte'
+      - 'src/lib/components/CapabilityExposure.svelte'
+      - 'src/lib/components/NamedCases.svelte'
+      - 'src/routes/api/project/cases/**'
+      - 'src/routes/workspace/cases/**'
+      - 'src/routes/project/**'
       - 'src/lib/components/ProjectOpening.svelte'
       - 'src/lib/components/RestoreProjectSources.svelte'
       - 'src/lib/client/activate-project.ts'
@@ -29,7 +34,6 @@ on:
       - 'src/lib/components/Json*.svelte'
       - 'src/lib/components/McpResult.svelte'
       - 'src/routes/workspace/native/**'
-      - 'src/routes/project/native/**'
       - 'src/routes/workspace/+page.svelte'
       - 'src/lib/client/workspace-view.ts'
       - 'bun.lock'
@@ -59,10 +63,20 @@ jobs:
       - name: Clean-install and call an exported native pack
         run: bun run test:deployment
       - name: Verify tool testing and workspace export in Chrome
+        env:
+          FORGE_UI_SCREENSHOTS: ${{ runner.temp }}/forge-ui
         run: |
           npm ci --prefix tests/browser
           bun tests/browser/workspace-export.mjs
           bun tests/browser/tool-arguments.mjs
+      - name: Save browser review screenshots
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: forge-ui
+          path: ${{ runner.temp }}/forge-ui
+          if-no-files-found: ignore
+          retention-days: 7
 
   windows-export:
     runs-on: windows-latest

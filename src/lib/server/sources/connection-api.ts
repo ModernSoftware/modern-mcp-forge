@@ -16,13 +16,25 @@ import {
   type VerifiedConnectionChange
 } from '$lib/server/sources/connection-drafts';
 import { ExternalSourceAdapter } from '$lib/server/sources/external';
-import { ProjectSourceSchema, sourceId } from '$lib/server/sources/schema';
+import {
+  ExposureRuleSchema,
+  ProjectSourceSchema,
+  sourceId
+} from '$lib/server/sources/schema';
 
 const identity = {
   projectId: z.string(),
   generation: z.number().int().nonnegative()
 };
 const Input = z.discriminatedUnion('action', [
+  z
+    .object({
+      ...identity,
+      action: z.literal('exposure'),
+      id: sourceId,
+      rule: ExposureRuleSchema
+    })
+    .strict(),
   z
     .object({
       ...identity,
@@ -60,6 +72,7 @@ const Input = z.discriminatedUnion('action', [
     .object({
       ...identity,
       action: z.literal('invoke'),
+      original: z.boolean().optional(),
       id: z.string(),
       kind: z.enum(['tool', 'resource', 'prompt']),
       name: z.string(),
@@ -98,9 +111,10 @@ export async function handleConnectionRequest(
         .sources.find((entry) => entry.id === input.id && entry.kind === kind);
       if (!source) throw new NativeProjectError(`Unknown ${kind} source.`);
       if (input.kind === 'prompt') {
-        const prompt = source.catalog.prompts.find(
-          (item) => item.name === input.name
-        );
+        const catalog = input.original
+          ? projectSources.inspect(input.id).catalog
+          : source.catalog;
+        const prompt = catalog.prompts.find((item) => item.name === input.name);
         const missing = prompt?.arguments?.find(
           (arg) => arg.required && !Object.hasOwn(input.arguments, arg.name)
         );
@@ -126,7 +140,8 @@ export async function handleConnectionRequest(
             arguments: input.arguments,
             signal: request.signal,
             origin: 'workbench'
-          }
+          },
+          input.original
         )
       });
     }
@@ -142,6 +157,38 @@ export async function handleConnectionRequest(
         )
           throw new NativeProjectError('Source ID already exists.', 409);
         return json(createBridgeStarter(project, input.id, input.runtime));
+      }
+      if (input.action === 'exposure') {
+        const { rule } = input;
+        if (
+          (rule.hidden || rule.alias || rule.description !== undefined) &&
+          !projectSources
+            .inspect(input.id)
+            .bindings.some(
+              (b) => b.kind === rule.kind && b.identity === rule.identity
+            )
+        )
+          throw new NativeProjectError(
+            'Capability missing from current discovery. Refresh the source before editing this rule.',
+            409
+          );
+        const change = prepareConnectionChange(project, input, kind);
+        const sources = change.manifest.sources ?? [];
+        const planned = projectSources.planNames(
+          project.id,
+          sources,
+          change.manifest
+        );
+        validateCatalogNames(change.manifest, [...planned.values()]);
+        change.commit();
+        return json({
+          snapshot: await projectSources.open(
+            project.id,
+            project.path,
+            sources,
+            { legacy: change.manifest, visibilityOnly: input.id }
+          )
+        });
       }
       let verified: VerifiedConnectionChange;
       if (input.action === 'commit') {
@@ -174,7 +221,7 @@ export async function handleConnectionRequest(
               project.id,
               manifest.sources ?? [],
               manifest,
-              { id: candidate.id, catalog }
+              { id: candidate.id, catalog, adapter }
             );
             validateCatalogNames(manifest, [...planned.values()]);
           }

@@ -8,7 +8,7 @@ Target branch: `v0.10.0`. Unified workspace merged in PR #16; external source in
 - Opening a project selects its MCP endpoint; closing stops its sources and rejects new MCP work.
 - The project workspace groups tools, resources and prompts and identifies their sources.
 - Native capabilities execute exclusively through MCPack 0.9.0. Node and Python are supported.
-- Bridge adapters and external servers contribute complete catalogs, not individual imported tools. Their code and schemas remain owned by the source; later local aliases must preserve routing identity.
+- Bridge adapters and external servers contribute complete catalogs, not individual imported tools. Their code and schemas remain owned by the source. Forge can hide, rename or describe each item for agents while preserving its upstream routing identity.
 - New external connections can keep unique upstream names and qualify collisions. Existing connections keep their prefix policy. Resource URIs carry the source identity.
 - Export one enabled native source with its worker modules, selected assets and dependency files. [Native deployment](native-deployment.md) covers the archive and exposure settings.
 - Runtime controls currently operate on sources; do not represent source status as per-worker telemetry.

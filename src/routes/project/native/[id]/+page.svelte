@@ -1,4 +1,5 @@
 <script lang="ts">
+  import NamedCases from '$lib/components/NamedCases.svelte';
   import McpResult from '$lib/components/McpResult.svelte';
   import ToolArguments from '$lib/components/ToolArguments.svelte';
   import { onMount } from 'svelte';
@@ -280,6 +281,18 @@
       onclick={invoke}>{busy ? 'Working…' : 'Run'}</button
     >
     {#if result !== undefined}{#key result}<McpResult {result} />{/key}{/if}
+    {#if kind === 'tool' && tool}{#key JSON.stringify( [data.projectId, data.document.source.id, selected] )}
+        <NamedCases
+          projectId={data.projectId}
+          generation={data.snapshot.generation}
+          source={data.document.source.id}
+          sourceKind="native"
+          tool={selected}
+          {argumentsText}
+          {result}
+          disabled={busy || dirty}
+        />
+      {/key}{/if}
     <p class="note">
       Nested tool arguments are validated by MCPack. Prompt values must be
       strings. Tests execute real handlers; calls are never automatically

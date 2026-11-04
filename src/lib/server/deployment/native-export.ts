@@ -31,7 +31,7 @@ const json = (value: unknown) => JSON.stringify(value, null, 2) + '\n';
 const dependencies =
   /^(?:package(?:-lock)?\.json|npm-shrinkwrap\.json|pnpm-lock\.yaml|yarn\.lock|bun\.lockb?|requirements[^/]*\.txt|pyproject\.toml|uv\.lock|poetry\.lock)$/i;
 const excluded =
-  /^(?:node_modules|venv|__pycache__|coverage|forge\.project\.json|forge\.db|id_(?:rsa|dsa|ecdsa|ed25519)(?:\.pub)?)$|\.(?:pem|pfx|p12|key|pyc|tgz|zip)$|-(?:shm|wal|journal)$/i;
+  /^(?:node_modules|venv|__pycache__|coverage|forge\.(?:project|cases)\.json|forge\.db|id_(?:rsa|dsa|ecdsa|ed25519)(?:\.pub)?)$|\.(?:pem|pfx|p12|key|pyc|tgz|zip)$|-(?:shm|wal|journal)$/i;
 type NativeSource = Extract<ProjectSource, { kind: 'native' }>;
 
 export function exportSources(project: ForgeProjectManifest) {

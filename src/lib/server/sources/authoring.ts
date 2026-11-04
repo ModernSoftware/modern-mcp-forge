@@ -17,6 +17,7 @@ import type { RegisteredProject } from '../projects/project-service';
 import {
   ProjectSourceSchema,
   ProjectSourcesSchema,
+  type ExposureRule,
   type ProjectSource
 } from './schema';
 import { nativeStarter, capabilityStarter } from './starter';
@@ -51,7 +52,7 @@ export function containedFile(root: string, filename: string) {
   return path;
 }
 
-function atomicWrite(path: string, content: string) {
+export function atomicWrite(path: string, content: string) {
   const temporary = `${path}.${randomUUID()}.tmp`;
   try {
     writeFileSync(temporary, content, { encoding: 'utf8', flag: 'wx' });
@@ -486,7 +487,8 @@ export function setCapabilityEnabled(
 
 type ConnectionChange =
   | { action: 'create' | 'update'; source: ProjectSource }
-  | { action: 'enable' | 'disable' | 'remove'; id: string };
+  | { action: 'enable' | 'disable' | 'remove'; id: string }
+  | { action: 'exposure'; id: string; rule: ExposureRule };
 
 /** Build the proposed manifest without writing it while discovery is in flight. */
 export function prepareConnectionChange(
@@ -507,11 +509,28 @@ export function prepareConnectionChange(
     throw new NativeProjectError(`Source ${id} is not a ${sourceKind} source.`);
   }
   if ('source' in change) {
+    const existing = source;
     source = change.source;
+    if (
+      change.action === 'update' &&
+      source.kind !== 'native' &&
+      existing.kind !== 'native' &&
+      existing.exposure
+    )
+      source = { ...source, exposure: existing.exposure };
     if (source.kind !== sourceKind)
       throw new NativeProjectError(`Expected a ${sourceKind} source.`);
     if (change.action === 'create') sources.push(source);
     else sources[index] = source;
+  } else if (change.action === 'exposure' && source.kind !== 'native') {
+    const rule = change.rule;
+    const rules = (source.exposure ?? []).filter(
+      (r) => r.kind !== rule.kind || r.identity !== rule.identity
+    );
+    if (rule.hidden || rule.alias || rule.description !== undefined)
+      rules.push(rule);
+    if (rules.length) source.exposure = rules;
+    else delete source.exposure;
   } else if (change.action === 'remove') sources.splice(index, 1);
   else source.enabled = change.action === 'enable';
   manifest.sources = ProjectSourcesSchema.parse(sources);
@@ -527,7 +546,12 @@ export function prepareConnectionChange(
           'Project configuration changed on disk. Review it and retry.',
           409
         );
-      atomicWrite(path, JSON.stringify(manifest, null, 2) + '\n');
+      const content = JSON.stringify(manifest, null, 2) + '\n';
+      if (Buffer.byteLength(content) > MAX_BYTES)
+        throw new NativeProjectError(
+          'Project configuration exceeds the 256 KiB editor limit.'
+        );
+      atomicWrite(path, content);
     }
   };
 }

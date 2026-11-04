@@ -6,6 +6,7 @@ import { chromium } from 'playwright-core';
 import { createServer } from 'vite';
 import { externalServer } from '../helpers/external-server';
 import { getAvailablePort } from '../helpers/network';
+import { capture, verifyCaseExplorer } from './case-explorer.mjs';
 
 const dir = await mkdtemp(join(tmpdir(), 'forge tool arguments '));
 process.env.MCP_FORGE_DB_PATH = join(dir, 'forge.db');
@@ -23,7 +24,7 @@ const post = (path, body) =>
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body)
   });
-let browser;
+let browser, page;
 try {
   // The lab setup installs decimal.js alongside the real Node and Python workers.
   await cp(join(lab, 'native'), join(dir, 'native'), { recursive: true });
@@ -40,7 +41,9 @@ try {
   };
   const union = {
     type: 'object',
-    properties: { value: { oneOf: [{ type: 'string' }, { type: 'number' }] } },
+    properties: {
+      value: { oneOf: [{ type: 'string' }, { type: 'number' }] }
+    },
     required: ['value']
   };
   await writeFile(
@@ -96,7 +99,7 @@ try {
     args: ['--disable-dev-shm-usage']
   });
   const context = await browser.newContext();
-  const page = await context.newPage();
+  page = await context.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   const go = async (path) => {
@@ -215,6 +218,31 @@ try {
   const quote = { sku: 'ACT-42', quantity: 3, tier: 'premium' };
   const result = await invoke('native', quote);
   assert.equal(result.structuredContent.total, '59.93');
+  await page.getByText('Named test cases', { exact: true }).click();
+  await page.getByRole('button', { name: 'Save as case' }).click();
+  await page.getByLabel('Case name').fill('Premium quote');
+  await page.getByLabel('Path in last result').fill('/structuredContent/total');
+  await page
+    .getByRole('button', { name: 'Use value from last result' })
+    .click();
+  assert.deepEqual(
+    JSON.parse(await page.getByLabel('Expected fields (JSON)').inputValue()),
+    [{ path: '/structuredContent/total', value: '59.93' }]
+  );
+  await capture(page, 'case-editor');
+  await page.getByRole('button', { name: 'Save case', exact: true }).click();
+  await page.getByText('Case saved to forge.cases.json.').waitFor();
+  page.once('dialog', (d) => d.accept());
+  await page
+    .getByRole('checkbox', { name: 'Select Premium quote', exact: true })
+    .check();
+  await page
+    .getByRole('button', { name: 'Run selected (1)', exact: true })
+    .click();
+  await page
+    .getByRole('article', { name: 'Premium quote', exact: true })
+    .locator('[data-status="passed"]')
+    .waitFor();
   assert.equal(await output.locator('pre').count(), 1);
   await toggle.focus();
   await page.keyboard.press('Space');
@@ -339,10 +367,102 @@ try {
   assert.ok((await editor.locator('pre[aria-hidden] span').count()) > 1);
   assert.deepEqual(await invoke('native', quote), result);
   await output.getByRole('heading', { name: 'Structured content' }).waitFor();
+  await go('/project/bridge/mirror?kind=tool&name=reflect');
+  const reflect = page.locator('article').filter({
+    has: page.getByRole('heading', { name: 'reflect', exact: true })
+  });
+  await reflect.getByText('Agent exposure', { exact: false }).click();
+  await capture(page, 'exposure');
+  await page.setViewportSize({ width: 390, height: 844 });
+  assert.ok(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth
+    ),
+    'Exposure editor fits mobile'
+  );
+  await capture(page, 'exposure-mobile');
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await reflect.getByLabel('Public alias').fill('echo_fixture');
+  await reflect.getByRole('button', { name: 'Save exposure' }).click();
+  await reflect.getByText('Agent exposure · echo_fixture').waitFor();
+  await go('/workspace');
+  await page.getByRole('link', { name: 'echo_fixture', exact: true }).click();
+  await editor.waitFor();
+  assert.equal(
+    await page.getByLabel('Capability', { exact: true }).inputValue(),
+    'reflect'
+  );
+  await invoke('bridge', {});
+  await page.getByText('Named test cases', { exact: true }).click();
+  await page.getByRole('button', { name: 'Save as case' }).click();
+  await page.getByLabel('Case name').fill('Mirror smoke');
+  await page.getByRole('button', { name: 'Save case', exact: true }).click();
+  await page.getByText('Case saved to forge.cases.json.').waitFor();
+  await reflect.getByText('Agent exposure · echo_fixture').click();
+  await reflect.getByRole('switch', { name: 'Expose to agents' }).uncheck();
+  await reflect.getByRole('button', { name: 'Save exposure' }).click();
+  await reflect.getByText('Agent exposure · Hidden').waitFor();
+  await go('/workspace/cases');
+  const mirrorCase = page
+    .locator('.case-row')
+    .filter({ hasText: 'Mirror smoke' });
+  page.once('dialog', (d) => d.accept());
+  await mirrorCase
+    .getByRole('checkbox', { name: 'Select Mirror smoke', exact: true })
+    .check();
+  await page
+    .getByRole('button', { name: 'Run selected (1)', exact: true })
+    .click();
+  await mirrorCase.locator('[data-status="passed"]').waitFor();
+  await verifyCaseExplorer({ page, post, readSources, base });
+  const quoteCase = page
+    .locator('.case-row')
+    .filter({ hasText: 'Premium quote' });
+  await quoteCase.getByRole('link', { name: 'Open tester' }).click();
+  await page.getByRole('heading', { name: 'Test get_quote_by_sku' }).waitFor();
+  const adapterFile = join(dir, 'adapter.mjs');
+  const original = await readFile(adapterFile, 'utf8');
+  async function rediscover(code) {
+    await writeFile(adapterFile, code);
+    const before = await readSources();
+    const r = await post('project/sources', {
+      action: 'reload',
+      projectId: before.project,
+      generation: before.generation
+    });
+    assert.equal(r.status, 200, await r.text());
+    await go('/workspace/cases');
+  }
+  await rediscover(
+    original.replace('"label":{"type":"string"}', '"label":{"type":"integer"}')
+  );
+  await mirrorCase.getByText(/Input schema changed/).waitFor();
+  assert.equal(
+    await mirrorCase
+      .getByRole('checkbox', { name: 'Select Mirror smoke', exact: true })
+      .isDisabled(),
+    true
+  );
+  await rediscover(original.replace('"name":"reflect"', '"name":"reflect_v2"'));
+  await mirrorCase.getByText(/Tool missing/).waitFor();
+  await go('/project/bridge/mirror');
+  await page.getByText(/Missing from upstream discovery/).waitFor();
+  await page.getByRole('button', { name: 'Remove rule' }).click();
+  await page
+    .getByText(/Missing from upstream discovery/)
+    .waitFor({ state: 'detached' });
+  await go('/workspace');
+  await page.getByRole('link', { name: 'reflect_v2', exact: true }).waitFor();
   assert.deepEqual(errors, []);
   console.log(
-    'PASS: native, bridge and external calls, sample generation and draft protection, highlighted JSON, structured results and image preview.'
+    'PASS: native, bridge and external testers, saved assertions, alias routing, hidden-tool cases and schema/identity drift.'
   );
+} catch (error) {
+  if (page) {
+    console.error('Browser failure page:', await page.locator('body').innerText().catch(() => '(unavailable)'));
+    await capture(page, 'tool-arguments-failure').catch(() => {});
+  }
+  throw error;
 } finally {
   await browser?.close();
   await post('projects/close', {}).catch(() => {});

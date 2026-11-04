@@ -49,8 +49,7 @@ Forge exposes a resource once when multiple pages return the same URI and identi
 
 Discovery preserves input schemas, tool annotations and output schemas. The catalog
 is read-only: Forge does not edit external handler code or input validation.
-Custom per-capability aliases, metadata overrides and exposure controls are future work;
-this slice supports connection-level disable and automatic namespacing. Forge
+Open **Manage connection → Discovered catalog → Agent exposure** to hide an item, assign a public alias or override its description for agents. **Restore upstream defaults** removes its local rule. Hidden items remain available in the local tester. Forge
 rejects conflicting fixed names, such as an always-prefixed external tool whose
 public name matches a native tool. Collision-only connections qualify the name
 and route calls through that alias.

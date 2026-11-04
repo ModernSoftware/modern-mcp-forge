@@ -1,5 +1,7 @@
 <script lang="ts">
+  import { page } from '$app/state';
   import JsonModeSwitch from '$lib/components/JsonModeSwitch.svelte';
+  import NamedCases from '$lib/components/NamedCases.svelte';
   import McpResult from '$lib/components/McpResult.svelte';
   import ToolArguments from '$lib/components/ToolArguments.svelte';
   import { reloadProjectSources } from '$lib/client/reload-project-sources';
@@ -119,7 +121,7 @@
       code = originalCode = data.handlerFile?.content ?? '';
       codeRevision = data.handlerFile?.revision ?? '';
       codePath = data.handlerFile?.path ?? '';
-      tab = 'Definition';
+      tab = page.url.searchParams.get('tab') === 'test' ? 'Test' : 'Definition';
       diagnostics = null;
       error = '';
       notice = '';
@@ -663,6 +665,18 @@
       onclick={run}>{busy ? 'Running…' : 'Run'}</button
     >
     {#if result !== undefined}{#key result}<McpResult {result} />{/key}{/if}
+    {#if data.kind === 'tools'}{#key JSON.stringify( [data.projectId, data.sourceId, data.definition.name] )}
+        <NamedCases
+          projectId={data.projectId}
+          generation={data.snapshot.generation}
+          source={data.sourceId}
+          sourceKind="native"
+          tool={String(data.definition.name)}
+          {argumentsText}
+          {result}
+          disabled={busy || dirty || disabled}
+        />
+      {/key}{/if}
   {/if}
 </div>
 

@@ -7,7 +7,7 @@ import { NativeNodeTransport } from '../mcpack/node-transport';
 import { resolveNodeCommand } from '../execution/node-command';
 import { resolvePythonCommand } from '../execution/python-command';
 import { containedFile } from './authoring';
-import type { SourceAdapter, SourceCall } from './contracts';
+import type { SourceAdapter, SourceCall, SourceCatalog } from './contracts';
 import type { ProjectSource } from './schema';
 import { DiscoveryError, REQUEST_TIMEOUT, UpstreamCatalog } from './upstream';
 
@@ -172,6 +172,9 @@ export class BridgeSourceAdapter implements SourceAdapter {
     } finally {
       startup.removeEventListener('abort', interrupt);
     }
+  }
+  originalIdentity(kind: keyof SourceCatalog, route: string) {
+    return this.catalog?.originalIdentity(kind, route) ?? route;
   }
   async discover() {
     if (!this.catalog || this.status !== 'ready')

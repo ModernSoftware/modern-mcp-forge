@@ -1,4 +1,5 @@
 <script lang="ts">
+  import NamedCases from './NamedCases.svelte';
   import McpResult from '$lib/components/McpResult.svelte';
   import ToolArguments from '$lib/components/ToolArguments.svelte';
   import { onDestroy, untrack } from 'svelte';
@@ -99,6 +100,7 @@
           generation,
           id: sourceId,
           action: 'invoke',
+          original: true,
           kind,
           name,
           arguments: values
@@ -200,3 +202,15 @@
         heading={`Result · ${name}`}
       />{/key}{/if}
 </form>
+{#if kind === 'tool' && selectedTool}{#key JSON.stringify( [projectId, sourceId, name] )}
+    <NamedCases
+      {projectId}
+      {generation}
+      source={sourceId}
+      {sourceKind}
+      tool={name}
+      argumentsText={args}
+      {result}
+      disabled={busy || !ready}
+    />
+  {/key}{/if}

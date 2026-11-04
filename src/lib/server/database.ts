@@ -54,6 +54,14 @@ function initializeSchema(db: Database): void {
     CREATE INDEX IF NOT EXISTS idx_projects_last_opened_at
       ON projects(last_opened_at DESC);
 
+    CREATE TABLE IF NOT EXISTS case_last_run (
+      project_id TEXT NOT NULL,
+      case_id TEXT NOT NULL,
+      definition_hash TEXT NOT NULL,
+      passed INTEGER NOT NULL,
+      ran_at TEXT NOT NULL,
+      PRIMARY KEY (project_id, case_id)
+    );
     CREATE TABLE IF NOT EXISTS tool_executions (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       project_id TEXT NOT NULL,

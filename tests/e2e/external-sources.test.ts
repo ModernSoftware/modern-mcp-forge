@@ -412,6 +412,265 @@ test('Forge combines authenticated external and native sources over HTTP and clo
         })
       ).content?.[0]
     ).toMatchObject({ text: 'Order NATIVE-COLLISION' });
+    const setRule = (rule: object) =>
+      action({ action: 'exposure', id: 'remote', rule });
+    const sessionCount = () =>
+      upstream.calls.filter((c) => c.method === 'initialize').length;
+    const countBeforeRules = sessionCount();
+    const args = { filter: { id: 'CASE-42' } };
+    const cases = (body: object) =>
+      post('project/cases', { projectId, generation, ...body });
+    let revision = (await cases({ action: 'list' })).body.revision;
+    const definition = {
+      name: 'Known order',
+      source: 'remote',
+      sourceKind: 'external',
+      tool: 'lookup',
+      arguments: args,
+      expect: {
+        mode: 'success',
+        fields: [{ path: '/content/0/text', value: 'Order CASE-42' }]
+      }
+    };
+    const saved = await cases({ action: 'save', revision, definition });
+    expect(saved.status).toBe(200);
+    const caseId = saved.body.cases[0].id;
+    expect(
+      (
+        await cases({
+          action: 'save',
+          revision,
+          definition: { ...definition, name: 'Stale edit' }
+        })
+      ).status
+    ).toBe(409);
+    revision = saved.body.revision;
+    expect(
+      (
+        await setRule({
+          kind: 'tools',
+          identity: 'lookup',
+          alias: 'local_lookup'
+        })
+      ).status
+    ).toBe(400);
+    expect(
+      (
+        await setRule({
+          kind: 'tools',
+          identity: 'lookup',
+          alias: 'find_order',
+          description: 'Local order lookup'
+        })
+      ).status
+    ).toBe(200);
+    const renamed = await connect();
+    expect(
+      (await renamed.listTools()).tools.find((t) => t.name === 'find_order')
+    ).toMatchObject({
+      description: 'Local order lookup',
+      inputSchema: tools.find((t) => t.name === 'remote__lookup')!.inputSchema
+    });
+    expect(
+      (await renamed.callTool({ name: 'find_order', arguments: args }))
+        .content?.[0]
+    ).toMatchObject({ text: 'Order CASE-42' });
+    expect(
+      (
+        await setRule({
+          kind: 'resources',
+          identity: 'support://invoice',
+          alias: 'order_invoice'
+        })
+      ).status
+    ).toBe(200);
+    expect(
+      (
+        await setRule({
+          kind: 'prompts',
+          identity: 'review',
+          alias: 'review_order'
+        })
+      ).status
+    ).toBe(200);
+    const remapped = await connect();
+    expect((await remapped.listResources()).resources[0]).toMatchObject({
+      name: 'order_invoice',
+      uri: resource.uri
+    });
+    expect(
+      (await remapped.readResource({ uri: resource.uri })).contents[0]
+    ).toMatchObject({ text: 'Invoice contents' });
+    expect(
+      (
+        await remapped.getPrompt({
+          name: 'review_order',
+          arguments: { customer: 'Diego' }
+        })
+      ).messages[0].content
+    ).toMatchObject({ text: 'Review Diego' });
+    for (const rule of [
+      { kind: 'tools', identity: 'lookup', hidden: true },
+      { kind: 'resources', identity: 'support://invoice', hidden: true },
+      { kind: 'prompts', identity: 'review', hidden: true }
+    ])
+      expect((await setRule(rule)).status).toBe(200);
+    expect(sessionCount()).toBe(countBeforeRules);
+    const hidden = await connect();
+    expect((await hidden.listTools()).tools.map((t) => t.name)).not.toContain(
+      'find_order'
+    );
+    expect((await hidden.listResources()).resources).toHaveLength(0);
+    expect((await hidden.listPrompts()).prompts).toHaveLength(0);
+    const dispatched = () =>
+      upstream.calls.filter((c) =>
+        ['tools/call', 'resources/read', 'prompts/get'].includes(c.method)
+      ).length;
+    const callsBefore = dispatched();
+    for (const call of [
+      () => hidden.callTool({ name: 'find_order', arguments: args }),
+      () => renamed.callTool({ name: 'find_order', arguments: args }),
+      () => hidden.readResource({ uri: resource.uri }),
+      () =>
+        hidden.getPrompt({ name: 'review', arguments: { customer: 'test' } })
+    ])
+      await call().then(
+        (r) => expect(r).toMatchObject({ isError: true }),
+        () => {}
+      );
+    expect(dispatched()).toBe(callsBefore);
+    expect(
+      (await cases({ action: 'run', revision, id: caseId, confirmLive: false }))
+        .status
+    ).toBe(400);
+    expect(dispatched()).toBe(callsBefore);
+    expect(
+      (await cases({ action: 'run', revision, id: caseId, confirmLive: true }))
+        .body
+    ).toEqual({ passed: true, problems: [] });
+    expect(dispatched()).toBe(callsBefore + 1);
+    const negative = await cases({
+      action: 'save',
+      revision,
+      definition: {
+        ...definition,
+        name: 'Missing filter',
+        arguments: {},
+        expect: { mode: 'invalid-input', path: '/filter' }
+      }
+    });
+    const invalid = negative.body.cases.find(
+      (c: { name: string }) => c.name === 'Missing filter'
+    );
+    expect(
+      (
+        await cases({
+          action: 'run',
+          revision: negative.body.revision,
+          id: invalid.id,
+          confirmLive: false
+        })
+      ).body.passed
+    ).toBe(true);
+    expect(dispatched()).toBe(callsBefore + 1);
+    const business = await cases({
+      action: 'save',
+      revision: negative.body.revision,
+      definition: {
+        name: 'Starter error',
+        source: 'local',
+        sourceKind: 'native',
+        tool: 'local_lookup',
+        arguments: {},
+        expect: {
+          mode: 'tool-error',
+          fields: [{ path: '/isError', value: true }]
+        }
+      }
+    });
+    const businessId = business.body.cases.find(
+      (c: { name: string }) => c.name === 'Starter error'
+    ).id;
+    expect(
+      (
+        await cases({
+          action: 'run',
+          revision: business.body.revision,
+          id: businessId,
+          confirmLive: true
+        })
+      ).body.passed
+    ).toBe(true);
+    const mismatch = await cases({
+      action: 'save',
+      revision: business.body.revision,
+      definition: {
+        ...definition,
+        name: 'Different order',
+        expect: {
+          mode: 'success',
+          fields: [{ path: '/content/0/text', value: 'Other' }]
+        }
+      }
+    });
+    const mismatchId = mismatch.body.cases.find(
+      (c: { name: string }) => c.name === 'Different order'
+    ).id;
+    expect(
+      (
+        await cases({
+          action: 'run',
+          revision: mismatch.body.revision,
+          id: mismatchId,
+          confirmLive: true
+        })
+      ).body
+    ).toEqual({
+      passed: false,
+      problems: [
+        { path: '/content/0/text', expected: 'Other', actual: 'Order CASE-42' }
+      ]
+    });
+    const reloadedCases = await post('project/sources', {
+      projectId,
+      generation,
+      action: 'reload'
+    });
+    generation = reloadedCases.body.generation;
+    expect((await cases({ action: 'list' })).body.cases[0]).toMatchObject({
+      id: caseId,
+      issue: '',
+      lastRun: { passed: true }
+    });
+    expect((await (await connect()).listResources()).resources).toHaveLength(0);
+    await post('projects/close', {});
+    const reopen = await post('projects/open', {
+      folderPath: join(root, 'project')
+    });
+    expect(reopen.body.project.id).toBe(projectId);
+    generation = (await (await fetch(base + '/api/project/sources')).json())
+      .generation;
+    expect((await cases({ action: 'list' })).body.cases[0]).toMatchObject({
+      id: caseId,
+      issue: '',
+      lastRun: { passed: true }
+    });
+    expect(
+      (
+        await cases({
+          action: 'run',
+          revision: mismatch.body.revision,
+          id: caseId,
+          confirmLive: true
+        })
+      ).body.passed
+    ).toBe(true);
+    const dataOnDisk = await readFile(
+      join(root, 'project', 'forge.cases.json'),
+      'utf8'
+    );
+    expect(dataOnDisk).not.toContain('lastRun');
+    expect(dataOnDisk).not.toContain('external-fixture-token');
     await action({ action: 'remove', id: 'remote' });
     await post('projects/close', {});
     expect((await fetch(base + '/mcp')).status).toBe(503);
