@@ -95,7 +95,7 @@ export async function verifyCaseExplorer({ page, post, readSources, base }) {
     assert.equal(await run.textContent(), 'Run selected (2)');
     await run.click();
     await page
-      .getByText(/Finished · 2 of 2 cases · 1 passed · 1 failed/)
+      .getByText('Finished · 2 of 2 cases · 1 passed · 1 failed', { exact: true })
       .waitFor();
     assert.equal(confirmations, 1);
     assert.deepEqual(
@@ -115,7 +115,7 @@ export async function verifyCaseExplorer({ page, post, readSources, base }) {
     await type.selectOption('all');
     await run.click();
     await page
-      .getByText(/Finished · 5 of 5 cases · 4 passed · 1 failed/)
+      .getByText('Finished · 5 of 5 cases · 4 passed · 1 failed', { exact: true })
       .waitFor();
     assert.equal(confirmations, 2);
     assert.equal(requests.length, 7);
@@ -215,7 +215,7 @@ export async function verifyCaseExplorer({ page, post, readSources, base }) {
       .click();
     release.resolve();
     await page
-      .getByText(/Stopped · 1 of 5 cases · 1 passed · 0 failed/)
+      .getByText('Stopped · 1 of 5 cases · 1 passed · 0 failed', { exact: true })
       .waitFor();
     assert.equal(intercepted, 1);
     await page.unroute('**/api/project/cases', stopGate);
@@ -237,7 +237,7 @@ export async function verifyCaseExplorer({ page, post, readSources, base }) {
     await page.route('**/api/project/cases', stale);
     await run.click();
     await page
-      .getByText(/Stopped · 1 of 5 cases · 0 passed · 0 failed · 1 run errors/)
+      .getByText('Stopped · 1 of 5 cases · 0 passed · 0 failed · 1 run errors', { exact: true })
       .waitFor();
     assert.equal(rejected, 1);
     await page.unroute('**/api/project/cases', stale);

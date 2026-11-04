@@ -458,7 +458,10 @@ try {
     'PASS: native, bridge and external testers, saved assertions, alias routing, hidden-tool cases and schema/identity drift.'
   );
 } catch (error) {
-  if (page) await capture(page, 'tool-arguments-failure').catch(() => {});
+  if (page) {
+    console.error('Browser failure page:', await page.locator('body').innerText().catch(() => '(unavailable)'));
+    await capture(page, 'tool-arguments-failure').catch(() => {});
+  }
   throw error;
 } finally {
   await browser?.close();
