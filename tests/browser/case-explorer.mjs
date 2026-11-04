@@ -138,7 +138,9 @@ export async function verifyCaseExplorer({ page, post, readSources, base }) {
 
     // Filters survive navigating away, but selection never auto-runs anything.
     await page.getByRole('link', { name: '← Workspace', exact: true }).click();
+    await page.waitForURL(base + '/workspace');
     const actions = page.getByRole('group', { name: 'Project actions' });
+    await actions.waitFor({ state: 'visible' });
     for (const width of [1280, 1920]) {
       await page.setViewportSize({ width, height: 950 });
       const boxes = await actions.getByRole('link').evaluateAll((nodes) =>
@@ -170,6 +172,7 @@ export async function verifyCaseExplorer({ page, post, readSources, base }) {
     await capture(page, 'workspace-mobile');
     await page.setViewportSize({ width: 1280, height: 800 });
     await actions.getByRole('link', { name: 'Named test cases' }).click();
+    await page.waitForURL(base + '/workspace/cases');
     await rows.nth(1).waitFor();
     assert.equal(await source.inputValue(), 'orders');
     assert.equal(await rows.count(), 2);
