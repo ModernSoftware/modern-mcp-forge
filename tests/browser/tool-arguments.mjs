@@ -24,7 +24,7 @@ const post = (path, body) =>
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body)
   });
-let browser;
+let browser, page;
 try {
   // The lab setup installs decimal.js alongside the real Node and Python workers.
   await cp(join(lab, 'native'), join(dir, 'native'), { recursive: true });
@@ -99,7 +99,7 @@ try {
     args: ['--disable-dev-shm-usage']
   });
   const context = await browser.newContext();
-  const page = await context.newPage();
+  page = await context.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   const go = async (path) => {
@@ -457,6 +457,9 @@ try {
   console.log(
     'PASS: native, bridge and external testers, saved assertions, alias routing, hidden-tool cases and schema/identity drift.'
   );
+} catch (error) {
+  if (page) await capture(page, 'tool-arguments-failure').catch(() => {});
+  throw error;
 } finally {
   await browser?.close();
   await post('projects/close', {}).catch(() => {});

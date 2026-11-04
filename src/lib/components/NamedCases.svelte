@@ -390,6 +390,7 @@
       {#if !source}
         <label
           >Source type<select
+            aria-label="Source type"
             bind:value={filterKind}
             disabled={working}
             onchange={() => (filterSource = 'all')}
@@ -402,7 +403,7 @@
           </select></label
         >
         <label
-          >Source<select bind:value={filterSource} disabled={working}
+          >Source<select aria-label="Source" bind:value={filterSource} disabled={working}
             ><option value="all">All sources</option>
             {#each sourceOptions as entry}<option value={entry.id}
                 >{entry.id} · {sourceLabels[entry.kind]}</option
@@ -411,7 +412,7 @@
         >
       {/if}
       <label
-        >Result<select bind:value={filterStatus} disabled={working}>
+        >Result<select aria-label="Result" bind:value={filterStatus} disabled={working}>
           <option value="all">All results</option><option value="passed"
             >Passed</option
           ><option value="failed">Failed</option>
