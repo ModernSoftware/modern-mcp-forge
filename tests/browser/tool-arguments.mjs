@@ -6,6 +6,7 @@ import { chromium } from 'playwright-core';
 import { createServer } from 'vite';
 import { externalServer } from '../helpers/external-server';
 import { getAvailablePort } from '../helpers/network';
+import { capture, verifyCaseExplorer } from './case-explorer.mjs';
 
 const dir = await mkdtemp(join(tmpdir(), 'forge tool arguments '));
 process.env.MCP_FORGE_DB_PATH = join(dir, 'forge.db');
@@ -40,7 +41,9 @@ try {
   };
   const union = {
     type: 'object',
-    properties: { value: { oneOf: [{ type: 'string' }, { type: 'number' }] } },
+    properties: {
+      value: { oneOf: [{ type: 'string' }, { type: 'number' }] }
+    },
     required: ['value']
   };
   await writeFile(
@@ -226,11 +229,20 @@ try {
     JSON.parse(await page.getByLabel('Expected fields (JSON)').inputValue()),
     [{ path: '/structuredContent/total', value: '59.93' }]
   );
+  await capture(page, 'case-editor');
   await page.getByRole('button', { name: 'Save case', exact: true }).click();
   await page.getByText('Case saved to forge.cases.json.').waitFor();
   page.once('dialog', (d) => d.accept());
-  await page.getByRole('button', { name: 'Run case', exact: true }).click();
-  await page.getByText('Premium quote · Passed', { exact: true }).waitFor();
+  await page
+    .getByRole('checkbox', { name: 'Select Premium quote', exact: true })
+    .check();
+  await page
+    .getByRole('button', { name: 'Run selected (1)', exact: true })
+    .click();
+  await page
+    .getByRole('article', { name: 'Premium quote', exact: true })
+    .locator('[data-status="passed"]')
+    .waitFor();
   assert.equal(await output.locator('pre').count(), 1);
   await toggle.focus();
   await page.keyboard.press('Space');
@@ -356,12 +368,20 @@ try {
   assert.deepEqual(await invoke('native', quote), result);
   await output.getByRole('heading', { name: 'Structured content' }).waitFor();
   await go('/project/bridge/mirror?kind=tool&name=reflect');
-  const reflect = page
-    .locator('article')
-    .filter({
-      has: page.getByRole('heading', { name: 'reflect', exact: true })
-    });
+  const reflect = page.locator('article').filter({
+    has: page.getByRole('heading', { name: 'reflect', exact: true })
+  });
   await reflect.getByText('Agent exposure', { exact: false }).click();
+  await capture(page, 'exposure');
+  await page.setViewportSize({ width: 390, height: 844 });
+  assert.ok(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth
+    ),
+    'Exposure editor fits mobile'
+  );
+  await capture(page, 'exposure-mobile');
+  await page.setViewportSize({ width: 1280, height: 720 });
   await reflect.getByLabel('Public alias').fill('echo_fixture');
   await reflect.getByRole('button', { name: 'Save exposure' }).click();
   await reflect.getByText('Agent exposure · echo_fixture').waitFor();
@@ -379,7 +399,7 @@ try {
   await page.getByRole('button', { name: 'Save case', exact: true }).click();
   await page.getByText('Case saved to forge.cases.json.').waitFor();
   await reflect.getByText('Agent exposure · echo_fixture').click();
-  await reflect.getByLabel('Expose to agents').uncheck();
+  await reflect.getByRole('switch', { name: 'Expose to agents' }).uncheck();
   await reflect.getByRole('button', { name: 'Save exposure' }).click();
   await reflect.getByText('Agent exposure · Hidden').waitFor();
   await go('/workspace/cases');
@@ -387,8 +407,14 @@ try {
     .locator('.case-row')
     .filter({ hasText: 'Mirror smoke' });
   page.once('dialog', (d) => d.accept());
-  await mirrorCase.getByRole('button', { name: 'Run case' }).click();
-  await page.getByText('Mirror smoke · Passed', { exact: true }).waitFor();
+  await mirrorCase
+    .getByRole('checkbox', { name: 'Select Mirror smoke', exact: true })
+    .check();
+  await page
+    .getByRole('button', { name: 'Run selected (1)', exact: true })
+    .click();
+  await mirrorCase.locator('[data-status="passed"]').waitFor();
+  await verifyCaseExplorer({ page, post, readSources, base });
   const quoteCase = page
     .locator('.case-row')
     .filter({ hasText: 'Premium quote' });
@@ -412,7 +438,9 @@ try {
   );
   await mirrorCase.getByText(/Input schema changed/).waitFor();
   assert.equal(
-    await mirrorCase.getByRole('button', { name: 'Run case' }).isDisabled(),
+    await mirrorCase
+      .getByRole('checkbox', { name: 'Select Mirror smoke', exact: true })
+      .isDisabled(),
     true
   );
   await rediscover(original.replace('"name":"reflect"', '"name":"reflect_v2"'));

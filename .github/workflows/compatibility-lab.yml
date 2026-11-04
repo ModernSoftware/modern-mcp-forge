@@ -63,10 +63,20 @@ jobs:
       - name: Clean-install and call an exported native pack
         run: bun run test:deployment
       - name: Verify tool testing and workspace export in Chrome
+        env:
+          FORGE_UI_SCREENSHOTS: ${{ runner.temp }}/forge-ui
         run: |
           npm ci --prefix tests/browser
           bun tests/browser/workspace-export.mjs
           bun tests/browser/tool-arguments.mjs
+      - name: Save browser review screenshots
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: forge-ui
+          path: ${{ runner.temp }}/forge-ui
+          if-no-files-found: ignore
+          retention-days: 7
 
   windows-export:
     runs-on: windows-latest

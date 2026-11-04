@@ -134,6 +134,7 @@
         ? 'Missing from upstream discovery.'
         : 'Source unavailable.'}
       <button
+        class="secondary-button"
         disabled={busy}
         onclick={() =>
           action({
@@ -145,11 +146,11 @@
   {/each}
   {#each categories as category}
     {@const items = data.inspection.catalog[category]}
-    <details open>
+    <details class="catalog-section" open>
       <summary>{category} ({items.length})</summary>
       {#each items as item ('uri' in item ? item.uri : item.name)}
         {@const identity = 'uri' in item ? item.uri : item.name}
-        <article>
+        <article class="capability-card">
           <h3>{item.name}</h3>
           <ExpandableDescription text={item.description} />
           <CapabilityExposure
@@ -164,7 +165,7 @@
             )}
             save={(rule) => action({ action: 'exposure', rule })}
           />
-          <details>
+          <details class="definition">
             <summary>Full definition</summary>
             <pre class="external-json">{JSON.stringify(item, null, 2)}</pre>
           </details>
@@ -188,6 +189,40 @@
 {/key}
 
 <style>
+  .catalog-section {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .catalog-section + .catalog-section {
+    margin-top: 1rem;
+  }
+  .catalog-section > summary {
+    padding: 1rem;
+    cursor: pointer;
+    font-weight: 800;
+    text-transform: capitalize;
+    background: var(--surface-solid);
+  }
+  .capability-card {
+    padding: 1rem;
+    border-top: 1px solid var(--border);
+    overflow-wrap: anywhere;
+  }
+  .capability-card h3 {
+    margin: 0 0 0.5rem;
+    font-size: 1rem;
+  }
+  .definition {
+    margin-top: 0.7rem;
+  }
+  .definition summary {
+    cursor: pointer;
+    padding: 0.6rem 0.2rem;
+    color: var(--muted);
+    font-size: 0.85rem;
+    font-weight: 700;
+  }
   .external-json {
     white-space: pre-wrap;
     overflow-wrap: anywhere;

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onDestroy } from 'svelte';
   import { atPointer, type ToolCase } from '$lib/testing/named-case';
   import type { listCases, runCase } from '$lib/server/sources/named-cases';
   let {
@@ -24,13 +25,130 @@
     working = $state(false),
     editing = $state(false);
   let saved = $state.raw<ReturnType<typeof listCases>>();
-  let visible = $derived(
+  type CaseRow = ReturnType<typeof listCases>['cases'][number];
+  type Verdict = Awaited<ReturnType<typeof runCase>>;
+  const sourceLabels = {
+    native: 'Native',
+    bridge: 'Bridged',
+    external: 'External'
+  };
+  let search = $state('');
+  let filterKind = $state('all');
+  let filterSource = $state('all');
+  let filterStatus = $state('all');
+  let selected = $state(new Set<string>());
+  let outcomes = $state<Record<string, Verdict & { error?: string }>>({});
+  let activeId = $state('');
+  let stopped = $state(false);
+  let progress = $state<{
+    total: number;
+    completed: number;
+    passed: number;
+    failed: number;
+    errors: number;
+  } | null>(null);
+  let disposed = false;
+  onDestroy(() => {
+    disposed = true;
+    stopped = true;
+  });
+  let scoped = $derived(
     saved?.cases.filter(
       (c) =>
         !source ||
-        (c.source === source && c.sourceKind === sourceKind && c.tool === tool)
+        (c.source === source &&
+          c.sourceKind === sourceKind &&
+          c.tool === tool)
     ) ?? []
   );
+  function status(c: CaseRow) {
+    if (c.id === activeId) return 'running';
+    if (c.issue) return 'review';
+    if (outcomes[c.id]?.error) return 'error';
+    const passed = outcomes[c.id]?.passed ?? c.lastRun?.passed;
+    return passed === undefined ? 'unrun' : passed ? 'passed' : 'failed';
+  }
+  let visible = $derived(
+    scoped.filter(
+      (c) =>
+        (filterKind === 'all' || c.sourceKind === filterKind) &&
+        (filterSource === 'all' || c.source === filterSource) &&
+        (filterStatus === 'all' || status(c) === filterStatus) &&
+        (c.name + ' ' + c.tool + ' ' + c.source)
+          .toLowerCase()
+          .includes(search.toLowerCase())
+    )
+  );
+  let sourceOptions = $derived(
+    [
+      ...new Map(
+        scoped
+          .filter((c) => filterKind === 'all' || c.sourceKind === filterKind)
+          .map((c) => [c.source, { id: c.source, kind: c.sourceKind }])
+      ).values()
+    ].sort((a, b) => a.id.localeCompare(b.id))
+  );
+  let runnable = $derived(visible.filter((c) => !c.issue));
+  let queue = $derived(runnable.filter((c) => selected.has(c.id)));
+  let allSelected = $derived(
+    runnable.length > 0 && queue.length === runnable.length
+  );
+  let filterKey = $derived(
+    'forge.cases.filters.v1.' + JSON.stringify([projectId, source, tool])
+  );
+  let loadedFilters = $state('');
+  $effect(() => {
+    try {
+      const state = JSON.parse(sessionStorage.getItem(filterKey) ?? '{}');
+      search = typeof state.search === 'string' ? state.search : '';
+      filterKind = ['native', 'bridge', 'external'].includes(state.kind)
+        ? state.kind
+        : 'all';
+      filterSource = typeof state.source === 'string' ? state.source : 'all';
+      filterStatus = [
+        'passed',
+        'failed',
+        'unrun',
+        'review',
+        'error'
+      ].includes(state.status)
+        ? state.status
+        : 'all';
+    } catch {
+      /* The explorer also works with storage disabled. */
+    }
+    loadedFilters = filterKey;
+  });
+  $effect(() => {
+    if (loadedFilters !== filterKey) return;
+    try {
+      sessionStorage.setItem(
+        filterKey,
+        JSON.stringify({
+          search,
+          kind: filterKind,
+          source: filterSource,
+          status: filterStatus
+        })
+      );
+    } catch {
+      /* Keep the current filters in memory. */
+    }
+  });
+  function select(id: string, checked: boolean) {
+    const next = new Set(selected);
+    if (checked) next.add(id);
+    else next.delete(id);
+    selected = next;
+  }
+  function selectVisible(checked: boolean) {
+    const next = new Set(selected);
+    for (const c of runnable) {
+      if (checked) next.add(c.id);
+      else next.delete(c.id);
+    }
+    selected = next;
+  }
   let message = $state(''),
     error = $state(''),
     id = $state(''),
@@ -41,8 +159,6 @@
   let mode = $state<ToolCase['expect']['mode']>('success');
   let fields = $state('[]'),
     path = $state('');
-  let verdict = $state.raw<Awaited<ReturnType<typeof runCase>>>();
-  let verdictName = $state('');
   async function post(body: object, signal?: AbortSignal) {
     const r = await fetch('/api/project/cases', {
       method: 'POST',
@@ -60,7 +176,10 @@
     const controller = new AbortController();
     post({ action: 'list' }, controller.signal)
       .then((data) => {
-        if (!controller.signal.aborted) saved = data;
+        if (!controller.signal.aborted) {
+          saved = data;
+          outcomes = {};
+        }
       })
       .catch((e) => {
         if (!controller.signal.aborted) error = e.message;
@@ -143,29 +262,83 @@
         definition
       });
       editing = false;
+      outcomes = {};
       message = 'Case saved to forge.cases.json.';
     });
   }
-  function run(c: ToolCase) {
-    const confirmLive =
-      c.expect.mode !== 'invalid-input' &&
-      window.confirm(
-        'Run “' +
-          c.name +
-          '” now? This calls the saved tool with its saved arguments and can change upstream data.'
-      );
-    if (c.expect.mode !== 'invalid-input' && !confirmLive) return;
-    return perform(async () => {
-      verdict = undefined;
-      verdict = await post({
-        action: 'run',
-        id: c.id,
-        revision: saved?.revision,
-        confirmLive
-      });
-      verdictName = c.name;
-      saved = await post({ action: 'list' });
-    });
+  async function runSelected() {
+    if (working || disabled || !saved || !queue.length) return;
+    const cases = [...queue];
+    const context = { projectId, generation, revision: saved.revision };
+    const live = cases.some((c) => c.expect.mode !== 'invalid-input');
+    if (
+      live &&
+      !window.confirm(
+        'Run ' +
+          cases.length +
+          ' selected ' +
+          (cases.length === 1 ? 'case' : 'cases') +
+          '? Tool calls use saved arguments and may change upstream data.'
+      )
+    )
+      return;
+    working = true;
+    stopped = false;
+    error = message = '';
+    progress = {
+      total: cases.length,
+      completed: 0,
+      passed: 0,
+      failed: 0,
+      errors: 0
+    };
+    for (const c of cases) {
+      if (stopped || disposed) break;
+      activeId = c.id;
+      try {
+        const verdict: Verdict = await post({
+          action: 'run',
+          ...context,
+          id: c.id,
+          confirmLive: live
+        });
+        outcomes = { ...outcomes, [c.id]: verdict };
+        progress = {
+          ...progress!,
+          completed: progress!.completed + 1,
+          passed: progress!.passed + Number(verdict.passed),
+          failed: progress!.failed + Number(!verdict.passed)
+        };
+      } catch (failure) {
+        const message =
+          failure instanceof Error ? failure.message : String(failure);
+        outcomes = {
+          ...outcomes,
+          [c.id]: { passed: false, problems: [], error: message }
+        };
+        progress = {
+          ...progress!,
+          completed: progress!.completed + 1,
+          errors: progress!.errors + 1
+        };
+        error = message;
+        stopped = true;
+      } finally {
+        activeId = '';
+      }
+    }
+    try {
+      if (!disposed)
+        saved = await post({
+          action: 'list',
+          projectId: context.projectId,
+          generation: context.generation
+        });
+    } catch (failure) {
+      error ||= failure instanceof Error ? failure.message : String(failure);
+    } finally {
+      working = false;
+    }
   }
   function remove(c: ToolCase) {
     if (!window.confirm('Delete “' + c.name + '” from this project?')) return;
@@ -176,7 +349,10 @@
         revision: saved?.revision
       });
       editing = false;
-      verdict = undefined;
+      const next = { ...outcomes };
+      delete next[c.id];
+      outcomes = next;
+      select(c.id, false);
       message = 'Case deleted.';
     });
   }
@@ -203,7 +379,67 @@
         >forge.cases.json</code
       >. Use fixture data that is safe to commit. Each run is explicit.
     </p>
-    <div class="workflow-toolbar">
+    <div class="case-filters">
+      <label
+        >Search cases<input
+          bind:value={search}
+          disabled={working}
+          placeholder="Case, tool or source"
+        /></label
+      >
+      {#if !source}
+        <label
+          >Source type<select
+            bind:value={filterKind}
+            disabled={working}
+            onchange={() => (filterSource = 'all')}
+          >
+            <option value="all">All types</option><option value="native"
+              >Native</option
+            ><option value="bridge">Bridged</option><option value="external"
+              >External</option
+            >
+          </select></label
+        >
+        <label
+          >Source<select bind:value={filterSource} disabled={working}
+            ><option value="all">All sources</option>
+            {#each sourceOptions as entry}<option value={entry.id}
+                >{entry.id} · {sourceLabels[entry.kind]}</option
+              >{/each}
+          </select></label
+        >
+      {/if}
+      <label
+        >Result<select bind:value={filterStatus} disabled={working}>
+          <option value="all">All results</option><option value="passed"
+            >Passed</option
+          ><option value="failed">Failed</option>
+          <option value="unrun">Not run</option><option value="review"
+            >Needs review</option
+          ><option value="error">Run error</option>
+        </select></label
+      >
+    </div>
+    <div class="case-actions">
+      <button
+        type="button"
+        class="primary-button"
+        disabled={disabled || working || !queue.length}
+        onclick={runSelected}>Run selected ({queue.length})</button
+      >
+      <button
+        type="button"
+        class="secondary-button"
+        disabled={disabled || working || !runnable.length}
+        onclick={() => selectVisible(true)}>Select all visible</button
+      >
+      <button
+        type="button"
+        class="secondary-button"
+        disabled={working || !selected.size}
+        onclick={() => (selected = new Set())}>Deselect all</button
+      >
       {#if source}<button
           type="button"
           class="secondary-button"
@@ -212,61 +448,145 @@
         >{/if}
       <button
         type="button"
+        class="secondary-button"
         disabled={working}
         onclick={() =>
           perform(async () => {
             saved = await post({ action: 'list' });
+            outcomes = {};
           })}>Refresh cases</button
       >
     </div>
+    {#if progress}<div class="run-progress" role="status">
+        <span
+          >{working ? 'Running' : stopped ? 'Stopped' : 'Finished'} · {progress.completed}
+          of {progress.total} cases · {progress.passed} passed · {progress.failed}
+          failed{progress.errors
+            ? ' · ' + progress.errors + ' run errors'
+            : ''}</span
+        >
+        {#if working}<button
+            type="button"
+            class="secondary-button"
+            disabled={stopped}
+            onclick={() => (stopped = true)}
+            >{stopped
+              ? 'Stopping after current case…'
+              : 'Stop after current case'}</button
+          >{/if}
+        <progress
+          aria-label="Test run progress"
+          value={progress.completed}
+          max={progress.total}
+        ></progress>
+      </div>{/if}
     {#if error}<p class="workflow-error" role="alert">{error}</p>{/if}
     {#if message}<p role="status">{message}</p>{/if}
-    {#each visible as c (c.id)}
-      <article class="case-row">
-        <strong>{c.name}</strong> <small>{c.source} · {c.tool}</small>
-        <p>
-          {c.issue ||
-            (c.lastRun
-              ? (c.lastRun.passed ? 'Passed' : 'Failed') +
-                ' · ' +
-                new Date(c.lastRun.at).toLocaleString()
-              : 'No run for this version')}
-        </p>
-        <div class="workflow-toolbar">
-          <button
-            type="button"
+    <div class="case-list" role="group" aria-label="Test cases">
+      <div class="case-list-heading">
+        <input
+          type="checkbox"
+          aria-label="Select all visible cases"
+          checked={allSelected}
+          indeterminate={queue.length > 0 && !allSelected}
+          disabled={disabled || working || !runnable.length}
+          onchange={(e) => selectVisible(e.currentTarget.checked)}
+        />
+        <span
+          >{visible.length} of {scoped.length} cases · {queue.length} visible selected</span
+        >
+      </div>
+      {#each visible as c (c.id)}
+        {@const state = status(c)}
+        {@const verdict = outcomes[c.id]}
+        <article
+          class="case-row"
+          class:case-selected={selected.has(c.id)}
+          aria-label={c.name}
+        >
+          <input
+            type="checkbox"
+            aria-label={'Select ' + c.name}
+            checked={selected.has(c.id)}
             disabled={disabled || working || !!c.issue}
-            onclick={() => run(c)}>Run case</button
-          >
-          {#if source}<button
-              type="button"
-              disabled={disabled || working}
-              onclick={() => draft(c)}>Review / edit</button
+            onchange={(e) => select(c.id, e.currentTarget.checked)}
+          />
+          <div class="case-info">
+            <div class="case-title">
+              <strong>{c.name}</strong><span
+                class="case-status"
+                data-status={state}
+                >{state === 'review'
+                  ? 'Needs review'
+                  : state === 'unrun'
+                    ? 'Not run'
+                    : state === 'error'
+                      ? 'Run error'
+                      : state === 'running'
+                        ? 'Running…'
+                        : state === 'passed'
+                          ? 'Passed'
+                          : 'Failed'}</span
+              >
+            </div>
+            <small
+              >{sourceLabels[c.sourceKind]} · {c.source} · {c.tool}{c.lastRun
+                ? ' · ' + new Date(c.lastRun.at).toLocaleString()
+                : ''}</small
             >
-          {:else if !c.issue.startsWith('Tool missing')}<a href={href(c)}
-              >Open tester</a
-            >{/if}
-          <button type="button" disabled={working} onclick={() => remove(c)}
-            >Delete case</button
-          >
-        </div>
-      </article>
-    {:else}{#if saved}<p>
-          No saved cases {source ? 'for this tool' : 'in this project'}.
-        </p>{/if}{/each}
-    {#if verdict}<div role="status">
-        <strong>{verdictName} · {verdict.passed ? 'Passed' : 'Failed'}</strong>
-        {#each verdict.problems as diff}<p>
-            <code>{diff.path || '(whole result)'}</code>
-          </p>
-          <pre>Expected {JSON.stringify(
-              diff.expected,
-              null,
-              2
-            )}{'\n'}Actual   {JSON.stringify(diff.actual, null, 2)}</pre>{/each}
-      </div>{/if}
+            {#if c.issue}<p class="workflow-muted">{c.issue}</p>{/if}
+            {#if verdict?.error}<p class="workflow-error">
+                {verdict.error}
+              </p>{/if}
+            {#if verdict?.problems.length}<details class="case-diff">
+                <summary
+                  >Expected and actual ({verdict.problems.length})</summary
+                >
+                {#each verdict.problems as diff}<p>
+                    <code>{diff.path || '(whole result)'}</code>
+                  </p>
+                  <pre>Expected {JSON.stringify(
+                      diff.expected,
+                      null,
+                      2
+                    )}{'\n'}Actual   {JSON.stringify(
+                      diff.actual,
+                      null,
+                      2
+                    )}</pre>{/each}
+              </details>{/if}
+          </div>
+          <div class="row-actions">
+            {#if source}<button
+                type="button"
+                class="secondary-button"
+                disabled={disabled || working}
+                onclick={() => draft(c)}>Review / edit</button
+              >
+            {:else if !c.issue.startsWith('Tool missing')}<a
+                class="secondary-button"
+                href={href(c)}>Open tester</a
+              >{/if}
+            <button
+              type="button"
+              class="secondary-button"
+              disabled={working}
+              onclick={() => remove(c)}>Delete case</button
+            >
+          </div>
+        </article>
+      {:else}{#if saved}
+          <p class="empty-cases">
+            {scoped.length
+              ? 'No matching cases. Change your search or filters.'
+              : 'No saved cases ' +
+                (source ? 'for this tool.' : 'in this project.')}
+          </p>{/if}
+      {/each}
+    </div>
     {#if editing && source}
-      <div class="workflow-form">
+      <div class="workflow-form case-editor">
+        <h3>{id ? 'Edit case' : 'Save a named case'}</h3>
         <label>Case name<input bind:value={name} maxlength="120" /></label>
         <label
           >Saved arguments (JSON)<textarea bind:value={args} rows="5"
@@ -293,26 +613,31 @@
             ></textarea></label
           >
           <p>
-            Each assertion has a JSON Pointer and expected value. An empty path
-            checks the entire result. An empty list checks only the outcome.
+            Each assertion has a JSON Pointer and expected value. An empty
+            path checks the entire result. An empty list checks only the
+            outcome.
           </p>
           {#if result !== undefined}<label
               >Path in last result<input bind:value={path} /></label
             >
-            <button type="button" onclick={capture}
+            <button type="button" class="secondary-button" onclick={capture}
               >Use value from last result</button
             >{/if}
         {/if}
-        <button
-          type="button"
-          disabled={disabled || working || !name.trim()}
-          onclick={save}>Save case</button
-        >
-        <button
-          type="button"
-          disabled={working}
-          onclick={() => (editing = false)}>Cancel</button
-        >
+        <div class="case-actions">
+          <button
+            class="primary-button"
+            type="button"
+            disabled={disabled || working || !name.trim()}
+            onclick={save}>Save case</button
+          >
+          <button
+            class="secondary-button"
+            type="button"
+            disabled={working}
+            onclick={() => (editing = false)}>Cancel</button
+          >
+        </div>
       </div>
     {/if}
   </div>
@@ -326,25 +651,174 @@
 <style>
   .named-cases {
     margin-block: 1rem;
-    padding: 1rem;
+    overflow: hidden;
   }
-  summary {
+  .named-cases > summary {
     cursor: pointer;
-    font-weight: 700;
+    font-weight: 800;
+    padding: 1rem 1.2rem;
+    background: var(--surface-solid);
+  }
+  .named-cases .case-panel {
+    padding: 1rem;
   }
   .case-panel {
     overflow-wrap: anywhere;
   }
-  .case-row {
-    border-top: 1px solid var(--border);
-    padding: 0.8rem 0;
+  .case-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.8rem;
+    margin: 1rem 0;
   }
-  .case-row small {
+  .case-filters label {
+    display: grid;
+    gap: 0.4rem;
+    font-size: 0.85rem;
+    flex: 1;
+    min-width: 8rem;
+  }
+  .case-filters label:first-child {
+    flex: 2;
+    min-width: 12rem;
+  }
+  .case-filters input,
+  .case-filters select {
+    width: 100%;
+    min-width: 0;
+    padding: 0.65rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface-solid);
+    color: var(--text);
+  }
+  .case-actions,
+  .row-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+    margin: 0.8rem 0;
+  }
+  .case-actions button,
+  .row-actions :is(button, a) {
+    font-size: 0.8rem;
+  }
+  .row-actions {
+    margin: 0;
+    justify-content: flex-end;
+  }
+  .case-list {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .case-list-heading {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    background: var(--surface-solid);
+    padding: 0.8rem 1rem;
+    font-size: 0.82rem;
+    color: var(--muted);
+  }
+  .case-row {
+    display: grid;
+    grid-template-columns: 1rem minmax(0, 1fr) auto;
+    gap: 0.8rem;
+    align-items: center;
+    border-top: 1px solid var(--border);
+    padding: 1rem;
+  }
+  .case-selected {
+    background: var(--accent-soft);
+  }
+  .case-list input[type='checkbox'] {
+    margin: 0;
+    padding: 0;
+    width: 1rem;
+    height: 1rem;
+    accent-color: var(--accent);
+  }
+  .case-info {
+    min-width: 0;
+  }
+  .case-title {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.65rem;
+    margin-bottom: 0.3rem;
+  }
+  .case-status {
+    padding: 0.15rem 0.5rem;
+    border-radius: 6px;
+    background: var(--surface-solid);
+    color: var(--muted);
+    font-size: 0.75rem;
+    font-weight: 800;
+  }
+  .case-status[data-status='passed'] {
+    color: var(--success);
+  }
+  .case-status[data-status='failed'],
+  .case-status[data-status='error'] {
+    color: var(--danger);
+  }
+  .case-status[data-status='running'] {
+    color: var(--accent);
+  }
+  .case-status[data-status='review'] {
+    color: var(--warning);
+  }
+  .case-info small {
+    color: var(--muted);
+  }
+  .case-info p {
+    margin: 0.4rem 0 0;
+  }
+  .case-diff {
+    margin-top: 0.6rem;
+  }
+  .case-diff summary {
+    cursor: pointer;
+  }
+  .case-editor {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface);
+  }
+  .case-editor h3 {
+    margin-top: 0;
+  }
+  .run-progress {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: center;
+    padding: 0.75rem 0;
+  }
+  .run-progress progress {
+    width: 100%;
+    height: 0.5rem;
+    accent-color: var(--accent);
+  }
+  .empty-cases {
+    padding: 1rem;
     color: var(--muted);
   }
   pre {
     white-space: pre-wrap;
     max-height: 20rem;
     overflow: auto;
+  }
+  @media (max-width: 700px) {
+    .case-row {
+      grid-template-columns: 1rem minmax(0, 1fr);
+    }
+    .row-actions {
+      grid-column: 2;
+      justify-content: flex-start;
+    }
   }
 </style>

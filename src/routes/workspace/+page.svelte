@@ -164,7 +164,7 @@
     <p>Build, edit and test your project's MCP capabilities.</p>
   </div>
 </section>
-<div class="workflow-toolbar" role="group" aria-label="Project actions">
+<div class="workflow-toolbar project-actions" role="group" aria-label="Project actions">
   <a class="primary-button" href="/workspace/new?kind=tools">＋ Add tool</a>
   <a class="secondary-button" href="/workspace/new?kind=resources"
     >Add resource</a
@@ -398,6 +398,27 @@
 {/if}
 
 <style>
+  .project-actions {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+  .project-actions a {
+    min-width: 0;
+    min-height: 3.4rem;
+    padding: 0.5rem;
+    font-size: 0.78rem;
+    line-height: 1.3;
+    text-align: center;
+    overflow-wrap: anywhere;
+  }
+  @media (max-width: 800px) {
+    .project-actions {
+      grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+    }
+  }
+
   .catalog-heading,
   .source-line,
   .catalog-group summary {

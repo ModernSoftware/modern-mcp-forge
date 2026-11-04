@@ -141,12 +141,19 @@ alias is rejected before the project file is written.
    `/structuredContent/total` or `/content/0/text`. An empty path captures
    the whole response. For an invalid-input case, enter the expected validation
    path, such as `/quantity`. Forge checks this locally without calling the tool.
-3. Choose **Run case** to compare the result. A case that dispatches a request
-   asks for confirmation. Check the expected and actual values when it fails.
+3. Select one or more cases, then choose **Run selected** to compare the results.
+   **Select all visible** selects the runnable cases matching the current
+   filters; cases hidden by filters are not run. **Deselect all** clears every
+   selection. A batch that dispatches requests asks for confirmation once.
+   Cases run sequentially in list order. **Stop after current case** stops the
+   queue without interrupting the current tool call. Check the expected and
+   actual values inside a failed row.
    A transport or authentication failure fails the case even if it expects
    a tool error.
 4. Open **Workspace → Named test cases** after reopening the project to see
-   the latest verdict and timestamp for each case. If an input schema changes,
+   the latest verdict and timestamp for each case. Search by case, tool or source,
+   or filter by source type, individual source and result. Filters are remembered
+   per project in the current browser tab. If an input schema changes,
    open the tester, review the saved arguments and assertions, then save the
    case again. A missing tool remains listed for review.
 
