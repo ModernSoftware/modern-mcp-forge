@@ -38,7 +38,7 @@
 
   <span
     class:status-success={data.execution.status === 'succeeded'}
-    class:status-failed={data.execution.status !== 'succeeded'}
+    class:status-failed={data.execution.status === 'failed'}
   >
     <span class="status-dot"></span>
     {data.execution.status}
@@ -51,6 +51,8 @@
 
     <dl>
       <div><dt>Runtime</dt><dd><span class="runtime-badge {data.execution.runtime}">{data.execution.runtime}</span></dd></div>
+      <div><dt>Origin</dt><dd>{data.execution.origin === 'mcp' ? 'MCP client' : data.execution.origin === 'workbench' ? 'Workbench test' : 'Not recorded'}</dd></div>
+      {#if data.execution.sourceId}<div><dt>Source</dt><dd>{data.execution.sourceId}</dd></div>{/if}
       <div><dt>Duration</dt><dd>{data.execution.durationMs ?? 0} ms</dd></div>
       <div><dt>Exit code</dt><dd>{data.execution.exitCode ?? '—'}</dd></div>
       <div><dt>Started</dt><dd>{formatDate(data.execution.startedAt)}</dd></div>

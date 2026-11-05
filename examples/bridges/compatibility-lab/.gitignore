@@ -1,0 +1,4 @@
+.venv/
+__pycache__/
+.xmcp/
+xmcp-env.d.ts

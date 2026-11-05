@@ -1,3 +1,4 @@
+import { ProjectSourcesSchema } from '$lib/server/sources/schema';
 import { z } from 'zod';
 
 export const ToolArgumentTypeSchema = z.enum([
@@ -108,6 +109,7 @@ export const ForgeProjectManifestSchema = z
       version: z.string().min(1),
       instructions: z.string().optional()
     }).passthrough(),
+    sources: ProjectSourcesSchema.optional(),
     tools: z.array(ToolDefinitionSchema).default([]),
     resources: z.array(ResourceDefinitionSchema).default([]),
     prompts: z.array(PromptDefinitionSchema).default([])

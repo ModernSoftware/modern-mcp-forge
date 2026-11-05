@@ -17,9 +17,9 @@
   }>();
 
   let container: HTMLDivElement;
-  let editor: Monaco.editor.IStandaloneCodeEditor | undefined;
-  let model: Monaco.editor.ITextModel | undefined;
-  let monacoApi: typeof import('monaco-editor') | undefined;
+  let editor = $state.raw<Monaco.editor.IStandaloneCodeEditor>();
+  let model = $state.raw<Monaco.editor.ITextModel>();
+  let monacoApi = $state.raw<typeof import('monaco-editor')>();
 
   function currentTheme(): 'vs' | 'vs-dark' {
     return document.documentElement.dataset.theme === 'dark' ? 'vs-dark' : 'vs';
@@ -73,9 +73,7 @@
         saveAction = editor.addAction({
           id: 'forge-save-source',
           label: 'Save Source',
-          keybindings: [
-            monacoApi.KeyMod.CtrlCmd | monacoApi.KeyCode.KeyS
-          ],
+          keybindings: [monacoApi.KeyMod.CtrlCmd | monacoApi.KeyCode.KeyS],
           run: () => {
             onSave?.();
           }
