@@ -1,6 +1,6 @@
 {
   "name": "modern-mcp-forge",
-  "version": "0.10.0-alpha.1",
+  "version": "0.10.0",
   "private": true,
   "type": "module",
   "imports": {
@@ -18,7 +18,7 @@
     "test:deployment": "svelte-kit sync && bun test tests/deployment",
     "test:e2e": "svelte-kit sync && bun test --max-concurrency=1 tests/e2e",
     "test:coverage": "svelte-kit sync && bun test --max-concurrency=1 tests/unit tests/integration --coverage",
-    "test:all": "bun run check && bun run test && bun run test:e2e && bun run build",
+    "test:all": "bun run check:docs && bun run check && bun run test && bun run test:e2e && bun run build",
     "mcp:smoke": "bun run scripts/mcp-smoke.ts",
     "runtime:check": "bun run scripts/runtime-check.ts",
     "agent:demo": "bun run examples/agent/index.ts",
@@ -27,7 +27,8 @@
     "agent:ollama:down": "docker compose -f examples/agent/docker-compose.ollama.yml down",
     "mcp:stdio:smoke": "bun run scripts/mcp-stdio-smoke.ts",
     "mcpack:setup": "bun run scripts/setup-mcpack.ts",
-    "test:mcpack": "svelte-kit sync && bun run scripts/test-mcpack.ts"
+    "test:mcpack": "svelte-kit sync && bun run scripts/test-mcpack.ts",
+    "check:docs": "bun run scripts/check-docs.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.53",

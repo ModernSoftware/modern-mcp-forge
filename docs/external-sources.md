@@ -14,11 +14,11 @@ native MCPack capabilities. This is development aggregation, not MCPack deployme
 
 Forge verifies an enabled connection before saving it. A failed attempt leaves the draft available to edit or cancel. A failed edit preserves the last saved configuration and session. If a previously saved external server goes offline, its catalog is omitted while healthy sources remain usable. Use **Manage connection** in the workspace to repair, disable or remove it. Reload to rediscover it when it recovers.
 
-## Set a bearer token on Windows
+## Set a bearer token
 
 The upstream service issues the **access token**. You choose the environment-variable name. Forge reads its value from the process that runs `bun run dev` and adds the `Bearer ` prefix. The project manifest stores only the variable name.
 
-In Git Bash, stop the existing Forge process, then run these commands in the Forge repository. Paste the raw token at the hidden prompt.
+In Bash on Linux, macOS or Git Bash on Windows, stop the existing Forge process, then run these commands in the Forge repository. Paste the raw token at the hidden prompt.
 
 ```bash
 read -rsp 'Access token: ' EXAMPLE_MCP_TOKEN; echo
@@ -34,6 +34,11 @@ bun run dev
 ```
 
 For [the hosted Inspector example](https://github.com/modelcontextprotocol/inspector/blob/main/specification/v2_auth_smoke_testing.md), connect Inspector directly to `https://example-server.modelcontextprotocol.io/mcp` and complete OAuth consent. In Inspector versions with **Connection Info → OAuth Details**, copy the access token for that server. Use it as the variable value, then enter `EXAMPLE_MCP_TOKEN` in Forge. Forge currently accepts a supplied access token. OAuth login and token refresh happen outside Forge. Replace expired tokens and restart Forge in the same terminal.
+
+Never put a token value into the variable-name field. Exporting a variable after
+Forge has started does not change the existing process environment. For containers,
+pass it into the container explicitly; a host shell export alone is insufficient.
+See [Docker environment settings](docker.md#environment-and-separate-checkouts).
 
 ## Identity and schemas
 

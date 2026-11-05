@@ -4,6 +4,7 @@ Describe what changed and why.
 
 ## Verification
 
+- [ ] `bun run check:docs`
 - [ ] `bun run check`
 - [ ] `bun run test`
 - [ ] `bun run test:e2e`
@@ -13,7 +14,7 @@ Describe what changed and why.
 ## Compatibility
 
 - [ ] No project manifest compatibility change
-- [ ] No Forge Tool ABI compatibility change
+- [ ] No MCPack/bridge contract or retained Forge Tool ABI compatibility change
 - [ ] No MCP transport compatibility change
 - [ ] No machine-local database compatibility change
 

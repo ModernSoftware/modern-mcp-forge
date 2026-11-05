@@ -1,108 +1,70 @@
-# Native MCPack integration (v0.10.0)
+# Native MCPack integration
 
-Forge can open an existing native MCPack project, edit its manifest and worker modules in Monaco, test its tools/resources/prompts, and expose them to an agent through Forge's `/mcp` endpoint. The same files run independently with the MCPack CLI.
+Forge 0.10.0 uses `@modern-software/mcpack@0.9.0` from its frozen lockfile. No
+MCPack checkout, npm token or separate setup is required for ordinary use.
+Install Forge normally, then follow [native authoring](native-authoring.md) or
+the [developer guide](developer-guide.md).
 
-## Install the published dependency
+## Runtime architecture
 
-Forge pins `@modern-software/mcpack@0.9.0` in package.json and bun.lock.
-Install Forge normally; no MCPack checkout, npm token, or separate setup step is needed:
+Forge runs under Bun and launches MCPack's installed CLI explicitly with Node.
+Each native source owns an MCPack host and its persistent Node/Python workers.
+The integration uses MCP rather than loading Node's worker runtime into Bun.
+This is distinct from a bridge adapter connecting an existing application.
 
-```sh
-git switch v0.10.0
-bun install --frozen-lockfile
-bun run test:mcpack
-bun run dev
-```
-
-Requires Bun per Forge's package.json and Node.js 22+. Python 3.11+ is needed only for
-projects with Python workers. Forge resolves the installed package's CLI and launches
-it with Node, while Forge itself continues to run under Bun. Runtime installation does
-not happen when you open a project. Version upgrades go through a dependency/lockfile PR.
-
-For a first project, copy the installed example into a folder you own. In Git Bash:
+The source manifest is standalone MCPack. The same handlers run outside Forge:
 
 ```sh
-mkdir -p ../my-native-project
-cp -R node_modules/@modern-software/mcpack/examples/hello/. ../my-native-project/
+node node_modules/@modern-software/mcpack/dist/cli.js validate /path/to/mcpack.json
+node node_modules/@modern-software/mcpack/dist/cli.js serve /path/to/mcpack.json
 ```
 
-Do not edit files inside node_modules; reinstalling dependencies may replace them.
+The second command serves stdio and waits for a client. Add `--transport http
+--port 3000` for HTTP. For portable deployment use [native export](native-deployment.md).
+Node 22+ is required; Python 3.11+ is needed for Python workers. Application code
+may impose stricter runtime requirements.
 
-## Developing MCPack itself (optional)
+## Lifecycle and editing
 
-The registry dependency is always the default, even if an old `.mcpack-runtime` folder
-exists. To test a local MCPack checkout instead:
+One interactive project is active at a time. Open starts its configured sources;
+switch/close stops the previous sources. Saving implementation files or reloading
+restarts enabled sources, discards memory and rediscovers capabilities. No
+in-flight writes are retried. Failed startup leaves saved files editable.
+Forge observes MCPack's worker shutdown budgets before force-stopping a host.
+
+The editor handles manifests and existing declared worker modules inside their
+source folder, including symlink checks. Files have a 256 KiB editor limit and
+revision protection. Use your IDE for helper files, dependency changes and
+TypeScript compilation. Point workers at executable JavaScript/Python.
+Native tool calls join [execution history](app-data.md); source diagnostics retain
+bounded stderr. Worker listings are configuration, not individual-worker telemetry.
+
+Management access is local. Workers execute trusted code and are not sandboxed.
+The MCPack manifest controls environment forwarding to workers. Native source
+capabilities are tools, static resources and prompts. Broader relay features
+have the limits described in [external sources](external-sources.md).
+
+## Maintainer override
+
+To test an unreleased local MCPack checkout, use:
 
 ```sh
 bun run mcpack:setup -- ../mcpack
-# Git Bash; use the path printed by setup, with forward slashes on Windows:
-export FORGE_MCPACK_CLI="$PWD/.mcpack-runtime/node_modules/@modern-software/mcpack/dist/cli.js"
-bun run test:mcpack
-bun run dev
 ```
 
-`mcpack:setup` runs npm ci/pack in that checkout and installs the tarball into the ignored
-`.mcpack-runtime` folder. It records the source/version/integrity in source.json. This
-includes uncommitted source changes; use a clean pinned commit for reproducible checks.
-Close the native project and rerun setup after changing MCPack. Project handler edits
-do not require reinstalling MCPack. Unset `FORGE_MCPACK_CLI` to return to the npm dependency.
-No browser request can change the CLI override.
+The script builds/packs that checkout and prints a CLI path. Set
+`FORGE_MCPACK_CLI` to that absolute path in the environment launching Forge, then
+run `bun run test:mcpack`. See [environment setup](external-sources.md#set-a-bearer-token)
+for shell-specific assignment patterns, substituting the CLI variable and path.
 
-## Try the workflow
-
-Use **Projects** to create a Forge project around your native project folder. In
-**Configuration**, attach `mcpack.json` using a source ID. Open the capability in
-**Project workspace** to edit its definition, or choose **Edit code & test** for
-its worker module and test panel. See [Native authoring](native-authoring.md).
-
-The standalone preview route has been retired; MCP is served only while a Forge
-project is open. Close stops its sources. The same manifest can still run outside
-Forge:
-
-```sh
-node node_modules/@modern-software/mcpack/dist/cli.js serve ../my-native-project/mcpack.json
-```
-
-This command serves stdio and waits for an MCP client. Add `--transport http --port 3000`
-for MCPack's standalone HTTP endpoint. Forge supplies its own development HTTP endpoint.
-
-## Ownership and lifecycle
-
-Forge remains a Bun application. It launches the MCPack CLI explicitly with Node; MCPack then manages its persistent Node/Python workers. This avoids running MCPack's `fork()` implementation under Bun's `process.execPath`.
-
-The package runs the same native runtime in both standalone and Forge use. Forge uses the CLI's MCP interface for this first integration rather than importing the Node runtime directly into Bun. This is a native project adapter, not the general external-server/bridge feature planned for later.
-
-One Forge project is active at a time. It owns one or more native sources, each with its own MCPack process and workers. Source descriptors persist in forge.project.json and the project appears in the recent list. Switching or closing projects stops the old sources. After restarting Forge, refresh the tab where you were working to resume its selected project and rediscover enabled sources. From Projects, choose **Continue**. When opening a workspace bookmark in a fresh tab, choose **Start project sources**.
-
-Save and restart stops the old MCPack process, writes the actual file, starts a fresh server, and discovers the new catalog. It does not retain application state or retry in-flight writes. A failed startup remains visible and editable for recovery. The **Reload sources** button reloads edits made in your own IDE. The connection deadline includes MCPack's configured worker startup budget and time for cleanup. Forge waits for configured worker shutdown deadlines before force-stopping an unresponsive host.
-
-Worker diagnostics show the last 16 KiB of stderr. Native and remote tool calls accepted for execution are recorded in the project’s local SQLite history, with arguments, results, status, source and origin (MCP client or workbench test). Resource reads and prompt retrievals are excluded. Diagnostics may contain application secrets; only use trusted local code.
-
-## Editing and transport boundaries
-
-The editor permits the manifest and existing declared worker modules inside the project root. It resolves symlinks, rejects escapes, limits files to 256 KiB, and rejects a stale save if another editor changed the file. Use your IDE for helper files, new modules, dependency changes, and TypeScript compilation; the manifest points to executable JavaScript.
-
-Management and MCP endpoints retain Forge's loopback/Origin checks. This is local development access control, not production OAuth or per-tool authorization. Environment values reach the MCPack host; its manifest controls which values workers inherit. Child processes are not a sandbox.
-
-The adapter exposes native tools, static resources and prompts only, matching the current MCPack contract. MCPack also supports Python workers and standalone HTTP/service-token authentication.
-External MCP sources, language bridges, and media results remain outside this adapter.
+The override is process configuration, not a browser setting. It can include
+uncommitted MCPack code. Use a clean pinned revision for reproducible tests.
+An old `.mcpack-runtime` folder alone does not select it. Unset the override to
+return to the registry dependency; verify the published package for release.
 
 ## Verification
 
-```sh
-bun run check
-bun run test
-bun run test:e2e
-bun run build
-bun run test:mcpack
-```
-
-`test:mcpack` resolves the registry dependency unless an explicit CLI override is set.
-It checks persistent calls, standalone protocol parity, editor conflict detection,
-restart, error recovery, and the real HTTP endpoint. Forge CI installs from the frozen
-lockfile and runs this suite on Windows, Linux, and macOS. The ordinary suites also discover the installed dependency; the dedicated command fails
-if its CLI is missing instead of silently skipping native verification.
-
-MCPack's own source regression workflow can still test unreleased changes against its
-pinned Forge revision. When updating that pin to this integration, set FORGE_MCPACK_CLI
-explicitly after the local setup step so the tests exercise the candidate checkout.
+`bun run test:mcpack` checks native discovery/result parity, persistent state,
+editing/conflicts, restart/recovery, shutdown and HTTP behavior. CI runs it on
+Windows, Linux and macOS. The dedicated command fails if the package CLI cannot
+be found rather than silently skipping native verification.

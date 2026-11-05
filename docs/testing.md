@@ -52,6 +52,7 @@ bun run test:all
 `test:all` runs:
 
 ```text
+bun run check:docs
 bun run check
 bun run test
 bun run test:e2e
@@ -62,7 +63,17 @@ The tests are forced to one test concurrency because several integration tests i
 
 ## What is covered
 
-### Project and manifest model
+### Current source-backed workflows
+
+- Native Node/Python authoring, lifecycle, revision conflicts and published MCPack parity.
+- Node/Python bridge adapters, stdio entrypoints and application checkout isolation.
+- External HTTP discovery, bearer environment references and failure isolation.
+- Agent exposure aliases, descriptions, hidden direct-call rejection and schema identity.
+- Saved cases, expected errors, exact assertions, schema drift and local verdict persistence.
+- Form/JSON arguments, sample generation, result previews and batch explorer behavior.
+- Clean native archive deployment and five-framework compatibility in separate suites.
+
+### Classic compatibility and shared project model
 
 - mandatory stable UUID project identity
 - manifest defaults and schema rejection
@@ -175,7 +186,7 @@ platform. See [Continuous integration](ci.md).
 
 ## What automated tests intentionally do not replace
 
-The following still need a manual test pass before 0.9.0:
+The following still need a manual test pass before 0.10.0:
 
 - visual layout and responsive behavior
 - Monaco keyboard/editor ergonomics
@@ -188,7 +199,7 @@ The following still need a manual test pass before 0.9.0:
 
 `bun run check` and `bun run build` provide compile-time coverage for all Svelte
 components, while the manual pass covers browser UX. Track that final pass with
-the [0.9.0 release checklist](release-checklist.md).
+the [0.10.0 release checklist](release-checklist.md).
 
 ## Test isolation
 
@@ -197,3 +208,30 @@ Every filesystem test uses an OS temporary directory and removes it afterward.
 Database tests use `MCP_FORGE_DB_PATH` pointing at a temporary SQLite file. They never use or modify the developer's normal Modern MCP Forge application database.
 
 The E2E HTTP server also gets its own temporary database and random available TCP port.
+
+
+## Additional release suites
+
+`test:all` does not run coverage, published-runtime parity, browser, deployment or
+the five-framework lab. Run the relevant commands explicitly or use CI:
+
+```sh
+bun run test:coverage
+bun run test:mcpack
+node examples/bridges/compatibility-lab/setup.mjs
+bun test examples/bridges/compatibility-lab/tests/compatibility.test.mjs
+bun run test:deployment
+npm ci --prefix tests/browser
+bun tests/browser/workspace-export.mjs
+bun tests/browser/tool-arguments.mjs
+```
+
+Follow the [lab requirements](../examples/bridges/compatibility-lab/README.md)
+before its setup. Browser checks need Chrome/Chromium (`CHROME_BIN` may specify
+its executable). Set `FORGE_UI_SCREENSHOTS` to an output directory to capture
+browser review images. The scripts create temporary synthetic projects and
+clean them up. They use real local calls, not paid services or production tokens.
+
+Saved user cases in `forge.cases.json` are a separate workbench feature; these
+repository test commands do not discover/run them as a CI suite. See
+[named test cases](named-test-cases.md) for their current boundaries.

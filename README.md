@@ -1,253 +1,99 @@
 <div align="center">
 
-# ⚒️ Modern MCP Forge
+# Modern MCP Forge
 
-### Build, test, and run MCP servers visually — without locking your tools to one language.
+Build, connect, test and deploy MCP capabilities from a local visual workbench.
 
-[![CI](https://github.com/ModernSoftware/modern-mcp-forge/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ModernSoftware/modern-mcp-forge/actions/workflows/ci.yml)
-[![Docker](https://github.com/ModernSoftware/modern-mcp-forge/actions/workflows/docker.yml/badge.svg?branch=main)](https://github.com/ModernSoftware/modern-mcp-forge/actions/workflows/docker.yml)
-[![GHCR](https://img.shields.io/badge/GHCR-modern--mcp--forge-2496ED?logo=docker&logoColor=white)](https://github.com/ModernSoftware/modern-mcp-forge/pkgs/container/modern-mcp-forge)
+[![CI](https://github.com/ModernSoftware/modern-mcp-forge/actions/workflows/ci.yml/badge.svg?branch=v0.10.0)](https://github.com/ModernSoftware/modern-mcp-forge/actions/workflows/ci.yml)
+[![Docker](https://github.com/ModernSoftware/modern-mcp-forge/actions/workflows/docker.yml/badge.svg)](https://github.com/ModernSoftware/modern-mcp-forge/actions/workflows/docker.yml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-![Platforms](https://img.shields.io/badge/CI-Windows%20%7C%20macOS%20%7C%20Linux-2ea44f)
-![Bun](https://img.shields.io/badge/runtime-Bun%201.4.2-000000?logo=bun&logoColor=white)
-![MCP](https://img.shields.io/badge/MCP-Streamable%20HTTP%20%2B%20stdio-6f42c1)
 
-**Local-first · Multi-project · Language-neutral · Git-friendly**
+Local-first · Node and Python · Git-friendly · Windows, macOS and Linux
 
 </div>
 
-> [!NOTE]
-> Modern MCP Forge **0.9.0** is the first public beta. Feedback, bug reports,
-> ideas, and contributions are welcome as the project moves toward 1.0.
+This branch prepares **Forge 0.10.0** for release rehearsal. A version in
+`package.json` does not mean a tag or container has been published. Check
+[GitHub Releases](https://github.com/ModernSoftware/modern-mcp-forge/releases)
+for published versions.
 
-Modern MCP Forge is a local-first visual workbench for authoring and testing
-[Model Context Protocol](https://modelcontextprotocol.io/) servers. It keeps the
-MCP boundary standard while letting Tool implementations run through a small,
-language-neutral Forge Tool ABI.
+Forge combines native MCPack sources, project-owned bridge adapters and external
+Streamable HTTP servers into one project MCP endpoint. Author tools, static
+resources and prompts; inspect the catalog; test real implementations; and choose
+what agents can discover. Native sources run with the published
+`@modern-software/mcpack@0.9.0` dependency and can deploy without Forge.
 
-The result is a developer environment where MCP Tools, Resources, and Prompts
-can be managed visually without requiring every Tool to be implemented in the
-same runtime.
+## Features
 
-## ✨ Highlights
+| Workflow | Included in 0.10.0 |
+| --- | --- |
+| Projects | Create/open/close, searchable recents, source groups and remembered workspace filters |
+| Native authoring | Node/Python workers, schemas, Monaco code editing, resources and prompts |
+| Existing applications | Node/Python adapters or local stdio entrypoints; application code stays with its owner |
+| External servers | Streamable HTTP discovery and calls, optional bearer-token environment references |
+| Testing | Schema-driven forms, JSON editing, sample inputs, formatted results and supported image previews |
+| Regression cases | Named inputs, expected success/tool error/invalid input, exact assertions and sequential batches |
+| Agent exposure | Hide upstream capabilities, set public aliases/descriptions and resolve naming collisions |
+| Diagnostics | Source lifecycle/recovery and local tool execution history |
+| Deployment | Native source ZIP with selected files, dependency manifests and standalone MCPack host |
 
-|     | Capability                                                                               |
-| --- | ---------------------------------------------------------------------------------------- |
-| 🗂️  | **Multi-project workspace** with portable, Git-friendly `forge.project.json` manifests   |
-| 🧰  | **Visual authoring** for MCP Tools, Resources, and Prompts                               |
-| 🟨  | **Bun Tool execution** through the Forge Tool ABI                                        |
-| 🟩  | **Node.js Tool execution** using the same ABI                                            |
-| 🐍  | **Python Tool execution** using the same ABI                                             |
-| 🧠  | **Monaco-powered editing** for Tool source, Resources, Prompts, and advanced JSON Schema |
-| 🧪  | **Execution history and diagnostics** stored locally in SQLite                           |
-| 🌐  | **Streamable HTTP MCP transport** at `/mcp`                                              |
-| 🖥️  | **stdio MCP transport** with explicit project selection                                  |
-| 🌗  | **Light and dark themes** with a local-first desktop-style workflow                      |
-| ✅  | **Automated verification** across Windows, macOS, and Linux                              |
+## Start locally
 
-## 🧭 How it fits together
+Install Bun **1.4.2** and Node.js **22+**. Python **3.11+** is needed for Python
+sources. The optional compatibility lab has additional pinned requirements.
 
-```mermaid
-flowchart LR
-    HOST["AI client / IDE / Agent"] <-- "MCP<br/>Streamable HTTP or stdio" --> FORGE["⚒️ Modern MCP Forge"]
-
-    FORGE --> TOOLS["🧰 Tools"]
-    FORGE --> RESOURCES["📚 Resources"]
-    FORGE --> PROMPTS["💬 Prompts"]
-
-    TOOLS --> ABI["Forge Tool ABI"]
-    ABI --> BUN["🟨 Bun"]
-    ABI --> NODE["🟩 Node.js"]
-    ABI --> PYTHON["🐍 Python"]
-```
-
-Forge speaks standard MCP externally. The Forge Tool ABI is an internal
-execution boundary that allows Tool implementations to remain
-runtime-independent.
-
-## 🚀 Quick start
-
-### Requirements
-
-- [Bun](https://bun.sh/) — required
-- Node.js — optional, for Node Tools
-- Python — optional, for Python Tools
-
-Install dependencies:
-
-```bash
-bun install
-```
-
-Run the development server:
-
-```bash
+```sh
+git clone --branch v0.10.0 https://github.com/ModernSoftware/modern-mcp-forge.git
+cd modern-mcp-forge
+bun install --frozen-lockfile
 bun run dev
 ```
 
-The development command checks Forge’s dependencies against `bun.lock` before starting Vite. After pulling an update, restart `bun run dev` from the Forge repository root. Project workers and bridge adapters use their own dependency setup.
+Open the URL Vite prints. Create a project in your own folder, then choose
+**Add tool**, **Add resource**, **Add prompt**, **Bridge existing implementation**
+or **Connect external server**. `bun run dev` checks Forge's frozen lockfile;
+workers and adapters have their own dependency installation.
 
-Open the local URL shown by Vite and create or open a Forge project.
+Follow the **[developer guide](docs/developer-guide.md)** for a complete first
+project, complex implementations, bridges, testing and deployment.
 
-Run the complete local release gate:
+## Connect an agent
 
-```bash
-bun run test:all
-```
+With the project open, copy its agent URL from the workspace (normally
+`http://localhost:5173/mcp`) into Inspector or a Streamable HTTP MCP client.
+Reconnect after source/catalog/exposure changes. Closing the project stops its
+sources and makes the interactive endpoint unavailable.
 
-### 🐳 Docker
+For client-launched sessions, use [stdio](docs/mcp-stdio.md). For a model-driven
+walkthrough, see the [Strands agent example](examples/agent/README.md).
 
-Docker is also available as an optional distribution:
+## Explore realistic examples
 
-```bash
-docker pull ghcr.io/modernsoftware/modern-mcp-forge:edge
-```
+The [compatibility lab](examples/bridges/compatibility-lab/README.md) combines a
+Node pricing tool, Python delivery estimator and five applications using
+FastAPI-MCP, FastMCP, xmcp, Mastra and MCP Framework. It includes dependencies,
+configuration, normal results, business failures and protocol parity checks.
 
-For a persistent setup with host project folders mounted into Forge, use the
-included `compose.yaml`. See the [Docker guide](docs/docker.md).
+## Deployment and distribution
 
-## 📦 Project model
+- [Export a native pack](docs/native-deployment.md) to run an MCPack server
+  independently of Forge. Bridges/external connections are not included.
+- [Run Forge with Docker](docs/docker.md), including local rehearsal builds,
+  persistent data, project mounts and environment settings.
+- Existing classic projects retain their [compatibility path](docs/legacy-compatibility.md);
+  new authoring uses MCPack.
 
-A Forge project is intentionally portable:
+Forge executes trusted project code with your user's permissions. Keep the
+workbench local. It is not a sandbox or a multi-user production gateway.
+Read the [security model](docs/security.md) before attaching applications.
 
-```text
-my-mcp-project/
-├── forge.project.json
-├── tools/
-├── resources/
-└── prompts/
-```
+## Documentation and contributing
 
-The project directory is the source of truth and can be committed directly to
-Git.
+- [Documentation index](docs/README.md)
+- [Troubleshooting](docs/troubleshooting.md)
+- [Contributing](CONTRIBUTING.md), [testing](docs/testing.md) and [CI](docs/ci.md)
+- [0.10.0 release checklist](docs/release-checklist.md) and [roadmap](docs/roadmap.md)
+- [Changelog](CHANGELOG.md)
 
-Machine-local state such as recent projects and execution history is kept
-outside the project in the user's application-data directory.
-
-## 🔌 MCP transports
-
-### 🌐 Streamable HTTP
-
-With Forge running and a project open:
-
-```text
-http://localhost:5173/mcp
-```
-
-Smoke test:
-
-```bash
-bun run mcp:smoke
-```
-
-### 🖥️ stdio
-
-stdio launches Forge for one explicit project and does not depend on whichever
-project is open in the web UI:
-
-```bash
-bun run scripts/mcp-stdio.ts --project /path/to/forge-project
-```
-
-Smoke test:
-
-```bash
-bun run mcp:stdio:smoke -- --project /path/to/forge-project
-```
-
-This makes it suitable for MCP hosts that spawn local servers as child
-processes.
-
-## 🧪 Quality and testing
-
-Modern MCP Forge is tested at several levels:
-
-```text
-Unit tests
-    ↓
-Integration tests
-    ↓
-HTTP + stdio MCP end-to-end tests
-    ↓
-Production build
-    ↓
-Windows + macOS + Linux GitHub Actions
-```
-
-Useful commands:
-
-```bash
-bun run check
-bun run test:unit
-bun run test:integration
-bun run test:e2e
-bun run test:coverage
-bun run build
-bun run test:all
-```
-
-The GitHub Actions workflow runs the verification suite on all three supported
-desktop operating-system families.
-
-## 📚 Documentation
-
-- 🗃️ [Application data](docs/app-data.md)
-- 🐳 [Docker and GHCR](docs/docker.md)
-- 🖥️ [MCP stdio transport](docs/mcp-stdio.md)
-- 🧪 [Testing](docs/testing.md)
-- 🔄 [Continuous integration](docs/ci.md)
-- ✅ [0.9.0 release checklist](docs/release-checklist.md)
-- 🤖 [Agent example](examples/agent/README.md)
-- 📖 [Documentation index](docs/README.md)
-
-Additional documentation for architecture, the Tool ABI, security,
-troubleshooting, and contribution guidance will continue to grow during the
-public beta.
-
-## 🔐 Security note
-
-> [!WARNING]
-> Modern MCP Forge executes Tool code from the project you open. Treat an
-> untrusted Forge project the same way you would treat any other untrusted
-> source-code repository.
-
-Local management endpoints are intentionally restricted to loopback traffic,
-and stdio reserves stdout exclusively for MCP protocol messages.
-
-## 🤝 Contributors
-
-Contributions, bug reports, ideas, and feedback are welcome.
-
-<a href="https://github.com/ModernSoftware/modern-mcp-forge/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=ModernSoftware/modern-mcp-forge" alt="Modern MCP Forge contributors" />
-</a>
-
-See the [contributors graph](https://github.com/ModernSoftware/modern-mcp-forge/graphs/contributors)
-or open an [issue](https://github.com/ModernSoftware/modern-mcp-forge/issues).
-
-## 📄 License
-
-Modern MCP Forge is licensed under the
-[Apache License 2.0](LICENSE).
-
-Apache-2.0 is a permissive open-source license that allows commercial use,
-modification, and distribution while also providing an explicit patent grant.
-
----
-
-<div align="center">
-
-**Built by [Modern Software](https://github.com/ModernSoftware)**
-
-If Modern MCP Forge is useful to you, consider starring the repository and
-sharing feedback during the 0.9 public beta.
-
-</div>
-
-## v0.10.0 project workspace
-
-Open a recent project, choose **Add capability**, then create a native Node or Python tool, resource or prompt. Edit its definition and handler, test it, and manage sources from Configuration. The same native files run with standalone MCPack. Download a [deployable native pack](docs/native-deployment.md) from the workspace. See [native authoring](docs/native-authoring.md) and [the setup guide](docs/mcpack.md). Forge includes the published MCPack 0.9.0 package from npm. A local checkout override remains available for maintainer testing.
-
-External Streamable HTTP servers can also be connected from the project workspace, with optional bearer authentication through an environment-variable reference. See [External sources](docs/external-sources.md) for namespacing, security boundaries and current limits.
-
-Choose **Bridge existing implementation** to wire a Node or Python adapter to an existing application. Commit the adapter and Forge manifest together. A named environment variable can locate a separate application checkout. Its tools, static resources and prompts join the same agent endpoint. [Bridge setup and testing](docs/bridged-sources.md)
+Built by [Modern Software](https://github.com/ModernSoftware).
+Licensed under [Apache-2.0](LICENSE).
