@@ -1,72 +1,56 @@
-# Project workflow and continuation guide
+# Project workflow
 
-Target branch: `v0.10.0`. Unified workspace merged in PR #16; external source integration tracked in issue #17.
+Start with the [developer guide](developer-guide.md) for a complete walkthrough.
 
-## Product decisions
+## Create, open and resume
 
-- Projects are folders owned by developers. Recent projects are a local registry.
-- Opening a project selects its MCP endpoint; closing stops its sources and rejects new MCP work.
-- The project workspace groups tools, resources and prompts and identifies their sources.
-- Native capabilities execute exclusively through MCPack 0.9.0. Node and Python are supported.
-- Bridge adapters and external servers contribute complete catalogs, not individual imported tools. Their code and schemas remain owned by the source. Forge can hide, rename or describe each item for agents while preserving its upstream routing identity.
-- New external connections can keep unique upstream names and qualify collisions. Existing connections keep their prefix policy. Resource URIs carry the source identity.
-- Export one enabled native source with its worker modules, selected assets and dependency files. [Native deployment](native-deployment.md) covers the archive and exposure settings.
-- Runtime controls currently operate on sources; do not represent source status as per-worker telemetry.
-- Preserve theme switching. Keep legacy data recognizable; never silently relabel it native.
+A project is a developer-owned directory containing `forge.project.json`. Create
+one from **Projects**, or open an existing folder. Search recent projects by name
+or path. Only one project supplies the interactive `/mcp` endpoint at a time.
+Switching stops the previous sources. Closing protects unsaved drafts, stops
+sources and makes `/mcp` unavailable (HTTP 503).
 
-## Delivery order
+After restarting Forge, refresh the working tab to restore its selected project
+and sources. **Continue** resumes a registered project. A bookmark in a fresh tab
+may offer **Start project sources**. Forget removes local registration, not files.
+A missing folder remains identifiable so you can restore or reopen it.
 
-1. Unified project navigation, recent-project search, native creation and shared editing.
-2. Bridge lifecycle and routing for Node/Python; external connection discovery and authentication.
-3. Native-only export and dependency handling; improved runtime telemetry and supported controls.
-4. End-to-end mixed-source testing, documentation and release review.
+## Work in the workspace
 
-## UX review follow-up
+- Create native tools, resources and prompts with the **Add** actions.
+- **Bridge existing implementation** attaches an adapter or local stdio server.
+- **Connect external server** attaches a Streamable HTTP endpoint.
+- Search names, descriptions and sources. Combine capability/source-type filters,
+  switch views and expand source groups. Settings persist per project in the
+  current browser tab, including after refresh.
+- **Configuration** manages source definitions, native manifests and advanced
+  project JSON. Source controls do not represent individual-worker telemetry.
+- **Named test cases** opens the project-wide explorer. **Execution history**
+  records tool invocations and their origin.
 
-The 28 October recording and tracked fixes are summarized in
-[UX review and implementation plan](reviews/2026-10-28-ux-plan.md).
-Native item editing now keeps Definition, Code and Test together. Visual field
-edits save directly; new items generate a single named handler. PR #18 merged into `v0.10.0`.
+## Edit and recover
 
-The [November 1 walkthrough](reviews/2026-11-01-ux-plan.md) tracks the IDE edit/reload fixes, source-local npm setup and agent connection flow. It includes a replay recipe for the SQLite quote tool.
+Native items keep Definition, Code and Test together. New native creation starts
+and discovers the source automatically. Save code changes and reload as prompted.
+IDE edits require **Reload project sources**. Reload restarts all enabled sources,
+loses process-local memory and does not retry interrupted calls.
 
-For the pre-merge replay, filter by capability type and source type together, then invoke a native tool from Inspector and from the workbench. Execution history should show two rows with different origins. Change an existing external connection to **Prefix only colliding names**, reconnect Inspector, and verify discovery and calls. Use **Bridge existing implementation** to wire a project-owned adapter.
+Enabled bridge/external attachments are verified before saving. A failed draft
+can be corrected or cancelled without replacing the saved connection. Generated
+adapter files remain on disk. Empty, disabled and failed sources stay manageable.
+Healthy sources remain usable when another source fails.
 
-## Continue in a fresh chat
+Revision checks protect externally edited files. Reload current contents and
+reconcile your draft on conflict. Detaching retains implementation files.
+Disabling keeps a source descriptor without executing it.
 
-Use ModernSoftware/modern-mcp-forge, base v0.10.0, working branch
-feat/bridged-mcp-sources for local bridge work. Inspect the linked PR and current CI
-before editing. Do not merge or publish without the user's instruction. Keep
-changes in this branch. Read this document and the PR's test results; do not
-assume future items above are implemented.
+## Connect and deploy
 
-## Implemented in the workspace PR
+Use the workspace agent URL in Inspector or an MCP client. Reconnect after
+catalog/exposure changes. See [agent exposure](agent-exposure.md) and
+[stdio](mcp-stdio.md) for client-launched sessions.
 
-- Search recent projects; open into the unified workspace.
-- Create one native capability in a new source, a new worker in an existing source,
-  or bind an existing worker handler. Node and Python use MCPack 0.9.0.
-- Edit tool metadata in either input-schema mode. Use visual fields for simple schemas, JSON for advanced rules and Advanced source files for the full manifest.
-- Filter/search capabilities and disable them without removing their code.
-- Configuration links to the same editors, shows configured workers, and manages sources.
-- Retire standalone preview selection. Close protects dirty drafts, stops sources and disables MCP.
-- Legacy data remains labeled and accessible through older views for deliberate migration.
-
-## Manual browser regression
-
-Create project → Add capability (tool/Node) → edit description → Save definition →
-Workspace → Disable/Enable → Edit details → change description → Close and decline
-(confirm project remains active) → Close and accept → Projects. Verify `/mcp` returns 503. Repeat creation for a Python resource and reuse a worker for a prompt. Try
-searching recent projects, dark theme and a narrow viewport. No browser console
-errors should occur when editing JSON.
-
-Toggling a native capability republishes the catalog and reuses the running workers when the pack and source definitions are current. Reload sources after editing implementation files. Native, bridged and external tool calls appear in Execution history. Individual worker stop/restart is still pending.
-
-## External sources slice
-
-PR #18 adds trusted Streamable HTTP connections, bearer authentication through environment variables, and routing alongside native capabilities.
-See [External sources](external-sources.md) for supported behavior and limits.
-External metadata overrides and OAuth login remain subsequent work.
-
-## Local bridges
-
-Use **Bridge existing implementation** to generate a Node or Python adapter inside the project. You can also launch an existing stdio entrypoint. [Local bridge setup and testing](bridged-sources.md) covers dependencies, public names and recovery.
+[Export native pack](native-deployment.md) deploys one native source with MCPack.
+Bridges and external connections are not bundled. Existing classic projects
+remain supported; new authoring uses MCPack. See
+[legacy compatibility](legacy-compatibility.md) for migration.

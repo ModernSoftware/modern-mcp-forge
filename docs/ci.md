@@ -1,147 +1,49 @@
 # Continuous integration
 
-Modern MCP Forge runs its release-oriented automated verification on all three
-desktop operating-system families supported by the project:
+[CI](../.github/workflows/ci.yml) runs on pull requests, pushes to `main` and
+`v0.10.0`, and manual dispatch. Ubuntu, Windows and macOS install the Bun version
+from `package.json`, Node 22 and Python 3.13, then run:
 
-```text
-Ubuntu
-Windows
-macOS
-```
+- Frozen dependency install and runtime diagnostics.
+- Repository documentation link checks.
+- Svelte/TypeScript checks.
+- Unit/integration tests.
+- Python bridge SDK installation and MCP end-to-end tests.
+- Published MCPack integration tests.
+- Production build.
 
-The workflow lives at:
+A separate Ubuntu job measures coverage. Coverage is informative, not a hard
+percentage gate. Tests use temporary projects/databases, explicit project
+selection and ephemeral ports; they must not use a developer's normal state.
+Legacy `.NET` rejection tests do not imply .NET worker support.
 
-```text
-.github/workflows/ci.yml
-```
+## Compatibility, browsers and deployment
 
-It runs for:
+[Multilanguage examples](../.github/workflows/compatibility-lab.yml) runs manually
+or for relevant PR paths, including package/lockfile changes. Its Linux job uses
+Node 24.22.1, Python 3.12.14 and uv 0.13.4 for the pinned five-framework lab.
+It then clean-installs/invokes native exports and runs the Chrome export/tester
+suites. Browser screenshots are uploaded as `forge-ui`, including on failure,
+and retained for seven days. A separate Windows job verifies native export.
 
-- pushes to `main`
-- pull requests
-- manual `workflow_dispatch` runs
+This workflow is additional to `test:all`. See [testing](testing.md) for commands.
 
-## Runtime matrix
+## Container verification and publication
 
-Each operating system installs:
+[Docker](../.github/workflows/docker.yml) builds and smoke-tests on every PR.
+PR runs do not log in to GHCR or publish. A qualifying `main` push publishes
+`edge`; published releases and explicit version dispatches publish versioned
+images. The requested publication version must match `package.json`.
+Stable releases also publish `latest`; see [Docker](docker.md).
 
-```text
-Bun      version from package.json
-Node.js  22
-Python   3.13
-```
+The smoke test runs on Linux amd64. Published images build amd64 and arm64;
+building arm64 alone is not a manual runtime acceptance result for that platform.
 
-Bun is the application runtime. Node.js and Python are installed so their Tool
-runtime integration tests execute rather than being skipped.
+## Diagnosing failures
 
-The reserved .NET runtime remains intentionally unimplemented in 0.9.0 and its
-tests verify the current not-implemented behavior.
-
-## Verification job
-
-Each operating system runs these as separate CI steps:
-
-```bash
-bun install --frozen-lockfile
-bun run runtime:check
-bun run check
-bun run test
-bun run test:e2e
-bun run build
-```
-
-They are intentionally separate instead of running only `bun run test:all` so a
-GitHub Actions failure immediately identifies the failing layer.
-
-The commands are equivalent to the local 0.9 release gate.
-
-## Coverage job
-
-A separate Ubuntu job runs:
-
-```bash
-bun run test:coverage
-```
-
-Coverage is informative rather than a hard percentage gate for 0.9.0.
-
-Some branches are intentionally platform-dependent, including:
-
-- OS-specific application-data paths
-- Python launcher resolution
-- runtime availability/fallback paths
-- filesystem failure branches
-
-The cross-platform verification matrix is more valuable than manufacturing
-tests solely to reach 100% line coverage.
-
-## Test isolation in CI
-
-Automated tests must not rely on a developer's machine-local Forge state.
-
-The suite uses:
-
-- temporary Forge projects
-- temporary SQLite databases
-- random local HTTP ports
-- explicit stdio project selection
-
-No test should require an existing project registration or the user's normal
-Forge database.
-
-## Pull requests
-
-The repository includes:
-
-```text
-.github/pull_request_template.md
-```
-
-For code changes, keep the four automated checks green before merging:
-
-```text
-check
-unit + integration
-E2E
-production build
-```
-
-UI-facing changes should additionally receive a manual browser pass.
-
-### Container verification
-
-Every pull request also runs the Docker workflow in verification-only mode:
-
-```text
-production Docker build
-        ↓
-start container
-        ↓
-GET /api/health
-        ↓
-pass / fail
-```
-
-Pull-request runs do not authenticate to GHCR and do not publish an image.
-Publishing is restricted to trusted push, release, or explicitly requested
-manual workflow runs.
-
-The Docker check runs on every pull request so it can be used as a consistent
-required status check for `main`. The image is smoke-tested on `linux/amd64`;
-published release images can target additional architectures.
-
-## Diagnosing CI-only failures
-
-When a test passes locally but fails in CI, first determine whether the failure
-is:
-
-1. operating-system-specific
-2. runtime-discovery-specific
-3. filesystem/path-specific
-4. timing/process-lifecycle-specific
-
-Do not immediately increase timeouts. Prefer surfacing the underlying startup
-or process error first, as done by the in-process HTTP E2E server.
-
-If only one operating system fails, reproduce with that platform before
-changing shared behavior.
+Distinguish platform/runtime discovery, filesystem/path, lifecycle/timing and
+application regressions. Read the failed step and source diagnostics before
+raising timeouts. Browser checks must await navigation and the intended element;
+avoid using fixed delays as a substitute for observed state. Preserve failure
+artifacts and verify the final candidate commit rather than relying on a prior
+branch's green run.

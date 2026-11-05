@@ -37,6 +37,8 @@ on:
       - 'src/routes/workspace/+page.svelte'
       - 'src/lib/client/workspace-view.ts'
       - 'bun.lock'
+      - 'package.json'
+      - 'Dockerfile'
 
 permissions:
   contents: read

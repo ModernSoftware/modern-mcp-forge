@@ -34,3 +34,17 @@ Clients send the token in the Authorization bearer header. For browser clients, 
 - Disabling a capability removes its binding from the exported manifest. Workers with no remaining bindings are omitted. Code shared by multiple handlers remains in its original module.
 - Bridge connections, remote descriptors, Forge settings, installed dependencies, hidden files, private-key files and symlinks are excluded. Review the file list if source and application directories overlap. The selection is limited to regular files inside the pack directory, 32 MiB combined, with up to 2,048 entries scanned.
 - Deployment of external sources behind the same endpoint is tracked in [issue #23](https://github.com/ModernSoftware/modern-mcp-forge/issues/23). The proposed gateway reads the production URL and bearer token from separate environment variables. The current export serves native capabilities.
+
+
+## Rehearsal acceptance
+
+Run the archive outside the original project and stop Forge while testing it.
+Verify the chosen catalog, each selected capability type, a business failure and
+required environment values. Do not copy `node_modules` or a host virtual
+environment to another platform. The archive's MCPack dependency remains 0.9.0;
+its application package version is independent of Forge 0.10.0.
+
+The basic host requires Node 22+, but application code can require a newer
+runtime (the compatibility lab uses Node 24). Python must be installed on the
+deployment host for Python workers. The export is not a container or a dependency
+installer. Use the generated README and review [security boundaries](security.md).

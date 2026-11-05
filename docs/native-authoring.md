@@ -7,10 +7,10 @@ with the standalone MCPack CLI without Forge.
 ## Try it
 
 1. Create or open a project from **Projects**. The recent list is searchable by name or folder; the active project has a green indicator.
-2. In **Project workspace**, choose **Add capability** and select Tool, Resource or Prompt with **Native MCPack** as its implementation.
+2. In **Project workspace**, choose **Add tool**, **Add resource** or **Add prompt**. New authoring uses Native MCPack.
 3. Create a source and choose Node/Python, or select an existing source and create/reuse a worker. Reusing a worker requires the name of a handler already returned by its factory. Forge does not rewrite existing handler code.
 4. Edit the name, description and definition. Tool inputs support a simple-field builder or full JSON Schema. Applying simple fields explicitly replaces the schema draft; it never silently flattens a complex schema.
-5. Choose **Edit code & test**, open the worker module, implement your behavior and save. The generated tool initially accepts `{"name":"Diego"}` and returns a greeting; replace this example with your own implementation.
+5. Choose **Edit code & test**, open the worker module, implement your behavior and save. The generated handler is a placeholder. Implement it against your declared schema; see the [first-tool walkthrough](developer-guide.md#create-your-first-native-tool).
 6. Connect Inspector or an agent to `http://localhost:5173/mcp`. Reconnect after changing or restarting sources.
 
 The workspace lists all native capability types and supports searching, filtering,
@@ -25,8 +25,9 @@ unsaved edits; reopening starts the configured sources again.
 ## Files and definitions
 
 New sources live under `native/<source-id>/` with a manifest and worker module.
-Creation exposes only the capability you chose. Generated factories contain example
-handlers for all three kinds, so you can reuse a worker for later capabilities.
+Creation exposes only the capability you chose. Normal creation generates one handler for the selected kind. When reusing a
+worker, implement the additional handler yourself before binding it. The separate
+demonstration source contains examples for all three kinds.
 Node workers use JavaScript modules; compile TypeScript yourself and point the
 manifest at its output. Python uses the executable configured in the manifest,
 defaulting to `python`. Forge does not install handler dependencies.
@@ -72,7 +73,7 @@ not silently rename or shadow names. Source-specific testing remains available.
 Existing classic handlers keep their ABI and are not automatically converted. The
 workspace explicitly identifies legacy definitions and links to their older views.
 New authoring starts with native MCPack; old creation URLs redirect to the new form. Legacy detail routes remain for deliberate migration.
-Execution history includes classic, native and external tool calls. For native
+Execution history includes classic, native, bridged and external tool calls. For native
 tools, the Test tab shows the result immediately. Open Execution history to
 compare that workbench test with calls from an MCP client. Resource reads and
 prompt retrievals do not create tool execution records. Worker listings show the
@@ -82,7 +83,7 @@ result format, test it, then disable the old classic definition. Existing classi
 files are not directly deployable with MCPack merely by attaching them.
 
 MCPack deployment remains native-only. [External MCP connections](external-sources.md)
-are available in the project workspace. [Local bridges](bridged-sources.md) can run existing stdio servers. Use [Export native pack](native-deployment.md) to deploy a native source independently. The management API uses Forge's existing local
+are available in the project workspace. [Local bridges](bridged-sources.md) can wire adapters or run existing stdio servers. Use [Export native pack](native-deployment.md) to deploy a native source independently. The management API uses Forge's existing local
 Host/Origin guards. Keep the authoring service on your local development machine.
 
 ## Verification

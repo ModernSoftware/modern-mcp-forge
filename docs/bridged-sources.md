@@ -78,3 +78,101 @@ The workbench keeps the selected capability after a request. Tool tests open wit
 ## Try a mixed-language project
 
 The [compatibility lab](../examples/bridges/compatibility-lab/README.md) opens as one Forge project. Its native Node and Python workers run alongside five independently packaged framework applications. The guide includes setup, Inspector inputs and a direct-versus-Forge integration test.
+
+## Precisely what cwd means
+
+`cwd` is a source setting, not an environment variable. It selects the working
+directory of the one child process serving that bridge. All of that adapter's
+capabilities share the process and directory. It provides neither per-tool
+isolation nor a security sandbox.
+
+| Setting or context | Resolution |
+| --- | --- |
+| `entrypoint` | Relative to the Forge project, always contained there |
+| `checkoutEnv` | Name of an environment variable containing an absolute application checkout path; adapter mode only |
+| Application root | Checkout path when configured; otherwise the Forge project directory |
+| `cwd` | Optional path relative to the application root; cannot escape it |
+| Default cwd, adapter mode | Application root |
+| Default cwd, stdio mode | Directory containing the entrypoint |
+| Node hook `applicationRoot` | Absolute application root; unchanged by `cwd` |
+| Python hook `context["application_root"]` | Same application root |
+
+For an application at `apps/inventory` inside the project:
+
+```json
+{
+  "kind": "bridge",
+  "id": "inventory",
+  "enabled": true,
+  "mode": "adapter",
+  "runtime": "node",
+  "entrypoint": "bridges/inventory/adapter.mjs",
+  "cwd": "apps/inventory",
+  "naming": "collisions"
+}
+```
+
+Here `process.cwd()` is `<project>/apps/inventory`, while `applicationRoot` is
+`<project>`. `readFile('./catalog.json')` uses cwd. `import './service.mjs'` still
+resolves beside the importing module; Node package imports resolve through that
+module's dependency tree, not the process cwd. Import the application's module
+by an absolute file URL when the adapter lives elsewhere:
+
+```js
+import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
+
+let application;
+const loadApplication = (applicationRoot) => application ??= import(
+  pathToFileURL(resolve(applicationRoot, 'apps/inventory/application.mjs')).href
+);
+
+export default {
+  async listTools(params, { applicationRoot }) {
+    const app = await loadApplication(applicationRoot);
+    return app.listTools(params);
+  },
+  async callTool(params, { applicationRoot, signal }) {
+    const app = await loadApplication(applicationRoot);
+    return app.callTool(params, { signal });
+  }
+};
+```
+
+This example assumes the application exports `listTools` and `callTool`; adapt
+those calls to its real public API. It preserves that API's result unchanged.
+With a separate checkout, adjust the module path relative to the checkout root,
+set `checkoutEnv`, and keep the adapter inside the Forge project.
+
+Python's host prepends the adapter folder, application root and cwd to
+`sys.path`, in that order. Thus an application module in cwd can be imported,
+but a same-named adapter module may shadow it. The interpreter is selected from
+an adapter-local `.venv` first, then cwd's `.venv`, then the normal Python resolver.
+Dependencies installed into another interpreter are not automatically visible.
+Avoid application import side effects that start a second stdio server; keep its
+standalone launch under `if __name__ == "__main__":` or import a separate factory.
+
+## Choosing a framework integration
+
+| Existing implementation | Preferred integration | Executable reference |
+| --- | --- | --- |
+| Plain Node registry | Map discovery and invocation hooks | [Registry adapter](../examples/bridges/adapters/registry.mjs) |
+| Python SDK FastMCP instance | Call its supported discovery/invocation APIs | [FastMCP adapter](../examples/bridges/adapters/fastmcp_adapter.py) |
+| FastAPI-MCP | In-memory MCP session over the application's public interface | [Returns adapter](../examples/bridges/compatibility-lab/bridges/returns.py) |
+| Standalone FastMCP providers | Framework's in-process client | [Policy adapter](../examples/bridges/compatibility-lab/bridges/policy.py) |
+| xmcp compiled file-based server | MCP client connected to compiled stdio entrypoint | [Deploy adapter](../examples/bridges/compatibility-lab/bridges/deploy.mjs) |
+| Mastra workflow | MCP client connected to existing stdio entrypoint | [Fulfillment adapter](../examples/bridges/compatibility-lab/bridges/fulfillment.mjs) |
+| MCP Framework | Public Web Request handler | [Warehouse adapter](../examples/bridges/compatibility-lab/bridges/warehouse.mjs) |
+
+The lab's `wire` helper in [client.mjs](../examples/bridges/compatibility-lab/bridges/client.mjs)
+is shared example code. Forge does not require a `wire` object. The contract is
+the six hooks above and their MCP result shapes. Framework APIs and lifecycle
+requirements differ, so adapters are intentionally language/framework-specific.
+Calling a bare function may bypass validation or middleware; use the application's
+normal dispatcher when parity matters. Do not inspect private SDK registration
+fields as a substitute for a supported API.
+
+Read the [lab guide](../examples/bridges/compatibility-lab/README.md) for pinned
+versions, business-failure fixtures, limitations and direct-versus-Forge checks.
+See [agent exposure](agent-exposure.md) and [named cases](named-test-cases.md) for
+catalog customization and regression testing after attachment.
