@@ -36,6 +36,7 @@ export class ProjectSourceManager {
   private catalogs = new Map<string, SourceCatalog>();
   private published: ReturnType<typeof publishCatalogs> = new Map();
   private error?: string;
+  private bridgeFailures = new Map<string, string>();
   private sourceFailures = new Map<string, string>();
   private failedSource?: { id: string; diagnostics: string };
 
@@ -43,7 +44,7 @@ export class ProjectSourceManager {
   diagnostics(project: string, source: string) {
     if (this.project !== project) return '';
     if (this.failedSource?.id === source) return this.failedSource.diagnostics;
-    return this.adapters.get(source)?.diagnostics?.() ?? '';
+    return this.bridgeFailures.get(source) ?? this.adapters.get(source)?.diagnostics?.() ?? '';
   }
 
   constructor(private factory: SourceFactory = nativeFactory) {}
@@ -251,6 +252,7 @@ export class ProjectSourceManager {
   private async stop() {
     ++this.generation;
     this.status = 'stopped';
+    this.bridgeFailures.clear();
     this.catalogs.clear();
     this.published.clear();
     await discardConnectionDrafts();
@@ -320,6 +322,8 @@ export class ProjectSourceManager {
       this.catalogs.set(source.id, await adapter.discover());
     } catch (error) {
       if (source.kind === 'native') throw error;
+      if (source.kind === 'bridge' && adapter.diagnostics)
+        this.bridgeFailures.set(source.id, adapter.diagnostics());
       await adapter.close();
       this.adapters.delete(source.id);
       this.sourceFailures.set(

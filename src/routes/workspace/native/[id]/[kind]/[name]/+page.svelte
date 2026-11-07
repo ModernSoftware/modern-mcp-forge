@@ -411,6 +411,10 @@
 {#if error || data.snapshot.error}<p role="alert" class="workflow-error">
     {error || data.snapshot.error}
   </p>{/if}
+{#if source?.status === 'failed'}
+  <p class="workflow-muted">Check worker <code>{String(data.definition.worker)}</code> in <code>{codePath || data.sourceFolder}</code>.
+    Its factory must return a <code>{data.kind}</code> entry named <code>{String(data.definition.handler)}</code>.</p>
+{/if}
 {#if notice}<p role="status">{notice}</p>{/if}
 <div
   class="glass-card editor-panel"
@@ -512,6 +516,19 @@
                 onclick={() => (fields = fields.filter((_, i) => i !== index))}
                 >Remove</button
               >
+              {#if field.type === 'string'}
+                <label class="minimum-length">Minimum length
+                  <input name={'minLength-' + index} type="number" min="0" step="1" disabled={busy}
+                    value={field.schema.type === 'string' && typeof field.schema.minLength === 'number' ? field.schema.minLength : undefined}
+                    oninput={(event) => {
+                      const input = event.currentTarget;
+                      const schema: Record<string, unknown> = field.schema.type === 'string' ? { ...field.schema } : { type: 'string' };
+                      if (input.value === '' && !input.validity.badInput) delete schema.minLength;
+                      else schema.minLength = input.valueAsNumber;
+                      field.schema = schema;
+                    }} />
+                </label>
+              {/if}
               {#if field.schema.type === field.type && Array.isArray(field.schema.enum)}
                 <small class="workflow-muted allowed-values"
                   >Allowed values · {field.schema.enum
@@ -736,6 +753,7 @@
     align-items: end;
     margin: 14px 0;
   }
+  .minimum-length { grid-column: 1 / -1; max-width: 10rem; }
   .allowed-values {
     grid-column: 1 / -1;
     overflow-wrap: anywhere;
@@ -793,6 +811,7 @@
     }
   }
   .save-bar {
+    align-items: center;
     margin-top: 20px;
   }
   .arguments {

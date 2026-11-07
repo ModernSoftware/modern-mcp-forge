@@ -1,3 +1,4 @@
+import type { ExecutionOrigin } from '../../execution-origin';
 import type { NativeCatalog, NativeKind } from '../mcpack/session';
 import type { ProjectSource } from './schema';
 
@@ -7,7 +8,7 @@ export interface SourceCall {
   name: string;
   arguments: Record<string, unknown>;
   signal?: AbortSignal;
-  origin?: 'mcp' | 'workbench';
+  origin?: ExecutionOrigin;
 }
 export interface SourceAdapter {
   start(): Promise<void>;

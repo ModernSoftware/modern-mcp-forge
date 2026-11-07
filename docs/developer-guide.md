@@ -62,12 +62,12 @@ to locations inside the container.
 
 ```mermaid
 flowchart TD
-    C["Agent or Inspector"] --> F["Forge project endpoint"]
-    F --> N["MCPack native source"]
-    F --> B["Project bridge adapter"]
-    F --> E["External MCP server"]
-    B --> A["Existing application"]
-    N --> W["Persistent Node or Python workers"]
+    C["MCP client"] --> F["Forge"]
+    F --> N["MCPack"]
+    F --> B["Adapter"]
+    F --> E["HTTP server"]
+    B --> A["Application"]
+    N --> W["Workers"]
 ```
 
 A project can mix these sources. Source IDs are unique within the project.
@@ -78,7 +78,11 @@ retain upstream identities and can have local exposure overrides.
 
 1. Choose **Add tool**. Enter `greet_customer`, a description, a new native source
    ID such as `customer-tools`, and the Node runtime.
-2. Define a required string argument `name`. Use JSON schema for advanced rules:
+2. Click **Create tool**. Forge creates a placeholder handler and opens its
+   editor. On **Definition**, add a string field named `name`, turn on
+   **Required**, enter **Minimum length** `1`, and click **Save definition**.
+   Required checks that the property is present. Minimum length also rejects an
+   empty string. **Edit as JSON** shows the corresponding schema:
 
    ```json
    {
@@ -89,9 +93,9 @@ retain upstream identities and can have local exposure overrides.
    }
    ```
 
-3. Create the tool. Forge writes a manifest and worker below
-   `native/customer-tools/`, then starts/discovers the source. Normal creation
-   generates one handler placeholder, not a working greeting.
+3. The project-level `forge.project.json` registers sources. Its top-level
+   tools, resources and prompts arrays support classic projects. The native
+   workers and their handler bindings are in `native/customer-tools/mcpack.json`.
 4. In **Code**, implement the handler:
 
    ```js
@@ -113,7 +117,7 @@ retain upstream identities and can have local exposure overrides.
 5. Save and reload as prompted. In **Test**, enter a name and run it. Check
    Preview and Raw JSON.
 6. Connect Inspector to the workspace's `/mcp` URL. Discover and call the same
-   tool. Execution history distinguishes workbench and MCP client calls.
+   tool. Execution history labels MCP client calls, one-off workbench tests and named test case calls.
 
 The manifest binding connects the public tool name to a worker and handler:
 
@@ -132,18 +136,20 @@ The manifest binding connects the public tool name to a worker and handler:
 ```
 
 This is one tool entry, not a complete manifest. Start with the generated
-manifest. For Python, select Python at creation and implement its worker factory:
+manifest. To add a second tool named `greet_customer_py` to the same source,
+select a new Python worker at creation. Match the handler key shown above the
+Code editor. For the `greet_customer_py` binding, use:
 
 ```python
 def create_worker(context):
-    def greet_customer(args, call):
+    def greet_customer_py(args, call):
         call.signal.throw_if_aborted()
         greeting = f"Hello, {args['name']}!"
         return {
             "content": [{"type": "text", "text": greeting}],
             "structuredContent": {"greeting": greeting},
         }
-    return {"tools": {"greet_customer": greet_customer}}
+    return {"tools": {"greet_customer_py": greet_customer_py}}
 ```
 
 See [native authoring](native-authoring.md) for existing-worker bindings,
