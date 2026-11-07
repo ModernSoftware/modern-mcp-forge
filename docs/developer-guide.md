@@ -60,15 +60,7 @@ to locations inside the container.
 | Bridge stdio | A local server already speaks MCP over stdio | Existing server entrypoint | No |
 | External HTTP | A server runs at a Streamable HTTP MCP URL | Remote service | No |
 
-```mermaid
-flowchart TD
-    C["MCP client"] --> F["Forge"]
-    F --> N["MCPack"]
-    F --> B["Adapter"]
-    F --> E["HTTP server"]
-    B --> A["Application"]
-    N --> W["Workers"]
-```
+![An MCP client connects to Forge. Forge routes native calls through MCPack workers, bridged calls through an adapter to the application, and external calls to the HTTP server.](images/project-sources.svg)
 
 A project can mix these sources. Source IDs are unique within the project.
 Native definitions own their published identities; bridge/external definitions

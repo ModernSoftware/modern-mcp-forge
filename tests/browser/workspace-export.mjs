@@ -181,7 +181,7 @@ try {
   assert.equal(await view.inputValue(), 'detailed');
   assert.equal(await search.inputValue(), '');
   assert.equal(await kind.inputValue(), 'all');
-  await verifySourcePaths(page, base, join(dir, 'second'));
+  await verifySourcePaths(page, join(dir, 'second'));
   assert.deepEqual(errors, []);
   console.log(
     'Chromium PASS: actual archive download, filters, search, grouping, expansion, navigation, reload, project isolation.'

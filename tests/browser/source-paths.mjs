@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-export async function verifySourcePaths(page, base, project) {
+export async function verifySourcePaths(page, project) {
   await mkdir(join(project, 'apps', 'deploy'), { recursive: true });
   await mkdir(join(project, 'bridges'), { recursive: true });
   await writeFile(join(project, 'apps', 'deploy', 'built.txt'), 'ready');
@@ -17,7 +17,11 @@ export async function verifySourcePaths(page, base, project) {
     };`
   );
 
-  await page.goto(base + '/workspace/connect?kind=bridge');
+  // Enter through the hydrated workspace, so the first form interaction is
+  // handled by Svelte instead of changing an SSR select before hydration.
+  await page.waitForLoadState('networkidle');
+  await page.getByRole('link', { name: 'Bridge existing implementation' }).click();
+  await page.waitForURL('**/workspace/connect?kind=bridge');
   await page.getByLabel('Bridge name').fill('deployment');
   await page.getByLabel('Adapter setup').selectOption('existing');
   const fileButton = page.getByRole('button', {
