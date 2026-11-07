@@ -12,7 +12,7 @@ Publication is pending release rehearsal and the final release gate.
   namespacing and isolated connection failures.
 - Project-owned Node/Python adapters and existing stdio bridges, including separate
   application checkouts and a five-framework compatibility lab.
-- Native deployment ZIP export with capability/file selection, dependency
+- Native deployment tar.gz export with capability/file selection, dependency
   declarations and a standalone MCPack host.
 - Schema-driven form/JSON testing, sample argument generation and formatted
   structured/text/image result previews.

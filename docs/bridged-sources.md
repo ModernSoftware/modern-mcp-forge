@@ -176,3 +176,27 @@ Read the [lab guide](../examples/bridges/compatibility-lab/README.md) for pinned
 versions, business-failure fixtures, limitations and direct-versus-Forge checks.
 See [agent exposure](agent-exposure.md) and [named cases](named-test-cases.md) for
 catalog customization and regression testing after attachment.
+
+## Attach the deployment planner to your own project
+
+Copy the compatibility lab's `bridges/` and `apps/deploy/` folders into your
+Forge project. Using Node 24 and npm, run these commands in the project root:
+
+```sh
+npm ci --prefix bridges
+npm ci --prefix apps/deploy
+npm --prefix apps/deploy run build
+```
+
+Choose **Wire an existing implementation**, **Node.js**, **Use an existing
+adapter file** and **Inside this Forge project**. Browse to
+`bridges/deploy.mjs` for the adapter and `apps/deploy` for the working directory.
+The adapter launches the compiled `dist/stdio.js` from that directory. Attach
+the bridge and call `plan_rollout` with
+`{"services":[{"name":"api","dependsOn":["db"]},{"name":"db","dependsOn":[]}]}`.
+The two rollout waves should contain `db` followed by `api`.
+
+If the attachment fails, expand **Show startup details**. Check the reported
+stage, path and working directory, then inspect the process output. A missing
+adapter file needs a path correction. A missing compiled server needs the
+application's dependencies, build and working directory. Review logs before sharing.

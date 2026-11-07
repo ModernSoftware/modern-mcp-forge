@@ -103,10 +103,14 @@
     }}>Remove connection</button
   >
 </div>
+{#if sourceState?.status === 'failed' && data.startupDetails}
+  <details class="startup-details"><summary>Show startup details</summary><pre>{data.startupDetails}</pre></details>
+{/if}
 <p class="workflow-muted">
   Reload reads saved files and restarts all enabled project sources.
 </p>
 {#key data.source.kind + '/' + data.source.id}<SourceConnection
+    projectPath={data.project.path}
     projectId={data.project.id}
     generation={data.snapshot.generation}
     kind={data.source.kind}

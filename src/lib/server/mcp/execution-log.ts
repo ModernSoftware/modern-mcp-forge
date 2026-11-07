@@ -11,7 +11,8 @@ export function tryLogExecution<T>(write: () => T): T | undefined {
   }
 }
 
-export type ExecutionOrigin = 'mcp' | 'workbench';
+import type { ExecutionOrigin } from '$lib/execution-origin';
+export type { ExecutionOrigin } from '$lib/execution-origin';
 
 export interface ExecutionRecord {
   id: number;

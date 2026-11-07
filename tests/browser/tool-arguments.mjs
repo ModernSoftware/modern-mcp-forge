@@ -415,6 +415,9 @@ try {
     .click();
   await mirrorCase.locator('[data-status="passed"]').waitFor();
   await verifyCaseExplorer({ page, post, readSources, base });
+  const history = await (await fetch(base + '/executions')).text();
+  assert.ok(history.includes('Named test case'));
+  assert.ok(history.includes('Workbench test'));
   const quoteCase = page
     .locator('.case-row')
     .filter({ hasText: 'Premium quote' });

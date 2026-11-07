@@ -57,6 +57,11 @@ by source type, source and result. Filters persist per project in the current
 browser tab. **Select all visible** selects runnable cases matching those
 filters. Hidden-by-filter cases are not run. **Deselect all** clears selection.
 
+Tool calls made by these runs appear as **Named test case** in Execution history.
+One-off calls from a tester appear as **Workbench test**. Previously recorded
+rows keep their original labels. Invalid-input cases validate locally and do
+not create a tool execution.
+
 **Run selected** runs sequentially in list order. Live calls requiring confirmation
 are confirmed once for the batch. **Stop after current case** stops the remaining
 queue without cancelling the active handler. No automatic retries or rollback

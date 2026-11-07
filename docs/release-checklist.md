@@ -65,7 +65,10 @@ The package version is prepared as `0.10.0`; publication remains a separate step
 - [ ] Confirm filters, search, grouping and expanded groups survive navigation/refresh within a project/tab.
 - [ ] Confirm another project's view preferences and execution history remain separate.
 - [ ] Check execution history for workbench/agent tool calls, results and error details.
-- [ ] Test both themes, keyboard access, long descriptions and narrow layouts; no clipped or unreachable actions.
+- [ ] In both themes and a narrow window, complete an edit and a test with
+  Tab/Shift+Tab and Enter/Space. Open a path picker, use Escape to dismiss it,
+  and check that focus returns to Browse. Expand a long description and check
+  that controls remain visible and reachable.
 - [ ] Inspect browser console for unexpected errors.
 
 ## Native deployment and Forge distribution

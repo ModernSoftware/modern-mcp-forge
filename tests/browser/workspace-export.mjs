@@ -1,3 +1,4 @@
+import { verifySourcePaths } from './source-paths.mjs';
 import { chromium } from 'playwright-core';
 import { createServer } from 'vite';
 import { mkdtemp, rm, readFile, writeFile } from 'node:fs/promises';
@@ -180,6 +181,7 @@ try {
   assert.equal(await view.inputValue(), 'detailed');
   assert.equal(await search.inputValue(), '');
   assert.equal(await kind.inputValue(), 'all');
+  await verifySourcePaths(page, join(dir, 'second'));
   assert.deepEqual(errors, []);
   console.log(
     'Chromium PASS: actual archive download, filters, search, grouping, expansion, navigation, reload, project isolation.'

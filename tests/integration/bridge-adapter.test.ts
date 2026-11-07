@@ -133,3 +133,38 @@ test('a versioned Node adapter delegates to two checkouts without redefining the
     await rm(root, { recursive: true, force: true });
   }
 }, 20000);
+
+test('a failed discovery explains the launch context and redacts inherited credentials', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'forge startup '));
+  const key = 'FORGE_TEST_DIAGNOSTIC_VALUE';
+  const previous = process.env[key];
+  process.env[key] = 'never-show-this-value';
+  const source = new BridgeSourceAdapter(root, {
+    id: 'broken',
+    kind: 'bridge',
+    mode: 'stdio',
+    enabled: true,
+    runtime: 'node',
+    entrypoint: 'broken.mjs',
+    inheritEnv: [key]
+  });
+  try {
+    await writeFile(
+      join(root, 'broken.mjs'),
+      `console.error("Missing build output dist/stdio.js", process.env.${key}, "Authorization: Bearer test-token"); process.exitCode = 7;`
+    );
+    await expect(source.start()).rejects.toThrow();
+    const details = source.diagnostics();
+    expect(details).toContain('Initialize MCP');
+    expect(details).toContain(root);
+    expect(details).toContain('Process exit: 7');
+    expect(details).toContain('dist/stdio.js');
+    expect(details).not.toContain(process.env[key]!);
+    expect(details).not.toContain('test-token');
+  } finally {
+    await source.close();
+    if (previous === undefined) delete process.env[key];
+    else process.env[key] = previous;
+    await rm(root, { recursive: true, force: true });
+  }
+});

@@ -9,7 +9,7 @@ import {
   statSync,
   writeFileSync
 } from 'node:fs';
-import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { dirname, join, relative } from 'node:path';
 import { ManifestSchema, type Manifest } from '@modern-software/mcpack';
 import { ForgeProjectManifestSchema } from '../project/schema';
 import { NativeProjectError } from '../mcpack/session';
@@ -22,6 +22,9 @@ import {
 } from './schema';
 import { nativeStarter, capabilityStarter } from './starter';
 
+import { containedFile, sourcePath } from '../filesystem/source-paths';
+export { containedFile } from '../filesystem/source-paths';
+
 const MAX_BYTES = 256 * 1024;
 const digest = (content: string) =>
   createHash('sha256').update(content).digest('hex');
@@ -30,26 +33,6 @@ function read(path: string) {
   if (statSync(path).size > MAX_BYTES)
     throw new NativeProjectError('File exceeds the 256 KiB editor limit.');
   return readFileSync(path, 'utf8');
-}
-
-export function containedFile(root: string, filename: string) {
-  if (
-    /^(?:[A-Za-z]:|[\\/])/.test(filename) ||
-    filename.split(/[\\/]/).includes('..')
-  ) {
-    throw new NativeProjectError(
-      'Use a relative path inside the source folder.'
-    );
-  }
-  const canonicalRoot = realpathSync(root);
-  const path = realpathSync(
-    resolve(canonicalRoot, filename.replaceAll('\\', '/'))
-  );
-  const rel = relative(canonicalRoot, path);
-  if (isAbsolute(rel) || rel === '..' || rel.startsWith(`..${sep}`)) {
-    throw new NativeProjectError('File resolves outside the source folder.');
-  }
-  return path;
 }
 
 export function atomicWrite(path: string, content: string) {
@@ -183,7 +166,7 @@ export function attachNativeSource(
     manifest: filename,
     enabled: true
   });
-  const path = containedFile(project.path, filename);
+  const path = sourcePath(project.path, filename, 'Manifest path');
   const native = ManifestSchema.parse(JSON.parse(read(path)));
   for (const worker of Object.values(native.workers))
     containedFile(dirname(path), worker.module);

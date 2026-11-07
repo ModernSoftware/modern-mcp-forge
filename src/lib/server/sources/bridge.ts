@@ -1,17 +1,27 @@
 import { existsSync, statSync } from 'node:fs';
-import { dirname, isAbsolute, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { createRequire } from 'node:module';
 import { Client } from '@modelcontextprotocol/client';
 import { getDefaultEnvironment } from '@modelcontextprotocol/client/stdio';
 import { NativeNodeTransport } from '../mcpack/node-transport';
 import { resolveNodeCommand } from '../execution/node-command';
 import { resolvePythonCommand } from '../execution/python-command';
-import { containedFile } from './authoring';
+import { applicationRoot, sourcePath } from '../filesystem/source-paths';
+import { diagnosticExcerpt } from '../mcpack/diagnostic-text';
 import type { SourceAdapter, SourceCall, SourceCatalog } from './contracts';
 import type { ProjectSource } from './schema';
 import { DiscoveryError, REQUEST_TIMEOUT, UpstreamCatalog } from './upstream';
 
 type BridgeSource = Extract<ProjectSource, { kind: 'bridge' }>;
+
+export class BridgeStartupError extends Error {
+  constructor(
+    message: string,
+    readonly details: string
+  ) {
+    super(message);
+  }
+}
 
 function interpreter(runtime: BridgeSource['runtime'], cwd: string) {
   if (runtime === 'node') return resolveNodeCommand();
@@ -35,6 +45,11 @@ export class BridgeSourceAdapter implements SourceAdapter {
   private catalog?: UpstreamCatalog;
   private status: ReturnType<SourceAdapter['health']>['status'] = 'stopped';
   private stderr = '';
+  private stage = 'Check paths';
+  private effectiveCwd = '';
+  private executable = '';
+  private exitStatus?: string | number;
+  private failureDetails = '';
   constructor(
     private root: string,
     private source: BridgeSource
@@ -42,41 +57,69 @@ export class BridgeSourceAdapter implements SourceAdapter {
   async start(signal?: AbortSignal) {
     signal?.throwIfAborted();
     this.status = 'starting';
-    const { entrypoint, runtime, inheritEnv = [], args = [] } = this.source;
-    const entry = containedFile(this.root, entrypoint);
-    const hooks = this.source.mode === 'adapter';
-    let application = this.root;
-    if (this.source.checkoutEnv) {
-      if (!hooks)
-        throw new Error(
-          'A checkout variable is supported only for an adapter module.'
-        );
-      const checkout = process.env[this.source.checkoutEnv];
-      if (
-        !checkout ||
-        !isAbsolute(checkout) ||
-        !statSync(checkout, { throwIfNoEntry: false })?.isDirectory()
-      )
-        throw new Error(
-          `Set ${this.source.checkoutEnv} to the absolute path of the application checkout before starting Forge.`
-        );
-      application = checkout;
+    this.stage = 'Check paths';
+    this.stderr = this.failureDetails = '';
+    this.exitStatus = undefined;
+    this.executable = '';
+    this.effectiveCwd = '';
+    try {
+      await this.connect(signal);
+    } catch (error) {
+      signal?.throwIfAborted();
+      this.status = 'failed';
+      const message =
+        error instanceof Error ? error.message : 'Bridge startup failed.';
+      const stderr = diagnosticExcerpt(this.stderr, [
+        ...(this.source.inheritEnv ?? []).map((key) => process.env[key] ?? ''),
+        ...(this.source.args ?? [])
+      ]);
+      this.failureDetails = [
+        `Stage: ${this.stage}`,
+        `Runtime: ${this.source.runtime}`,
+        this.executable && `Executable: ${this.executable}`,
+        `Entrypoint: ${this.source.entrypoint}`,
+        `Working directory: ${this.effectiveCwd || '(unresolved)'}`,
+        this.exitStatus !== undefined && `Process exit: ${this.exitStatus}`,
+        stderr && `Standard error:\n${stderr}`
+      ]
+        .filter(Boolean)
+        .join('\n');
+      throw new BridgeStartupError(message, this.failureDetails);
     }
+  }
+
+  diagnostics() {
+    return this.failureDetails;
+  }
+
+  private async connect(signal?: AbortSignal) {
+    const { entrypoint, runtime, inheritEnv = [], args = [] } = this.source;
+    const hooks = this.source.mode === 'adapter';
+    const application = applicationRoot(this.root, this.source.checkoutEnv);
+    this.effectiveCwd = this.source.cwd
+      ? resolve(application, this.source.cwd.replaceAll('\\', '/'))
+      : hooks
+        ? application
+        : dirname(resolve(this.root, entrypoint.replaceAll('\\', '/')));
+    const entry = sourcePath(
+      this.root,
+      entrypoint,
+      hooks ? 'Adapter file' : 'Stdio entrypoint'
+    );
     const cwd = this.source.cwd
-      ? containedFile(application, this.source.cwd)
+      ? sourcePath(application, this.source.cwd, 'Working directory', true)
       : hooks
         ? application
         : dirname(entry);
-    if (!statSync(entry).isFile() || !statSync(cwd).isDirectory())
-      throw new Error(
-        'Choose an adapter or entrypoint file and a valid working directory.'
-      );
+    this.effectiveCwd = cwd;
+    this.stage = 'Launch runtime';
     // A dedicated adapter venv can contain both the runner and application dependencies.
     const adapterFolder = dirname(entry);
     const command = interpreter(
       runtime,
       hooks && existsSync(join(adapterFolder, '.venv')) ? adapterFolder : cwd
     );
+    this.executable = command.executable;
     const launchArgs = [...command.prefixArgs];
     if (hooks) {
       if (runtime === 'python') launchArgs.push('-B');
@@ -127,6 +170,7 @@ export class BridgeSourceAdapter implements SourceAdapter {
         signal: startup,
         timeout: REQUEST_TIMEOUT
       });
+      this.stage = 'Discover catalog';
       const catalog = new UpstreamCatalog(
         client,
         this.source.id,
@@ -138,7 +182,10 @@ export class BridgeSourceAdapter implements SourceAdapter {
       this.catalog = catalog;
       this.status = 'ready';
     } catch (failure) {
+      if (this.stage === 'Launch runtime' && transport.spawned)
+        this.stage = 'Initialize MCP';
       await this.close();
+      this.exitStatus = transport.exitStatus;
       this.status = 'failed';
       signal?.throwIfAborted();
       if (deadline.aborted)
@@ -163,11 +210,11 @@ export class BridgeSourceAdapter implements SourceAdapter {
         )
       )
         throw new Error(
-          'Bridge startup failed to import a module. Install dependencies in the bridge working directory and check its imports.'
+          'Bridge startup failed to import a module. Check the working directory, installed dependencies and build output.'
         );
       if (failure instanceof DiscoveryError) throw failure;
       throw new Error(
-        'Bridge initialization or discovery failed. Run the entrypoint in its working directory and check that stdout contains only MCP messages.'
+        'Bridge initialization or discovery failed. Check the startup details and working directory.'
       );
     } finally {
       startup.removeEventListener('abort', interrupt);

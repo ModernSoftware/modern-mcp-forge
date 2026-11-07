@@ -9,5 +9,7 @@ export const load: PageServerLoad = ({ params }) => {
   )?.source;
   if (!source || source.kind === 'native' || source.kind !== params.sourceKind)
     error(404, 'Connection not found.');
-  return { ...data, source, inspection: projectSources.inspect(source.id) };
+  return { ...data, source,
+    startupDetails: source.kind === 'bridge' ? projectSources.diagnostics(data.project.id, source.id) : '',
+    inspection: projectSources.inspect(source.id) };
 };

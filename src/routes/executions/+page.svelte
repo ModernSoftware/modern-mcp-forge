@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { executionOriginLabel } from '$lib/execution-origin';
   import { onMount } from 'svelte';
   import { invalidate } from '$app/navigation';
 
@@ -94,7 +95,7 @@
                 </a>
               </td>
               <td><a class="tool-link" href={`/executions/${execution.id}`}>{execution.toolName}</a></td>
-              <td>{execution.origin === 'mcp' ? 'MCP client' : execution.origin === 'workbench' ? 'Workbench test' : '—'}</td>
+              <td>{executionOriginLabel(execution.origin) ?? '—'}</td>
               <td><span class="runtime-badge {execution.runtime}">{execution.runtime}</span></td>
               <td>{formatDate(execution.startedAt)}</td>
               <td>{execution.durationMs ?? 0} ms</td>
