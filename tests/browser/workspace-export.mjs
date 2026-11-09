@@ -1,3 +1,4 @@
+import { verifyNativeRehearsal } from './native-rehearsal.mjs';
 import { verifySourcePaths } from './source-paths.mjs';
 import { chromium } from 'playwright-core';
 import { createServer } from 'vite';
@@ -124,21 +125,28 @@ try {
     assert.equal(await type.inputValue(), 'native');
     assert.equal(await search.inputValue(), 'greet');
     assert.equal(
-      await page.locator('details.catalog-group').first().getAttribute('open'),
+      await page
+        .locator('details.catalog-group')
+        .first()
+        .getAttribute('open'),
       ''
     );
   };
   await check();
   await page.getByRole('link', { name: 'Export native pack' }).click();
   await page.getByRole('heading', { name: 'Export native pack' }).waitFor();
-  const downloadButton = page.getByRole('button', { name: 'Download .tar.gz' });
+  const downloadButton = page.getByRole('button', {
+    name: 'Download .tar.gz'
+  });
   for (const name of ['demo_greet', 'demo_guide', 'demo_welcome']) {
     const box = page.getByRole('checkbox', { name, exact: true });
     assert.equal(await box.isChecked(), true);
     await box.uncheck();
   }
   assert.equal(await downloadButton.isDisabled(), true);
-  await page.getByRole('checkbox', { name: 'demo_guide', exact: true }).check();
+  await page
+    .getByRole('checkbox', { name: 'demo_guide', exact: true })
+    .check();
   await page.getByRole('button', { name: 'Refresh preview' }).click();
   await page.waitForFunction(
     () => !document.querySelector('.actions button')?.disabled
@@ -182,6 +190,7 @@ try {
   assert.equal(await search.inputValue(), '');
   assert.equal(await kind.inputValue(), 'all');
   await verifySourcePaths(page, join(dir, 'second'));
+  await verifyNativeRehearsal(page, join(dir, 'second'));
   assert.deepEqual(errors, []);
   console.log(
     'Chromium PASS: actual archive download, filters, search, grouping, expansion, navigation, reload, project isolation.'

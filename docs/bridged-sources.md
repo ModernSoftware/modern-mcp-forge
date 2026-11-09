@@ -196,6 +196,22 @@ the bridge and call `plan_rollout` with
 `{"services":[{"name":"api","dependsOn":["db"]},{"name":"db","dependsOn":[]}]}`.
 The two rollout waves should contain `db` followed by `api`.
 
+The planner uses only the `services` array in the request. It does not query a
+database or deploy services. If `item1` depends on `item2`, include both entries
+
+```json
+{
+  "services": [
+    { "name": "item1", "dependsOn": ["item2"] },
+    { "name": "item2", "dependsOn": [] }
+  ]
+}
+```
+
+The expected text result is `{"waves":[["item2"],["item1"]]}`. Omitting `item2`
+returns the intentional `MISSING_DEPENDENCY` tool error. That result proves the
+request reached the application, and the complete graph exercises success.
+
 If the attachment fails, expand **Show startup details**. Check the reported
 stage, path and working directory, then inspect the process output. A missing
 adapter file needs a path correction. A missing compiled server needs the

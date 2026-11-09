@@ -8,7 +8,7 @@ with the standalone MCPack CLI without Forge.
 
 1. Create or open a project from **Projects**. The recent list is searchable by name or folder; the active project has a green indicator.
 2. In **Project workspace**, choose **Add tool**, **Add resource** or **Add prompt**. New authoring uses Native MCPack.
-3. Create a source and choose Node/Python, or select an existing source and create/reuse a worker. Reusing a worker requires the name of a handler already returned by its factory. Forge does not rewrite existing handler code.
+3. Create a source and choose Node/Python, or select an existing source. **Create a new handler** generates a dedicated worker module in that source. **Use an existing handler** binds a handler already returned by a selected worker factory.
 4. Edit the name, description and definition. Tool inputs support a simple-field builder or full JSON Schema. Applying simple fields explicitly replaces the schema draft; it never silently flattens a complex schema.
 5. Choose **Edit code & test**, open the worker module, implement your behavior and save. The generated handler is a placeholder. Implement it against your declared schema; see the [first-tool walkthrough](developer-guide.md#create-your-first-native-tool).
 6. Connect Inspector or an agent to `http://localhost:5173/mcp`. Reconnect after changing or restarting sources.
@@ -37,8 +37,7 @@ modules must remain inside the manifest folder, including through symlinks.
 
 Select the manifest to add bindings with the form or edit its complete JSON in
 Monaco. Tool inputs support simple string/number/boolean fields or full JSON Schema
-with nested objects and arrays. Existing schemas are never flattened. Resource URIs
-and prompt arguments are editable in JSON. **Add to draft** changes only the editor
+with nested objects and arrays. Existing schemas are never flattened. Resource URIs and prompt arguments have visual fields and a JSON definition view. **Add to draft** changes only the editor
 buffer. Implement the named handler in its worker module and save the files.
 Incomplete handlers may fail startup; the files stay editable for repair.
 
@@ -49,8 +48,7 @@ compilation are later work. A shared worker module may implement many capabiliti
 
 ## Lifecycle and errors
 
-- File revisions prevent overwriting external changes; conflicts return 409. Files
-  are replaced atomically and have a 256 KiB editor limit.
+- File revisions prevent overwriting external changes. A 409 conflict preserves the Forge draft and the disk file. Copy the draft for a manual merge or reload the disk version after confirming draft discard. Reload progress remains visible while sources restart. Files are replaced atomically and have a 256 KiB editor limit.
 - Saving/reloading restarts all project sources and discards worker memory. Schema
   and path failures reject the save. Runtime validation failures retain saved work
   and show startup errors, allowing repair.
@@ -106,3 +104,7 @@ Open a tool’s **Test** tab. The form uses the running tool’s input schema. F
 In the JSON editor, **Populate sample** builds an argument object from the tool’s schema. Forge uses valid published examples when available and checks generated values before inserting them. Choose **Replace draft** or **Keep draft** if you already have input. Review identifiers, URLs and other values specific to your application before selecting **Run**. If Forge cannot generate a valid sample, you can still edit the JSON yourself.
 
 After a call, **Preview** displays structured content, text and supported inline images. **Raw JSON** shows the complete response, including metadata and original image data. Try **Populate sample** on the compatibility lab’s `get_quote_by_sku` and run it to see the structured quote.
+
+## Prompt authoring and testing
+
+Declare string arguments with **Add argument** on Definition, or edit their declarations in JSON. The Test tab provides synchronized Form/JSON inputs and rejects non-string values. The [developer guide](developer-guide.md#resources-and-prompts) includes complete Node and Python factories and explains model settings.

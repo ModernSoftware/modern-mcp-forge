@@ -105,10 +105,7 @@
   <div>
     <div class="eyebrow">WORKSPACE</div>
     <h1>Projects</h1>
-    <p>
-      Forge projects are portable folders. This machine keeps only local
-      registration and execution history in SQLite.
-    </p>
+    <p>Create, open and return to MCP projects in your local folders.</p>
   </div>
 
   <div class="page-actions">
@@ -124,19 +121,13 @@
   </div>
 {/if}
 
-<section class="glass-card architecture-note">
-  <div>
-    <strong> Portable project </strong>
-    <code> forge.project.json · native sources · handler files </code>
-  </div>
-
-  <span>↔</span>
-
-  <div>
-    <strong> Machine-local Forge state </strong>
-    <code title={data.databasePath}> SQLite registry · execution history </code>
-  </div>
-</section>
+<details class="storage-note">
+  <summary>About project storage</summary>
+  <p>
+    Project definitions and native code live in your project folder. Forge
+    keeps recent projects and execution history on this machine.
+  </p>
+</details>
 
 {#if data.projects.length === 0}
   <section class="glass-card empty-projects">
@@ -245,40 +236,18 @@
     gap: 8px;
   }
 
-  .architecture-note {
-    display: grid;
-    grid-template-columns: 1fr auto 1fr;
-    align-items: center;
-    gap: 18px;
+  .storage-note {
     margin-bottom: 18px;
-    padding: 15px 18px;
-  }
-
-  .architecture-note > div {
-    min-width: 0;
-  }
-
-  .architecture-note strong,
-  .architecture-note code {
-    display: block;
-  }
-
-  .architecture-note strong {
-    margin-bottom: 4px;
-    font-size: 0.72rem;
-  }
-
-  .architecture-note code {
-    overflow: hidden;
     color: var(--muted);
-    font-size: 0.64rem;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    font-size: 0.85rem;
   }
-
-  .architecture-note > span {
-    color: var(--accent);
-    font-size: 1.2rem;
+  .storage-note summary {
+    cursor: pointer;
+    width: fit-content;
+  }
+  .storage-note p {
+    max-width: 65ch;
+    line-height: 1.5;
   }
 
   .projects-grid {
@@ -485,15 +454,6 @@
   @media (max-width: 860px) {
     .projects-grid {
       grid-template-columns: 1fr;
-    }
-
-    .architecture-note {
-      grid-template-columns: 1fr;
-    }
-
-    .architecture-note > span {
-      transform: rotate(90deg);
-      justify-self: center;
     }
   }
 

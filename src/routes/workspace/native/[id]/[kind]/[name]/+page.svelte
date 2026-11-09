@@ -1,4 +1,10 @@
 <script lang="ts">
+  import {
+    promptFields,
+    promptDefinitions,
+    promptArgumentsSchema,
+    type PromptArgument
+  } from '$lib/authoring/prompt-arguments';
   import { page } from '$app/state';
   import JsonModeSwitch from '$lib/components/JsonModeSwitch.svelte';
   import NamedCases from '$lib/components/NamedCases.svelte';
@@ -40,7 +46,17 @@
   let original = $state('');
   let schemaText = $state('');
   let visualAvailability = $derived.by(() => {
-    if (data.kind !== 'tools' || mode !== 'json') return '';
+    if (mode !== 'json') return '';
+    if (data.kind === 'prompts') {
+      try {
+        return promptFields(JSON.parse(content).arguments) === null
+          ? 'Fix the prompt argument definitions in JSON before switching to visual fields.'
+          : '';
+      } catch {
+        return 'Finish the JSON syntax before switching to visual fields.';
+      }
+    }
+    if (data.kind !== 'tools') return '';
     try {
       return schemaFields(JSON.parse(schemaText)) === null
         ? 'This schema uses nested fields or advanced rules. Edit it in JSON.'
@@ -52,8 +68,17 @@
   let revision = $state('');
   let fields = $state<SchemaField[]>([]);
   let originalFields = $state('[]');
+  let promptArguments = $state<PromptArgument[]>([]);
+  let originalPromptArguments = $state('[]');
+  let promptDirty = $derived(
+    mode === 'fields' &&
+      JSON.stringify(promptArguments) !== originalPromptArguments
+  );
   let key = $state('');
   let busy = $state(false);
+  let reloading = $state(false);
+  let conflict = $state(false);
+  let copyNotice = $state('');
   let error = $state('');
   let notice = $state('');
   let code = $state('');
@@ -92,6 +117,7 @@
   let definitionDirty = $derived(
     content !== original ||
       fieldsDirty ||
+      promptDirty ||
       (data.kind === 'tools' &&
         mode === 'json' &&
         schemaText !== JSON.stringify(definition?.inputSchema, null, 2))
@@ -111,7 +137,11 @@
       data.kind === 'tools' ? schemaFields(data.definition.inputSchema) : [];
     fields = loaded ?? [];
     originalFields = JSON.stringify(fields);
-    mode = loaded === null ? 'json' : 'fields';
+    const prompts =
+      data.kind === 'prompts' ? promptFields(data.definition.arguments) : [];
+    promptArguments = prompts ?? [];
+    originalPromptArguments = JSON.stringify(promptArguments);
+    mode = loaded === null || prompts === null ? 'json' : 'fields';
   }
   $effect(() => {
     const next = `${data.projectId}/${data.sourceId}/${data.kind}/${data.definition.name}`;
@@ -121,8 +151,11 @@
       code = originalCode = data.handlerFile?.content ?? '';
       codeRevision = data.handlerFile?.revision ?? '';
       codePath = data.handlerFile?.path ?? '';
-      tab = page.url.searchParams.get('tab') === 'test' ? 'Test' : 'Definition';
+      tab =
+        page.url.searchParams.get('tab') === 'test' ? 'Test' : 'Definition';
       diagnostics = null;
+      conflict = false;
+      copyNotice = '';
       error = '';
       notice = '';
       result = undefined;
@@ -150,6 +183,8 @@
       else if (fieldsDirty)
         value.inputSchema = fieldsSchema(fields, value.inputSchema);
     }
+    if (data.kind === 'prompts' && mode === 'fields' && promptDirty)
+      value.arguments = promptDefinitions(promptArguments);
     return value;
   }
   function changeMode(json: boolean) {
@@ -167,6 +202,12 @@
           fields = loaded;
           originalFields = JSON.stringify(fields);
         }
+      }
+      if (data.kind === 'prompts' && next === 'fields') {
+        const loaded = promptFields(value.arguments);
+        if (!loaded) throw new Error(visualAvailability);
+        promptArguments = loaded;
+        originalPromptArguments = JSON.stringify(loaded);
       }
       content = JSON.stringify(value, null, 2);
       mode = next;
@@ -191,7 +232,14 @@
       })
     });
     const payload = await response.json();
-    if (!response.ok) throw new Error(payload.error ?? 'Request failed.');
+    if (!response.ok) {
+      if (
+        response.status === 409 &&
+        /File changed on disk/.test(payload.error ?? '')
+      )
+        conflict = true;
+      throw new Error(payload.error ?? 'Request failed.');
+    }
     return payload;
   }
   async function refresh() {
@@ -225,6 +273,9 @@
       if (data.kind === 'tools' && mode === 'fields')
         fields = schemaFields(value.inputSchema) ?? [];
       originalFields = JSON.stringify(fields);
+      promptArguments = promptFields(value.arguments) ?? [];
+      originalPromptArguments = JSON.stringify(promptArguments);
+      conflict = false;
       schemaText = JSON.stringify(value.inputSchema ?? {}, null, 2);
       revision = payload.file.revision;
       result = undefined;
@@ -263,6 +314,7 @@
       });
       code = originalCode = payload.file.content;
       codeRevision = payload.file.revision;
+      conflict = false;
       result = undefined;
       notice = payload.snapshot.error
         ? 'Code saved. Source startup failed. Inspect diagnostics to repair the worker.'
@@ -285,6 +337,7 @@
     )
       return;
     busy = true;
+    reloading = true;
     error = '';
     notice = '';
     result = undefined;
@@ -295,6 +348,8 @@
       );
       await refresh();
       resetDefinition();
+      conflict = false;
+      copyNotice = '';
       code = originalCode = data.handlerFile?.content ?? '';
       codeRevision = data.handlerFile?.revision ?? '';
       codePath = data.handlerFile?.path ?? '';
@@ -306,6 +361,7 @@
       await refresh();
     } finally {
       busy = false;
+      reloading = false;
     }
   }
   async function run() {
@@ -316,7 +372,7 @@
     result = undefined;
     try {
       const args =
-        data.kind === 'tools'
+        data.kind !== 'resources'
           ? editor?.argumentsForRun()
           : data.kind === 'resources'
             ? {}
@@ -348,7 +404,8 @@
 </script>
 
 <svelte:head
-  ><title>{String(data.definition.name)} · Modern MCP Forge</title></svelte:head
+  ><title>{String(data.definition.name)} · Modern MCP Forge</title
+  ></svelte:head
 >
 <svelte:window
   onbeforeunload={(event) => {
@@ -392,10 +449,12 @@
     </button>
   {/each}
 </div>
-<div class="runtime-bar">
+<div class="runtime-bar" aria-busy={reloading}>
   <span>Source <strong>{source?.status ?? 'stopped'}</strong></span>
   <button class="secondary-button" disabled={busy} onclick={reload}
-    >Reload files &amp; restart sources</button
+    >{reloading
+      ? 'Reloading files & restarting sources…'
+      : 'Reload files & restart sources'}</button
   >
   <button class="secondary-button" disabled={busy} onclick={showDiagnostics}
     >Show worker diagnostics</button
@@ -404,6 +463,37 @@
     >Use reload after editing the worker or its imports outside Forge.</small
   >
 </div>
+{#if reloading}<p role="status">
+    Reading files from disk and restarting project sources. This can take a
+    moment while workers and connected servers start.
+  </p>{/if}
+{#if conflict}
+  <section class="conflict-note" aria-label="File conflict">
+    <p>
+      The file changed outside Forge. Your draft is still in this editor. Copy
+      it before reloading if you want to merge your changes in your IDE.
+    </p>
+    <button
+      class="secondary-button"
+      disabled={busy}
+      onclick={async () => {
+        try {
+          await navigator.clipboard.writeText(
+            tab === 'Code' ? code : JSON.stringify(draftDefinition(), null, 2)
+          );
+          copyNotice = 'Draft copied.';
+        } catch {
+          copyNotice =
+            'Copy could not complete. Select and copy the draft from the editor.';
+        }
+      }}>Copy current draft</button
+    >
+    <button class="secondary-button" disabled={busy} onclick={reload}
+      >Reload disk version</button
+    >
+    {#if copyNotice}<p role="status">{copyNotice}</p>{/if}
+  </section>
+{/if}
 {#if diagnostics !== null && diagnosticGeneration === data.snapshot.generation}
   <pre class="code-block" aria-live="polite">{diagnostics ||
       'No worker output for this source.'}</pre>
@@ -412,8 +502,12 @@
     {error || data.snapshot.error}
   </p>{/if}
 {#if source?.status === 'failed'}
-  <p class="workflow-muted">Check worker <code>{String(data.definition.worker)}</code> in <code>{codePath || data.sourceFolder}</code>.
-    Its factory must return a <code>{data.kind}</code> entry named <code>{String(data.definition.handler)}</code>.</p>
+  <p class="workflow-muted">
+    Check worker <code>{String(data.definition.worker)}</code> in
+    <code>{codePath || data.sourceFolder}</code>. Its factory must return a
+    <code>{data.kind}</code>
+    entry named <code>{String(data.definition.handler)}</code>.
+  </p>
 {/if}
 {#if notice}<p role="status">{notice}</p>{/if}
 <div
@@ -430,7 +524,8 @@
           >Name<input
             value={String(definition.name ?? '')}
             disabled={busy}
-            oninput={(event) => setProperty('name', event.currentTarget.value)}
+            oninput={(event) =>
+              setProperty('name', event.currentTarget.value)}
           /></label
         >
         <label
@@ -480,8 +575,8 @@
           <h3>Input fields</h3>
           <p class="workflow-muted">
             Changes are included when you save the definition. Existing
-            validation rules are retained unless you change a field's type. Use
-            JSON mode for nested objects and arrays.
+            validation rules are retained unless you change a field's type.
+            Use JSON mode for nested objects and arrays.
           </p>
           {#each fields as field, index}<div class="field-row">
               <label
@@ -503,6 +598,34 @@
                   disabled={busy}
                 /></label
               >
+              {#if field.type === 'string'}
+                <label class="minimum-length"
+                  >Minimum length
+                  <input
+                    name={'minLength-' + index}
+                    type="number"
+                    min="0"
+                    step="1"
+                    disabled={busy}
+                    value={field.schema.type === 'string' &&
+                    typeof field.schema.minLength === 'number'
+                      ? field.schema.minLength
+                      : undefined}
+                    oninput={(event) => {
+                      const input = event.currentTarget;
+                      const schema: Record<string, unknown> =
+                        field.schema.type === 'string'
+                          ? { ...field.schema }
+                          : { type: 'string' };
+                      if (input.value === '' && !input.validity.badInput)
+                        delete schema.minLength;
+                      else schema.minLength = input.valueAsNumber;
+                      field.schema = schema;
+                    }}
+                  />
+                </label>
+              {:else}<span class="constraint-empty" aria-hidden="true"
+                ></span>{/if}
               <label class="required"
                 >Required<input
                   type="checkbox"
@@ -513,22 +636,10 @@
               <button
                 class="secondary-button"
                 disabled={busy}
-                onclick={() => (fields = fields.filter((_, i) => i !== index))}
+                onclick={() =>
+                  (fields = fields.filter((_, i) => i !== index))}
                 >Remove</button
               >
-              {#if field.type === 'string'}
-                <label class="minimum-length">Minimum length
-                  <input name={'minLength-' + index} type="number" min="0" step="1" disabled={busy}
-                    value={field.schema.type === 'string' && typeof field.schema.minLength === 'number' ? field.schema.minLength : undefined}
-                    oninput={(event) => {
-                      const input = event.currentTarget;
-                      const schema: Record<string, unknown> = field.schema.type === 'string' ? { ...field.schema } : { type: 'string' };
-                      if (input.value === '' && !input.validity.badInput) delete schema.minLength;
-                      else schema.minLength = input.valueAsNumber;
-                      field.schema = schema;
-                    }} />
-                </label>
-              {/if}
               {#if field.schema.type === field.type && Array.isArray(field.schema.enum)}
                 <small class="workflow-muted allowed-values"
                   >Allowed values · {field.schema.enum
@@ -557,7 +668,8 @@
             >URI<input
               value={String(definition.uri ?? '')}
               disabled={busy}
-              oninput={(event) => setProperty('uri', event.currentTarget.value)}
+              oninput={(event) =>
+                setProperty('uri', event.currentTarget.value)}
             /></label
           >
           <label
@@ -569,10 +681,51 @@
             /></label
           >
         {:else}
-          <p>
-            Prompt arguments are strings. Edit their definitions in JSON mode;
-            implement the rendered messages in Code.
+          <h3>Prompt arguments</h3>
+          <p class="workflow-muted">
+            Declare the string values used by your handler. Implement the
+            rendered messages in Code.
           </p>
+          {#each promptArguments as argument, index}
+            <div class="field-row prompt-row">
+              <label
+                >Argument name<input
+                  bind:value={argument.name}
+                  disabled={busy}
+                /></label
+              >
+              <label
+                >Description<input
+                  bind:value={argument.description}
+                  disabled={busy}
+                /></label
+              >
+              <label class="required"
+                >Required<input
+                  type="checkbox"
+                  bind:checked={argument.required}
+                  disabled={busy}
+                /></label
+              >
+              <button
+                class="secondary-button"
+                disabled={busy}
+                onclick={() =>
+                  (promptArguments = promptArguments.filter(
+                    (_, i) => i !== index
+                  ))}>Remove argument</button
+              >
+            </div>
+          {/each}
+          <button
+            class="secondary-button"
+            disabled={busy}
+            onclick={() =>
+              (promptArguments = [
+                ...promptArguments,
+                { name: '', description: '', required: false }
+              ])}>Add argument</button
+          >
         {/if}
       </div>
     {/if}
@@ -585,7 +738,9 @@
       <button disabled={busy || !definitionDirty} onclick={resetDefinition}
         >Discard definition changes</button
       >
-      <span>{definitionDirty ? 'Unsaved definition' : 'Definition saved'}</span>
+      <span
+        >{definitionDirty ? 'Unsaved definition' : 'Definition saved'}</span
+      >
     </div>
   {:else if tab === 'Code'}
     <h2>Code</h2>
@@ -632,16 +787,16 @@
   {:else}
     <h2>Test {String(data.definition.name)}</h2>
     <p>
-      Runs this item's saved implementation. No need to select its source, type
-      or name again.
+      Runs this item's saved implementation. No need to select its source,
+      type or name again.
     </p>
     {#if dirty}<p role="status">
         Save or discard your definition and code changes before testing.
       </p>{/if}
     {#if disabled}<p role="status">
         {#if !data.sourceEnabled}
-          This source is disabled. <a href="/project">Open Configuration</a> to enable
-          it.
+          This source is disabled. <a href="/project">Open Configuration</a> to
+          enable it.
         {:else if data.disabled}
           This capability is disabled. <a href="/workspace"
             >Open the workspace</a
@@ -667,18 +822,21 @@
         bind:text={argumentsText}
         disabled={busy}
       />
-    {:else if data.kind === 'prompts'}<label class="arguments"
-        >Arguments (JSON)<textarea
-          rows="8"
-          bind:value={argumentsText}
-          disabled={busy}></textarea></label
-      >{/if}
+    {:else if data.kind === 'prompts'}
+      <ToolArguments
+        bind:this={editor}
+        kind="prompt"
+        schema={promptArgumentsSchema(data.definition.arguments)}
+        bind:text={argumentsText}
+        disabled={busy}
+      />
+    {/if}
     <button
       class="primary-button"
       disabled={busy ||
         dirty ||
         disabled ||
-        (data.kind === 'tools' && !editor?.canRun())}
+        (data.kind !== 'resources' && !editor?.canRun())}
       onclick={run}>{busy ? 'Running…' : 'Run'}</button
     >
     {#if result !== undefined}{#key result}<McpResult {result} />{/key}{/if}
@@ -747,13 +905,35 @@
   .field-row {
     display: grid;
     grid-template-columns:
-      minmax(100px, 1fr) 110px minmax(140px, 1fr)
-      75px auto;
+      minmax(100px, 1fr) 100px minmax(140px, 1.4fr)
+      105px 75px auto;
     gap: 12px;
     align-items: end;
     margin: 14px 0;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
   }
-  .minimum-length { grid-column: 1 / -1; max-width: 10rem; }
+  .minimum-length {
+    max-width: 10rem;
+  }
+  .field-row .required {
+    align-self: stretch;
+    align-content: space-between;
+    padding-bottom: 8px;
+  }
+  .prompt-row {
+    grid-template-columns: minmax(120px, 1fr) minmax(160px, 2fr) 75px auto;
+  }
+  .conflict-note {
+    padding: 1rem;
+    margin: 1rem 0;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+  }
+  .conflict-note button {
+    margin: 0.25rem 0.5rem 0.25rem 0;
+  }
   .allowed-values {
     grid-column: 1 / -1;
     overflow-wrap: anywhere;
@@ -814,11 +994,6 @@
     align-items: center;
     margin-top: 20px;
   }
-  .arguments {
-    display: grid;
-    gap: 8px;
-    margin: 16px 0;
-  }
   textarea {
     width: 100%;
     box-sizing: border-box;
@@ -835,9 +1010,12 @@
   code {
     overflow-wrap: anywhere;
   }
-  @media (max-width: 800px) {
+  @media (max-width: 1100px) {
     .field-row {
       grid-template-columns: 1fr 1fr;
+    }
+    .constraint-empty {
+      display: none;
     }
     .editor-panel {
       padding: 16px;

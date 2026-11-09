@@ -13,6 +13,9 @@
   let sourceChoice = $state('new');
   let workerChoice = $state('new');
   let workerId = $state('');
+  let customWorkerId = $state(false);
+  let effectiveWorkerId = $derived(customWorkerId ? workerId : name);
+  let implementation = $state('create');
   let handler = $state('');
   let existing = $derived(
     data.sources.find((entry) => entry.source.id === sourceChoice)
@@ -41,10 +44,13 @@
             sourceChoice === 'new'
               ? undefined
               : {
-                  worker: workerChoice === 'new' ? workerId : workerChoice,
+                  worker:
+                    implementation === 'create'
+                      ? effectiveWorkerId
+                      : workerChoice,
                   handler,
                   revision: existing?.revision,
-                  newWorker: workerChoice === 'new'
+                  newWorker: implementation === 'create'
                 }
         })
       });
@@ -106,7 +112,10 @@
       aria-label="Source"
       bind:value={sourceChoice}
       disabled={busy}
-      onchange={() => (workerChoice = 'new')}
+      onchange={() => {
+        workerChoice = '';
+        implementation = 'create';
+      }}
       ><option value="new">Create a source</option
       >{#each data.sources.filter((entry) => entry.source.kind === 'native' && entry.manifest) as entry}<option
           value={entry.source.id}>{entry.source.id}</option
@@ -131,29 +140,54 @@
       /></label
     >
     <p class="workflow-muted">
-      Creates <code>native/{effectiveSourceId || 'source-id'}/mcpack.json</code> and
-      a worker module. The source ID identifies this group; it is not the handler
-      filename.
+      Creates <code
+        >native/{effectiveSourceId || 'source-id'}/mcpack.json</code
+      > and a worker module. The source ID identifies this group; it is not the
+      handler filename.
     </p>{:else}
     <label
-      >Worker<select
-        aria-label="Worker"
-        bind:value={workerChoice}
+      >Implementation<select
+        aria-label="Implementation"
+        bind:value={implementation}
         disabled={busy}
-        ><option value="new">Create a worker</option
-        >{#each Object.entries(existing?.manifest?.workers ?? {}) as [id, worker]}<option
-            value={id}>{id} · {worker.runtime}</option
-          >{/each}</select
-      ></label
+      >
+        <option value="create">Create a new handler</option>
+        <option value="existing">Use an existing handler</option>
+      </select></label
     >
-    {#if workerChoice === 'new'}<label
+    {#if implementation === 'create'}
+      <label
         >New worker ID<input
-          bind:value={workerId}
+          value={effectiveWorkerId}
+          oninput={(event) => {
+            customWorkerId = true;
+            workerId = event.currentTarget.value;
+          }}
           required
           pattern={'[A-Za-z][A-Za-z0-9_-]{0,63}'}
           disabled={busy}
         /></label
-      >{:else}<label
+      >
+      <p class="workflow-muted">
+        Creates an editable handler in its own worker module within this
+        source. Give each worker a distinct ID. You can import shared services
+        from your application.
+      </p>
+    {:else}
+      <label
+        >Worker<select
+          aria-label="Worker"
+          bind:value={workerChoice}
+          required
+          disabled={busy}
+        >
+          <option value="">Select an existing worker</option>
+          {#each Object.entries(existing?.manifest?.workers ?? {}) as [id, worker]}
+            <option value={id}>{id} · {worker.runtime}</option>
+          {/each}
+        </select></label
+      >
+      <label
         >Existing handler name<input
           bind:value={handler}
           required
@@ -161,23 +195,26 @@
         /></label
       >
       <p class="workflow-muted">
-        The existing factory must already return this handler. Forge will not
-        rewrite your existing code.
-      </p>{/if}
+        The selected worker's factory must already return this handler under <code
+          >{kind}</code
+        >. Choose “Create a new handler” to generate a starter implementation.
+      </p>
+    {/if}
   {/if}
-  {#if sourceChoice === 'new' || workerChoice === 'new'}<label
+  {#if sourceChoice === 'new' || implementation === 'create'}<label
       >Worker runtime<select
         aria-label="Worker runtime"
         bind:value={runtime}
         disabled={busy}
-        ><option value="node">Node</option><option value="python">Python</option
+        ><option value="node">Node</option><option value="python"
+          >Python</option
         ></select
       ></label
     >{/if}
   <p class="workflow-muted">
-    Tools, resources and prompts can all use native MCPack handlers. New workers
-    get only the selected item, named after it. Configure its definition,
-    implement its code, then test it in the editor.
+    Tools, resources and prompts can all use native MCPack handlers. New
+    workers get only the selected item, named after it. Configure its
+    definition, implement its code, then test it in the editor.
   </p>
   <button class="primary-button" disabled={busy}
     >{busy ? 'Creating…' : `Create ${label}`}</button

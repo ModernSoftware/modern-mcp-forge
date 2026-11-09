@@ -19,6 +19,7 @@ Publication is pending release rehearsal and the final release gate.
 - Named tool cases with exact assertions, expected failures, schema drift checks
   and sequential batch execution.
 - Agent exposure settings for upstream visibility, public aliases and descriptions.
+- Explicit new-handler creation, visual prompt argument authoring/testing, and visible file-conflict recovery.
 - Developer/reference documentation and a 0.10.0 rehearsal checklist.
 - Removed unused native-list/definition-dialog components and obsolete session
   review notes; retained active classic-project compatibility.
