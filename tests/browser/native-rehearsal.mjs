@@ -212,13 +212,30 @@ export async function verifyNativeRehearsal(page, project) {
       .waitFor();
     assert.equal(await readFile(path, 'utf8'), before);
     assert.equal(await readFile(declaration, 'utf8'), manifestBefore);
+    const createdResponse = page.waitForResponse(
+      (response) =>
+        response.url().endsWith('/api/project/native') &&
+        response.request().postDataJSON()?.action === 'create-capability'
+    );
     await page
       .getByRole('button', { name: `Create ${kind}`, exact: true })
       .click();
+    const created = await createdResponse;
+    const payload = await created.json();
+    assert.equal(created.status(), 200, JSON.stringify(payload));
+    assert.equal(payload.snapshot.status, 'ready', JSON.stringify(payload));
     await page.waitForURL(
       `**/workspace/native/review_topic/${kind}s/${name}`
     );
-    assert.equal(await page.getByRole('alert').count(), 0);
+    // Monaco keeps two screen-reader announcement nodes after its preview closes.
+    const errors = await page
+      .locator('[role="alert"]:not(.monaco-alert)')
+      .allTextContents();
+    assert.deepEqual(
+      errors,
+      [],
+      `Unexpected alerts for ${name}: ${errors.join('\n')}`
+    );
     const updated = JSON.parse(await readFile(declaration, 'utf8'));
     assert.deepEqual(updated.workers, JSON.parse(manifestBefore).workers);
     assert.equal(

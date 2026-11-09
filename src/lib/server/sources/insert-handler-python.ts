@@ -87,7 +87,7 @@ def insert(data):
     return content
 
 try:
-    print(json.dumps({"content": insert(json.load(sys.stdin))}))
+    print(json.dumps({"content": insert(json.loads(sys.stdin.buffer.read().decode("utf-8")))}))
 except (SyntaxError, ValueError) as error:
     print(json.dumps({"error": str(error) if isinstance(error, ValueError) else "Fix the Python worker syntax before adding a handler."}))
 `;
