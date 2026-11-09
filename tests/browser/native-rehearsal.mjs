@@ -88,10 +88,21 @@ export async function verifyNativeRehearsal(page, project) {
   const original = await readFile(worker, 'utf8');
   const draft = original.replace('Not implemented yet.', 'Forge draft');
   const disk = original.replace('Not implemented yet.', 'Saved in IDE');
-  const editor = page.locator('.monaco-editor textarea').first();
-  await editor.focus();
-  await page.keyboard.press('ControlOrMeta+a');
-  await page.keyboard.insertText(draft);
+  // Monaco may use Chrome's EditContext instead of the fallback textarea.
+  // Apply a real model edit through its public API so onChange marks the draft.
+  await page.locator('.monaco-editor .view-lines').waitFor();
+  await page.evaluate(async (text) => {
+    const { monaco } = await import('/src/lib/client/monaco.ts');
+    const editor = monaco.editor
+      .getEditors()
+      .find((item) => item.getModel()?.getLanguageId() === 'javascript');
+    if (!editor?.getModel())
+      throw new Error('JavaScript editor was not ready');
+    editor.executeEdits('rehearsal', [
+      { range: editor.getModel().getFullModelRange(), text }
+    ]);
+  }, draft);
+  await page.getByRole('tab', { name: 'Code *', exact: true }).waitFor();
   await writeFile(worker, disk);
   const conflictResponse = page.waitForResponse(
     (r) =>
