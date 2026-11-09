@@ -113,11 +113,16 @@ export async function verifyNativeRehearsal(page, project) {
   assert.equal((await conflictResponse).status(), 409);
   await page.getByRole('region', { name: 'File conflict' }).waitFor();
   assert.equal(await readFile(worker, 'utf8'), disk);
-  await page
-    .locator('.monaco-editor .view-lines')
-    .getByText(/Forge draft/)
-    .first()
-    .waitFor();
+  const editorText = () =>
+    page.evaluate(async () => {
+      const { monaco } = await import('/src/lib/client/monaco.ts');
+      return monaco.editor
+        .getEditors()
+        .find((item) => item.getModel()?.getLanguageId() === 'javascript')
+        ?.getValue();
+    });
+  // Monaco virtualizes lines outside the viewport. Compare the complete model.
+  assert.equal(await editorText(), draft);
   page.once('dialog', (dialog) => dialog.accept());
   await page.getByRole('button', { name: 'Reload disk version' }).click();
   await page
@@ -136,11 +141,7 @@ export async function verifyNativeRehearsal(page, project) {
     await page.getByRole('region', { name: 'File conflict' }).count(),
     0
   );
-  await page
-    .locator('.monaco-editor .view-lines')
-    .getByText(/Saved in IDE/)
-    .first()
-    .waitFor();
+  assert.equal(await editorText(), disk);
   assert.equal(
     await page
       .getByRole('button', { name: 'Save code', exact: true })
