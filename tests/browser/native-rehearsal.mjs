@@ -192,7 +192,7 @@ export async function verifyNativeRehearsal(page, project) {
   ]) {
     await workspace();
     await page
-      .getByRole('link', { name: `Add ${kind}`, exact: true })
+      .getByRole('link', { name: new RegExp(`Add ${kind}$`) })
       .click();
     await page.getByRole('textbox', { name: 'Name', exact: true }).fill(name);
     await page
