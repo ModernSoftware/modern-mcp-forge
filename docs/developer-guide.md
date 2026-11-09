@@ -130,7 +130,7 @@ The manifest binding connects the public tool name to a worker and handler:
 
 This is one tool entry, not a complete manifest. Start with the generated
 manifest. To add a second tool named `greet_customer_py` to the same source,
-select **Create a new handler**, give its worker a distinct ID, and choose Python at creation. Match the handler key shown above the
+select **Create a new worker and handler**, give its worker a distinct ID, and choose Python at creation. Match the handler key shown above the
 Code editor. For the `greet_customer_py` binding, use:
 
 ```python
@@ -201,11 +201,40 @@ use your IDE for helpers, folders and dependency installation.
 
 ## Resources and prompts
 
-Choose **Add resource** or **Add prompt**, then select a source. **Create a new
-handler** generates a dedicated worker module for either Node or Python. Choose
-a unique worker ID and runtime. **Use an existing handler** binds a function
-already returned by a selected worker. Multiple capabilities can share that
-worker when you implement their factories in your IDE.
+Choose **Add resource** or **Add prompt**, then select a source. The same choices
+also apply to **Add tool**:
+
+| Implementation | File change | Worker behavior |
+| --- | --- | --- |
+| **Add a new handler to an existing worker** | Adds a function and its registry entry to the selected module after a preview | Shares the selected worker's runtime, configuration and initialized dependencies |
+| **Create a new worker and handler** | Creates a new `.mjs` or `.py` module in this source | Creates a separate worker with its own runtime and state |
+| **Use an existing handler** | Adds only a manifest binding | Uses a handler you already implemented |
+
+A **source** is an exportable pack described by one MCPack manifest. A **worker**
+is a runtime instance configured to load a module and call its factory. A
+**handler** is a function registered under `tools`, `resources` or `prompts` in
+the factory's return value. One module can implement all three groups. Different
+worker IDs can load the same module, but they still have separate worker state.
+
+For a shared handler, select the worker, choose **Preview handler**, review the
+proposed file, then choose **Create resource/prompt/tool**. No extra module or
+worker is created. The selected worker's runtime is inherited. Both the manifest
+and module revisions are checked before saving. If the module changes in your
+IDE, refresh the preview before trying again. Creation restarts sources and
+reinitializes worker memory, as other code saves do.
+
+Automatic insertion supports exported Node factories and top-level Python
+factories with a single direct object/dictionary return and literal handler
+groups, including the generated scaffolds and examples below. It preserves
+existing code and comments. Dynamic registries, spreads, decorators or conditional
+factory returns may require manual editing. Forge explains unsupported structures
+without changing files. Use **Use an existing handler** after implementing the
+function yourself, or choose a new worker. Python previews use a local Python
+interpreter to parse source, without importing the worker or its dependencies.
+
+Adding an argument later changes the definition, not your existing handler code.
+Read prompt values from `args.topic` in Node or `args["topic"]` in Python. Forge
+does not rewrite your implementation when its definition changes.
 
 On a resource's **Definition** tab, set its URI and content type. On a prompt's
 **Definition** tab, choose **Add argument** and enter its name, description and

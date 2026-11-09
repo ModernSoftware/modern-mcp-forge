@@ -10,6 +10,7 @@ import { startProjectSources } from '$lib/server/sources/project';
 import {
   setCapabilityEnabled,
   createNativeCapability,
+  previewNativeHandler,
   updateNativeDefinition,
   attachNativeSource,
   changeNativeSource,
@@ -21,6 +22,17 @@ import {
 const identity = { projectId: z.string(), id: z.string().min(1) };
 const generation = { generation: z.number().int().nonnegative() };
 const Input = z.discriminatedUnion('action', [
+  z
+    .object({
+      ...identity,
+      ...generation,
+      action: z.literal('preview-handler'),
+      kind: z.enum(['tools', 'resources', 'prompts']),
+      name: z.string(),
+      worker: z.string(),
+      revision: z.string()
+    })
+    .strict(),
   z
     .object({ ...identity, ...generation, action: z.literal('diagnostics') })
     .strict(),
@@ -48,7 +60,9 @@ const Input = z.discriminatedUnion('action', [
           worker: z.string(),
           handler: z.string().optional(),
           revision: z.string(),
-          newWorker: z.boolean()
+          newWorker: z.boolean(),
+          addHandler: z.boolean().optional(),
+          workerRevision: z.string().optional()
         })
         .strict()
         .optional()
@@ -139,7 +153,9 @@ export const POST: RequestHandler = async ({ request }) => {
     if (input.action === 'diagnostics') {
       current();
       return json(
-        { diagnostics: projectSources.diagnostics(input.projectId, input.id) },
+        {
+          diagnostics: projectSources.diagnostics(input.projectId, input.id)
+        },
         {
           headers: { 'cache-control': 'no-store' }
         }
@@ -165,6 +181,17 @@ export const POST: RequestHandler = async ({ request }) => {
       const project = current();
       if (input.action === 'read')
         return json({ file: readNativeFile(project, input.id, input.path) });
+      if (input.action === 'preview-handler')
+        return json({
+          preview: previewNativeHandler(
+            project,
+            input.id,
+            input.kind,
+            input.name,
+            input.worker,
+            input.revision
+          )
+        });
       let file;
       if (input.action === 'set-capability-enabled')
         setCapabilityEnabled(

@@ -8,7 +8,7 @@ with the standalone MCPack CLI without Forge.
 
 1. Create or open a project from **Projects**. The recent list is searchable by name or folder; the active project has a green indicator.
 2. In **Project workspace**, choose **Add tool**, **Add resource** or **Add prompt**. New authoring uses Native MCPack.
-3. Create a source and choose Node/Python, or select an existing source. **Create a new handler** generates a dedicated worker module in that source. **Use an existing handler** binds a handler already returned by a selected worker factory.
+3. Create a source and choose Node/Python, or select an existing source. **Add a new handler to an existing worker** previews code insertion into its module. **Create a new worker and handler** creates a separate module. **Use an existing handler** binds a function already returned by a selected worker factory.
 4. Edit the name, description and definition. Tool inputs support a simple-field builder or full JSON Schema. Applying simple fields explicitly replaces the schema draft; it never silently flattens a complex schema.
 5. Choose **Edit code & test**, open the worker module, implement your behavior and save. The generated handler is a placeholder. Implement it against your declared schema; see the [first-tool walkthrough](developer-guide.md#create-your-first-native-tool).
 6. Connect Inspector or an agent to `http://localhost:5173/mcp`. Reconnect after changing or restarting sources.
@@ -25,8 +25,18 @@ unsaved edits; reopening starts the configured sources again.
 ## Files and definitions
 
 New sources live under `native/<source-id>/` with a manifest and worker module.
-Creation exposes only the capability you chose. Normal creation generates one handler for the selected kind. When reusing a
-worker, implement the additional handler yourself before binding it. The separate
+Creation exposes only the capability you chose. The creation form can generate a
+handler in an existing module or create a new module in the same source. Shared
+handlers use the selected worker's runtime, settings and initialized dependencies.
+Previewing reads files without writing them or executing the factory. Confirming
+creation checks both file revisions, inserts the handler and adds its manifest
+binding. A stale preview must be refreshed before retrying.
+
+Automatic insertion supports factories that directly return an object/dictionary
+with literal handler groups. Dynamic registries and conditional returns require
+manual editing and **Use an existing handler**, or a separate new worker. Existing
+handlers, imports and comments are preserved. See the [worker choices and shared
+factory examples](developer-guide.md#resources-and-prompts). The separate
 demonstration source contains examples for all three kinds.
 Node workers use JavaScript modules; compile TypeScript yourself and point the
 manifest at its output. Python uses the executable configured in the manifest,

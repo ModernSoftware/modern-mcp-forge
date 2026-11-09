@@ -89,7 +89,9 @@ export function registerNativeSources(
         {
           title: prompt.title,
           description: prompt.description,
-          argsSchema: z.object(shape)
+          // MCP allows an omitted argument map. Validate it as {}, so required
+          // arguments still fail while argument-free/optional prompts work.
+          argsSchema: z.object(shape).prefault({})
         },
         async (args, context) =>
           (await invoke(

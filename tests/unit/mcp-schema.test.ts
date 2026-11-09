@@ -1,7 +1,10 @@
 import { describe, expect, test } from 'bun:test';
 import { buildToolInputSchema } from '$lib/server/mcp/input-schema';
 import { buildPromptArgsSchema } from '$lib/server/mcp/prompt-schema';
-import type { PromptDefinition, ToolDefinition } from '$lib/server/project/schema';
+import type {
+  PromptDefinition,
+  ToolDefinition
+} from '$lib/server/project/schema';
 
 type ToolInputSchema = ReturnType<typeof buildToolInputSchema>;
 
@@ -136,6 +139,19 @@ describe('buildPromptArgsSchema', () => {
       }).success
     ).toBe(true);
     expect(schema.safeParse({}).success).toBe(false);
+    expect(schema.safeParse(undefined).success).toBe(false);
+  });
+
+  test('accepts omitted maps only when no prompt arguments are required', () => {
+    expect(
+      buildPromptArgsSchema({ ...prompt, arguments: {} }).parse(undefined)
+    ).toEqual({});
+    expect(
+      buildPromptArgsSchema({
+        ...prompt,
+        arguments: { focus: { required: false } }
+      }).parse(undefined)
+    ).toEqual({});
   });
 
   test('requires prompt values to be strings', () => {

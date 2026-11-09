@@ -158,10 +158,8 @@ export async function verifyNativeRehearsal(page, project) {
   await page
     .getByLabel('Source', { exact: true })
     .selectOption('review_topic');
-  assert.equal(
-    await page.getByLabel('Implementation').inputValue(),
-    'create'
-  );
+  assert.equal(await page.getByLabel('Implementation').inputValue(), 'add');
+  await page.getByLabel('Implementation').selectOption('create');
   assert.equal(
     await page.getByLabel('New worker ID').inputValue(),
     'support_guide'
@@ -185,6 +183,72 @@ export async function verifyNativeRehearsal(page, project) {
   await run.click();
   await page.getByRole('region', { name: 'Request result' }).waitFor();
   await page.getByRole('tab', { name: 'Definition', exact: true }).click();
+  // Add capabilities to both existing modules without allocating another worker.
+  for (const [kind, name, workerId, module] of [
+    ['prompt', 'shared_review', 'main', 'handlers.mjs'],
+    ['resource', 'shared_guide', 'main', 'handlers.mjs'],
+    ['tool', 'shared_python_tool', 'support_guide', 'support_guide.py'],
+    ['prompt', 'shared_python_prompt', 'support_guide', 'support_guide.py']
+  ]) {
+    await workspace();
+    await page
+      .getByRole('link', { name: `Add ${kind}`, exact: true })
+      .click();
+    await page.getByRole('textbox', { name: 'Name', exact: true }).fill(name);
+    await page
+      .getByLabel('Source', { exact: true })
+      .selectOption('review_topic');
+    await page.getByLabel('Worker', { exact: true }).selectOption(workerId);
+    assert.equal(await page.getByLabel('Worker runtime').count(), 0);
+    const path = join(project, 'native/review_topic', module);
+    const before = await readFile(path, 'utf8');
+    const declaration = join(project, 'native/review_topic/mcpack.json');
+    const manifestBefore = await readFile(declaration, 'utf8');
+    await page
+      .getByRole('button', { name: 'Preview handler', exact: true })
+      .click();
+    await page
+      .getByRole('region', { name: 'Worker change preview' })
+      .waitFor();
+    assert.equal(await readFile(path, 'utf8'), before);
+    assert.equal(await readFile(declaration, 'utf8'), manifestBefore);
+    await page
+      .getByRole('button', { name: `Create ${kind}`, exact: true })
+      .click();
+    await page.waitForURL(
+      `**/workspace/native/review_topic/${kind}s/${name}`
+    );
+    assert.equal(await page.getByRole('alert').count(), 0);
+    const updated = JSON.parse(await readFile(declaration, 'utf8'));
+    assert.deepEqual(updated.workers, JSON.parse(manifestBefore).workers);
+    assert.equal(
+      updated[`${kind}s`].find((item) => item.name === name).worker,
+      workerId
+    );
+    assert.match(await readFile(path, 'utf8'), new RegExp(name));
+    await page.getByRole('tab', { name: 'Test', exact: true }).click();
+    await run.click();
+    await page.getByRole('region', { name: 'Request result' }).waitFor();
+  }
+  // Manual binding remains available and must not alter the module.
+  await workspace();
+  await page.getByRole('link', { name: 'Add prompt', exact: true }).click();
+  await page
+    .getByRole('textbox', { name: 'Name', exact: true })
+    .fill('reuse_review');
+  await page
+    .getByLabel('Source', { exact: true })
+    .selectOption('review_topic');
+  await page.getByLabel('Implementation').selectOption('existing');
+  await page.getByLabel('Existing handler name').fill('shared_review');
+  const beforeBinding = await readFile(worker, 'utf8');
+  await page
+    .getByRole('button', { name: 'Create prompt', exact: true })
+    .click();
+  await page.waitForURL(
+    '**/workspace/native/review_topic/prompts/reuse_review'
+  );
+  assert.equal(await readFile(worker, 'utf8'), beforeBinding);
   if (process.env.FORGE_UI_SCREENSHOTS) {
     await mkdir(process.env.FORGE_UI_SCREENSHOTS, { recursive: true });
     await page.screenshot({
@@ -193,6 +257,6 @@ export async function verifyNativeRehearsal(page, project) {
     });
   }
   console.log(
-    'Chromium PASS: visual prompt authoring, Form/JSON string validation, stale draft preservation and reload, generated Python resource.'
+    'Chromium PASS: visual prompts, Form/JSON validation, conflict recovery, new worker creation, previewed shared Node/Python handlers and existing-handler bindings.'
   );
 }

@@ -19,7 +19,8 @@ Publication is pending release rehearsal and the final release gate.
 - Named tool cases with exact assertions, expected failures, schema drift checks
   and sequential batch execution.
 - Agent exposure settings for upstream visibility, public aliases and descriptions.
-- Explicit new-handler creation, visual prompt argument authoring/testing, and visible file-conflict recovery.
+- Previewed handler insertion into shared Node/Python workers, explicit new-worker and existing-handler choices, visual prompt argument authoring/testing, and visible file-conflict recovery.
+- Argument-free and optional-only prompts accept omitted MCP argument maps while required prompt arguments remain validated.
 - Developer/reference documentation and a 0.10.0 rehearsal checklist.
 - Removed unused native-list/definition-dialog components and obsolete session
   review notes; retained active classic-project compatibility.
