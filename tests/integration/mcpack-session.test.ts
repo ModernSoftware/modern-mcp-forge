@@ -248,3 +248,22 @@ test.skipIf(!hasMCPack)(
   },
   30_000
 );
+
+test('failed Python binding identifies the expected handler and worker', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'forge-missing-handler-'));
+  const manager = new NativeProjectManager();
+  try {
+    const manifest = join(root, 'mcpack.json');
+    await writeFile(manifest, JSON.stringify({
+      schemaVersion: 1, name: 'greetings', version: '1.0.0',
+      workers: { python: { runtime: 'python', module: './worker.py' } },
+      tools: [{ name: 'greet_customer_py', worker: 'python', handler: 'greet_customer_py', inputSchema: {type:'object', properties:{}} }]
+    }));
+    await writeFile(join(root,'worker.py'),
+      "def create_worker(context):\n    return {'tools': {'greet_customer': lambda args, call: {}}}\n");
+    const failed = await manager.open(manifest);
+    expect(failed?.status).toBe('failed');
+    expect(failed?.error).toContain('Missing tools handler "greet_customer_py"');
+    expect(failed?.error).toContain('worker "python"');
+  } finally { await manager.close(); await rm(root, {recursive: true, force:true}); }
+}, 30000);

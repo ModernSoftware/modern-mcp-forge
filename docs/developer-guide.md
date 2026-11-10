@@ -60,15 +60,7 @@ to locations inside the container.
 | Bridge stdio | A local server already speaks MCP over stdio | Existing server entrypoint | No |
 | External HTTP | A server runs at a Streamable HTTP MCP URL | Remote service | No |
 
-```mermaid
-flowchart TD
-    C["Agent or Inspector"] --> F["Forge project endpoint"]
-    F --> N["MCPack native source"]
-    F --> B["Project bridge adapter"]
-    F --> E["External MCP server"]
-    B --> A["Existing application"]
-    N --> W["Persistent Node or Python workers"]
-```
+![An MCP client connects to Forge. Forge routes native calls through MCPack workers, bridged calls through an adapter to the application, and external calls to the HTTP server.](images/project-sources.svg)
 
 A project can mix these sources. Source IDs are unique within the project.
 Native definitions own their published identities; bridge/external definitions
@@ -78,7 +70,11 @@ retain upstream identities and can have local exposure overrides.
 
 1. Choose **Add tool**. Enter `greet_customer`, a description, a new native source
    ID such as `customer-tools`, and the Node runtime.
-2. Define a required string argument `name`. Use JSON schema for advanced rules:
+2. Click **Create tool**. Forge creates a placeholder handler and opens its
+   editor. On **Definition**, add a string field named `name`, turn on
+   **Required**, enter **Minimum length** `1`, and click **Save definition**.
+   Required checks that the property is present. Minimum length also rejects an
+   empty string. **Edit as JSON** shows the corresponding schema:
 
    ```json
    {
@@ -89,9 +85,9 @@ retain upstream identities and can have local exposure overrides.
    }
    ```
 
-3. Create the tool. Forge writes a manifest and worker below
-   `native/customer-tools/`, then starts/discovers the source. Normal creation
-   generates one handler placeholder, not a working greeting.
+3. The project-level `forge.project.json` registers sources. Its top-level
+   tools, resources and prompts arrays support classic projects. The native
+   workers and their handler bindings are in `native/customer-tools/mcpack.json`.
 4. In **Code**, implement the handler:
 
    ```js
@@ -100,9 +96,10 @@ retain upstream identities and can have local exposure overrides.
        tools: {
          async greet_customer({ name }, call) {
            call.signal.throwIfAborted();
+           const result = { greeting: `Hello, ${name}!` };
            return {
-             content: [{ type: 'text', text: `Hello, ${name}!` }],
-             structuredContent: { greeting: `Hello, ${name}!` }
+             content: [{ type: 'text', text: JSON.stringify(result) }],
+             structuredContent: result
            };
          }
        }
@@ -113,7 +110,7 @@ retain upstream identities and can have local exposure overrides.
 5. Save and reload as prompted. In **Test**, enter a name and run it. Check
    Preview and Raw JSON.
 6. Connect Inspector to the workspace's `/mcp` URL. Discover and call the same
-   tool. Execution history distinguishes workbench and MCP client calls.
+   tool. Execution history labels MCP client calls, one-off workbench tests and named test case calls.
 
 The manifest binding connects the public tool name to a worker and handler:
 
@@ -132,22 +129,46 @@ The manifest binding connects the public tool name to a worker and handler:
 ```
 
 This is one tool entry, not a complete manifest. Start with the generated
-manifest. For Python, select Python at creation and implement its worker factory:
+manifest. To add a second tool named `greet_customer_py` to the same source,
+select **Create a new worker and handler**, give its worker a distinct ID, and choose Python at creation. Match the handler key shown above the
+Code editor. For the `greet_customer_py` binding, use:
 
 ```python
+import json
+
 def create_worker(context):
-    def greet_customer(args, call):
+    def greet_customer_py(args, call):
         call.signal.throw_if_aborted()
-        greeting = f"Hello, {args['name']}!"
+        result = {"greeting": f"Hello, {args['name']}!"}
         return {
-            "content": [{"type": "text", "text": greeting}],
-            "structuredContent": {"greeting": greeting},
+            "content": [{"type": "text", "text": json.dumps(result)}],
+            "structuredContent": result,
         }
-    return {"tools": {"greet_customer": greet_customer}}
+    return {"tools": {"greet_customer_py": greet_customer_py}}
 ```
 
 See [native authoring](native-authoring.md) for existing-worker bindings,
 manifest editing, validation and file limits.
+
+### Text and structured tool results
+
+`content` is a list of MCP content blocks, such as text and images.
+`structuredContent` carries JSON data that clients can inspect directly and that
+named test cases can assert through paths such as `/structuredContent/greeting`.
+They are independent fields. Forge preserves both and does not synchronize them.
+Build a result once and derive both representations from it, as above.
+
+For compatibility, the MCP specification recommends also returning serialized
+JSON in a text block when supplying structured content. A tool can return only
+text when structured output is unnecessary. If you declare an `outputSchema`,
+its structured result must satisfy that schema. See the
+[MCP tool result specification](https://modelcontextprotocol.io/specification/2025-11-25/server/tools#structured-content).
+
+**Use value from last result** captures the selected path exactly. Changing only
+`content[0].text` will not change an assertion targeting `structuredContent`.
+After changing a tool's input schema, review its saved arguments, save the case,
+then update the expected result if the behavior also changed. Case verdicts and
+tool execution status measure different things.
 
 ## Organize complex implementations
 
@@ -180,32 +201,121 @@ use your IDE for helpers, folders and dependency installation.
 
 ## Resources and prompts
 
-Choose **Add resource** for a static URI such as `support://guide`. Bind a handler
-returning `contents`, with each entry carrying a URI and text or blob. Choose
-**Add prompt** for named messages. Declare argument names and required status;
-MCP prompt argument values are strings.
+Choose **Add resource** or **Add prompt**, then select a source. The same choices
+also apply to **Add tool**:
 
-Inside a Node worker's returned object, the shapes are:
+| Implementation | File change | Worker behavior |
+| --- | --- | --- |
+| **Add a new handler to an existing worker** | Adds a function and its registry entry to the selected module after a preview | Shares the selected worker's runtime, configuration and initialized dependencies |
+| **Create a new worker and handler** | Creates a new `.mjs` or `.py` module in this source | Creates a separate worker with its own runtime and state |
+| **Use an existing handler** | Adds only a manifest binding | Uses a handler you already implemented |
+
+A **source** is an exportable pack described by one MCPack manifest. A **worker**
+is a runtime instance configured to load a module and call its factory. A
+**handler** is a function registered under `tools`, `resources` or `prompts` in
+the factory's return value. One module can implement all three groups. Different
+worker IDs can load the same module, but they still have separate worker state.
+
+For a shared handler, select the worker, choose **Preview handler**, review the
+proposed file, then choose **Create resource/prompt/tool**. No extra module or
+worker is created. The selected worker's runtime is inherited. Both the manifest
+and module revisions are checked before saving. If the module changes in your
+IDE, refresh the preview before trying again. Creation restarts sources and
+reinitializes worker memory, as other code saves do.
+
+Automatic insertion supports exported Node factories and top-level Python
+factories with a single direct object/dictionary return and literal handler
+groups, including the generated scaffolds and examples below. It preserves
+existing code and comments. Dynamic registries, spreads, decorators or conditional
+factory returns may require manual editing. Forge explains unsupported structures
+without changing files. Use **Use an existing handler** after implementing the
+function yourself, or choose a new worker. Python previews use a local Python
+interpreter to parse source, without importing the worker or its dependencies.
+
+Adding an argument later changes the definition, not your existing handler code.
+Read prompt values from `args.topic` in Node or `args["topic"]` in Python. Forge
+does not rewrite your implementation when its definition changes.
+
+On a resource's **Definition** tab, set its URI and content type. On a prompt's
+**Definition** tab, choose **Add argument** and enter its name, description and
+required status. **Edit as JSON** edits the full definition and retains the
+worker/handler binding. Prompt arguments are a list of declarations, for example
+`[{"name":"topic","description":"Subject to review","required":true}]`.
+
+The following are complete factories for an existing shared Node worker. Add the
+bindings `guide` under resources and `review` under prompts to its MCPack manifest.
+For generated modules, keep the handler names shown above Forge's Code editor.
 
 ```js
-resources: {
-  async guide({ uri }) {
-    return { contents: [{ uri, mimeType: 'text/plain', text: 'Support guide' }] };
-  }
-},
-prompts: {
-  async review({ topic }) {
-    return { messages: [
-      { role: 'user', content: { type: 'text', text: `Review ${topic}` } }
-    ] };
-  }
+export function createWorker(context) {
+  return {
+    resources: {
+      async guide({ uri }) {
+        return { contents: [{ uri, mimeType: 'text/plain', text: 'Support guide' }] };
+      }
+    },
+    prompts: {
+      async review({ topic }) {
+        return { messages: [
+          { role: 'user', content: { type: 'text', text: `Review ${topic}` } }
+        ] };
+      }
+    }
+  };
 }
 ```
 
-Bind `guide` and `review` in the manifest; defining functions alone does not
-publish them. Read resources and retrieve prompts in Test or an MCP client.
-These operations do not create tool history records. Named cases currently
-apply to tools only.
+The equivalent shared Python worker is
+
+```python
+def create_worker(context):
+    def guide(args, call):
+        return {"contents": [{
+            "uri": args["uri"], "mimeType": "text/plain", "text": "Support guide"
+        }]}
+
+    def review(args, call):
+        return {"messages": [{
+            "role": "user",
+            "content": {"type": "text", "text": f"Review {args['topic']}"}
+        }]}
+
+    return {"resources": {"guide": guide}, "prompts": {"review": review}}
+```
+
+Resource reads and prompt retrievals are available in **Test** and through an MCP
+client. They do not create tool execution records. Named cases currently apply
+to tools only.
+
+### Prompt input and model settings
+
+MCP prompt arguments are named strings. Forge provides synchronized Form and JSON
+views for testing native, bridged and external prompts. Required arguments must
+be present, and JSON values such as nested objects, numbers and booleans are
+rejected before invocation. Empty strings remain strings and may need further
+validation in your handler.
+
+A prompt renders messages. It does not set the client's model temperature or
+maximum token count. If your application needs structured settings for rendering,
+explicitly define a string argument and parse JSON inside that string in your
+handler, with application validation. For example
+
+```json
+{"topic":"inventory","settings":"{\"temperature\":0.6,\"maxTokens\":1000}"}
+```
+
+These are application-specific rendering inputs. The consuming client controls
+the actual model configuration. See the
+[MCP prompt specification](https://modelcontextprotocol.io/specification/2025-11-25/server/prompts).
+
+### External edits and conflicts
+
+If VS Code saves a worker after you opened it in Forge, saving the old Forge draft
+returns a conflict. The disk version remains intact and the draft remains in the
+editor. **Copy current draft** preserves your text for a manual merge in your IDE.
+**Reload disk version** asks before discarding unsaved edits, reads the latest
+files and restarts the sources. Progress remains visible through startup.
+Forge does not currently offer an automatic three-way merge.
 
 ## Bridge existing applications
 
@@ -236,6 +346,16 @@ drafts. **Manage connection** repairs, disables or removes saved sources. An
 unavailable upstream leaves healthy sources usable. See
 [external connections](external-sources.md) for cross-platform environment setup,
 authentication diagnostics, naming and protocol limits.
+
+### Why Inspector sometimes needs reconnecting
+
+MCP supports optional `list_changed` notifications. Forge 0.10.0 builds its
+exposed catalog from the current source generation and requires clients to
+reconnect after source restarts or exposure changes. A client can otherwise keep
+its earlier discovery results. Hiding a capability or changing its alias also
+removes the old public identity from Forge's current routing. Reconnect to refresh
+discovery, then test the old identity directly to verify rejection.
+Automatic catalog notifications are a later enhancement.
 
 ## Test arguments and results
 

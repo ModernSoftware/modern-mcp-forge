@@ -39,11 +39,15 @@ test('project native authoring exposes Node and Python over HTTP and recovers af
       { projectId, generation, ...body },
       origin
     );
-    if (response.body.snapshot) generation = response.body.snapshot.generation;
+    if (response.body.snapshot)
+      generation = response.body.snapshot.generation;
     return response;
   }
   async function connect() {
-    const client = new Client({ name: 'native-authoring-test', version: '1' });
+    const client = new Client({
+      name: 'native-authoring-test',
+      version: '1'
+    });
     clients.push(client);
     await client.connect(
       new StreamableHTTPClientTransport(new URL(`${base}/mcp`))
@@ -58,7 +62,9 @@ test('project native authoring exposes Node and Python over HTTP and recovers af
     });
     projectId = created.body.project.id;
     generation = (
-      (await fetch(`${base}/api/project/sources`).then((r) => r.json())) as any
+      (await fetch(`${base}/api/project/sources`).then((r) =>
+        r.json()
+      )) as any
     ).generation;
     expect(
       (
@@ -216,9 +222,9 @@ test('project native authoring exposes Node and Python over HTTP and recovers af
     expect((await action(diagnostic)).body.diagnostics).toContain(
       'deliberate startup failure'
     );
-    expect((await action(diagnostic, 'https://untrusted.example')).status).toBe(
-      403
-    );
+    expect(
+      (await action(diagnostic, 'https://untrusted.example')).status
+    ).toBe(403);
     expect(JSON.stringify(failed.body.snapshot)).not.toContain(
       'deliberate startup failure'
     );
@@ -273,6 +279,89 @@ test('project native authoring exposes Node and Python over HTTP and recovers af
     expect((await action(testGreet)).body.result.content[0].text).toBe(
       'Updated, Dev!'
     );
+    for (const [id, runtime] of [
+      ['js', 'node'],
+      ['py', 'python']
+    ]) {
+      const declaration = (
+        await action({
+          action: 'read',
+          id,
+          path: `native/${id}/mcpack.json`,
+          generation: undefined
+        })
+      ).body.file;
+      const request = {
+        action: 'preview-handler',
+        id,
+        kind: 'prompts',
+        name: `${id}_shared`,
+        worker: 'main',
+        revision: declaration.revision
+      };
+      expect((await action(request, 'https://evil.example')).status).toBe(
+        403
+      );
+      const proposed = await action(request);
+      expect(proposed.status).toBe(200);
+      const preview = proposed.body.preview;
+      expect(
+        await readFile(join(root, 'project', preview.path), 'utf8')
+      ).toBe(preview.original);
+      expect(preview.content).toContain(`${id}_shared`);
+      const create = {
+        action: 'create-capability',
+        id,
+        runtime,
+        kind: 'prompts',
+        name: `${id}_shared`,
+        description: 'Shared factory',
+        options: {
+          worker: 'main',
+          newWorker: false,
+          addHandler: true,
+          revision: declaration.revision,
+          workerRevision: preview.revision
+        }
+      };
+      await writeFile(
+        join(root, 'project', preview.path),
+        preview.original + '\n'
+      );
+      expect((await action(create)).status).toBe(409);
+      const refreshed = await action(request);
+      create.options.workerRevision = refreshed.body.preview.revision;
+      const added = await action(create);
+      expect(added.status).toBe(200);
+      expect(added.body.snapshot.status).toBe('ready');
+      const manifestAfter = JSON.parse(
+        await readFile(join(root, 'project', declaration.path), 'utf8')
+      );
+      expect(manifestAfter.workers).toEqual(
+        JSON.parse(declaration.content).workers
+      );
+      const freshClient = await connect();
+      await expect(
+        freshClient.getPrompt({ name: `${id}_welcome` })
+      ).rejects.toThrow('Invalid arguments');
+      expect(
+        (await freshClient.listPrompts()).prompts.find(
+          (prompt) => prompt.name === `${id}_welcome`
+        )?.arguments
+      ).toEqual([{ name: 'name', description: '', required: true }]);
+      expect(
+        (await freshClient.getPrompt({ name: `${id}_shared` })).messages[0]
+          .content
+      ).toMatchObject({ text: 'Not implemented yet.' });
+      expect(
+        (
+          await freshClient.callTool({
+            name: `${id}_greet`,
+            arguments: { name: 'Diego' }
+          })
+        ).isError
+      ).not.toBe(true);
+    }
     const disabled = await action({ action: 'disable', id: 'py' });
     expect(
       disabled.body.snapshot.sources.find((item: any) => item.id === 'py')
@@ -296,7 +385,9 @@ test('project native authoring exposes Node and Python over HTTP and recovers af
         name: { type: 'string' },
         filter: {
           type: 'object',
-          properties: { codes: { type: 'array', items: { type: 'integer' } } },
+          properties: {
+            codes: { type: 'array', items: { type: 'integer' } }
+          },
           required: ['codes'],
           additionalProperties: false
         }
@@ -465,7 +556,9 @@ test('project native authoring exposes Node and Python over HTTP and recovers af
       '/src/lib/server/sources/manager.ts'
     );
     await sources.projectSources.close();
-    const database = await server.ssrLoadModule('/src/lib/server/database.ts');
+    const database = await server.ssrLoadModule(
+      '/src/lib/server/database.ts'
+    );
     database.closeDatabase();
     await server.close();
     if (oldDatabase === undefined) delete process.env.MCP_FORGE_DB_PATH;

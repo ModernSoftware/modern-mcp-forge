@@ -49,3 +49,9 @@ merging. Feature completion does not by itself authorize that release merge.
 
 These are not hidden promises in the 0.10.0 release. Use the
 [release checklist](release-checklist.md) to finish acceptance before adding scope.
+
+## Authoring follow-ups after 0.10.0
+
+- Explore multiple helper files in the native and adapter editors, with scoped filesystem access, per-file revisions, unsaved-change guards and import navigation. Current implementations can already import helpers edited in an IDE.
+- Extend previewed shared-worker insertion beyond direct object/dictionary factories if real projects justify more patterns. Direct Node/Python factories already support adding tools, resources and prompts in the same module.
+- Evaluate live MCP catalog notifications and client behavior across source reloads, exposure changes and project switches. Reconnection remains the 0.10.0 workflow.

@@ -13,8 +13,14 @@
   let {
     schema,
     text = $bindable('{}'),
-    disabled = false
-  }: { schema: unknown; text?: string; disabled?: boolean } = $props();
+    disabled = false,
+    kind = 'tool'
+  }: {
+    schema: unknown;
+    text?: string;
+    disabled?: boolean;
+    kind?: 'tool' | 'prompt';
+  } = $props();
   const id = $props.id();
   let jsonMode = $state(false);
   let prepared = $derived(prepareArguments(schema));
@@ -32,17 +38,17 @@
   }
   export function argumentsForRun() {
     if (!draft.value || draft.errors.length)
-      throw new Error('Correct the tool arguments before running.');
+      throw new Error(`Correct the ${kind} arguments before running.`);
     return draft.value;
   }
 </script>
 
 <fieldset class="arguments" {disabled}>
-  <legend>Tool arguments</legend>
+  <legend>{kind === 'prompt' ? 'Prompt' : 'Tool'} arguments</legend>
   <div class="toolbar">
     <p>
       {raw
-        ? 'Edit the argument object sent to the tool.'
+        ? `Edit the argument object sent to the ${kind}.`
         : 'Enter values for this test run.'}
     </p>
     <JsonModeSwitch
@@ -53,6 +59,9 @@
       }}
     />
   </div>
+  {#if kind === 'prompt'}<p class="hint">
+      Prompt values must be strings. Render the messages in the handler.
+    </p>{/if}
   {#if raw}
     {#if prepared.limitation}<p class="hint">
         JSON editor · {prepared.limitation}
@@ -78,7 +87,7 @@
       />
     {:else}
       <p class="hint">
-        This tool declares no named fields.{prepared.form
+        This {kind} declares no named fields.{prepared.form
           .additionalProperties !== false
           ? ' Use JSON to enter additional properties.'
           : ''}

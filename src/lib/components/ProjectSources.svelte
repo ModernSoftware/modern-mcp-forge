@@ -1,4 +1,5 @@
 <script lang="ts">
+  import SourcePathInput from './SourcePathInput.svelte';
   import { reloadProjectSources } from '$lib/client/reload-project-sources';
   import { goto, invalidateAll } from '$app/navigation';
   import type { ProjectSource } from '$lib/server/sources/schema';
@@ -119,7 +120,7 @@
           disabled={busy}
           onclick={() => {
             if (
-              window.confirm(`Detach ${source.id}? Files will remain on disk.`)
+              window.confirm(`Detach ${source.id}? This removes its source settings, including disabled capabilities. Reattaching starts with all manifest capabilities enabled. Source files stay on disk.`)
             )
               void action({ action: 'remove', id: source.id });
           }}>Detach</button
@@ -149,6 +150,7 @@
     <div class="fields">
       <label
         >Source ID<input
+          name="sourceId"
           bind:value={id}
           required
           maxlength="64"
@@ -156,18 +158,12 @@
           placeholder="support"
         /></label
       >
-      <label
-        >Manifest path<input
-          bind:value={manifest}
-          required
-          disabled={busy}
-          placeholder="native/support/mcpack.json"
-        /></label
-      >
+      <SourcePathInput {projectId} label="Manifest path" kind="manifest" bind:value={manifest}
+        required disabled={busy} placeholder="native/support/mcpack.json" />
       <button disabled={busy}>{busy ? 'Working…' : 'Add source'}</button>
     </div>
     <p class="note">
-      Use a project-relative manifest. Attaching starts trusted local code.
+      Use the previous source ID to reconnect saved cases. Select the MCPack manifest inside this project. Attaching starts trusted local code.
       Disabling a source stops its workers and removes its capabilities from
       discovery.
     </p>

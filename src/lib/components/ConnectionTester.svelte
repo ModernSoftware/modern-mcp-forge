@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { promptArgumentsSchema } from '$lib/authoring/prompt-arguments';
   import NamedCases from './NamedCases.svelte';
   import McpResult from '$lib/components/McpResult.svelte';
   import ToolArguments from '$lib/components/ToolArguments.svelte';
@@ -39,7 +40,6 @@
   let selectedTool = $derived(
     catalog?.tools.find((tool) => tool.name === name)
   );
-  let promptValues = $state<Record<string, string>>({});
   let result = $state.raw<unknown>(undefined);
   let error = $state('');
   let pending: AbortController | undefined;
@@ -59,7 +59,6 @@
 
   function clearInputs() {
     args = '{}';
-    promptValues = {};
     result = undefined;
     error = '';
   }
@@ -69,24 +68,9 @@
     result = undefined;
     error = '';
     let values: unknown = {};
-    if (kind === 'tool') {
+    if (kind === 'tool' || kind === 'prompt') {
       if (!editor?.canRun()) return;
       values = editor.argumentsForRun();
-    } else if (kind === 'prompt') {
-      const missing = promptFields.find(
-        (f) =>
-          f.required &&
-          (!Object.hasOwn(promptValues, f.name) || !promptValues[f.name])
-      );
-      if (missing) {
-        error = `Enter ${missing.name} to retrieve this prompt.`;
-        return;
-      }
-      values = Object.fromEntries(
-        promptFields
-          .filter((f) => Object.hasOwn(promptValues, f.name))
-          .map((f) => [f.name, promptValues[f.name]])
-      );
     }
     busy = true;
     pending = new AbortController();
@@ -166,35 +150,20 @@
         disabled={busy}
       />{/key}
   {:else if selected && kind === 'prompt'}
-    {#each promptFields as field (field.name)}
-      <label
-        >{field.name}{field.required ? ' (required)' : ' (optional)'}
-        <input
-          aria-label={field.name}
-          required={field.required}
-          disabled={busy}
-          value={Object.hasOwn(promptValues, field.name)
-            ? promptValues[field.name]
-            : ''}
-          oninput={(e) => {
-            promptValues = {
-              ...promptValues,
-              [field.name]: e.currentTarget.value
-            };
-          }}
-        />
-        {#if field.description}<small class="workflow-muted"
-            >{field.description}</small
-          >{/if}
-      </label>
-    {:else}<p class="workflow-muted">This prompt takes no arguments.</p>{/each}
+    {#key name}<ToolArguments
+        bind:this={editor}
+        kind="prompt"
+        schema={promptArgumentsSchema(promptFields)}
+        bind:text={args}
+        disabled={busy}
+      />{/key}
   {/if}
   <button
     class="primary-button"
     disabled={busy ||
       !ready ||
       !selected ||
-      (kind === 'tool' && !editor?.canRun())}>Run request</button
+      (kind !== 'resource' && !editor?.canRun())}>Run request</button
   >
   {#if error}<p class="workflow-error" role="alert">{error}</p>{/if}
   {#if result !== undefined}{#key result}<McpResult

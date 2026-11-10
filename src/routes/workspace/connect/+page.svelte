@@ -24,5 +24,6 @@
 {#key bridge}<SourceConnection
     kind={bridge ? 'bridge' : 'external'}
     projectId={data.project.id}
+    projectPath={data.project.path}
     generation={data.snapshot.generation}
   />{/key}

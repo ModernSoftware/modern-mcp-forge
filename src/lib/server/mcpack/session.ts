@@ -1,3 +1,5 @@
+import { ManifestSchema } from '@modern-software/mcpack';
+import { diagnosticExcerpt, missingHandlerMessage } from './diagnostic-text';
 import { installedMCPackCli } from './cli-path';
 export { installedMCPackCli } from './cli-path';
 import { Client } from '@modelcontextprotocol/client';
@@ -123,10 +125,12 @@ export class NativeProjectManager {
   private async start(session: NativeSession) {
     session.status = 'starting';
     session.error = undefined;
+    session.diagnostics = '';
     session.catalog = { tools: [], resources: [], prompts: [] };
     const client = new Client({ name: 'modern-mcp-forge-native', version: '0.10.0' });
+    let manifest: any;
     try {
-      const manifest = JSON.parse(await this.readLimited(session.manifestPath));
+      manifest = JSON.parse(await this.readLimited(session.manifestPath));
       session.files = [session.manifestPath];
       for (const worker of Object.values(manifest.workers ?? {}) as { module?: unknown }[]) {
         if (typeof worker.module !== 'string') continue;
@@ -191,8 +195,16 @@ export class NativeProjectManager {
       session.status = 'ready';
     } catch (error) {
       session.status = 'failed';
-      session.error = error instanceof Error ? error.message : String(error);
       await client.close().catch(() => {});
+      const validated = ManifestSchema.safeParse(manifest);
+      const pack = validated.success ? validated.data : undefined;
+      const secrets = Object.values(pack?.workers ?? {}).flatMap(worker => [
+        ...Object.values(worker.env ?? {}),
+        ...(worker.inheritEnv ?? []).map(key => process.env[key] ?? '')
+      ]);
+      session.error = missingHandlerMessage(session.diagnostics, pack)
+        ?? (error instanceof Error ? error.message : String(error));
+      session.diagnostics = diagnosticExcerpt(session.diagnostics, secrets);
       session.client = undefined;
       // Keep the selected project editable after a failed startup.
     }

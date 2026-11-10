@@ -35,7 +35,7 @@ what agents can discover. Native sources run with the published
 | Regression cases | Named inputs, expected success/tool error/invalid input, exact assertions and sequential batches |
 | Agent exposure | Hide upstream capabilities, set public aliases/descriptions and resolve naming collisions |
 | Diagnostics | Source lifecycle/recovery and local tool execution history |
-| Deployment | Native source ZIP with selected files, dependency manifests and standalone MCPack host |
+| Deployment | Native source tar.gz archive with selected files, dependency manifests and standalone MCPack host |
 
 ## Start locally
 

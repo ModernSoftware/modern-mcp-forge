@@ -9,16 +9,16 @@
     sans-serif;
   font-synthesis: none;
 
-  --bg: #f5f7fc;
-  --surface: rgba(255, 255, 255, 0.78);
-  --surface-solid: #ffffff;
+  --bg: #eaf0f5;
+  --surface: rgba(244, 247, 250, 0.94);
+  --surface-solid: #f5f7fa;
   --surface-2: #f4f6fb;
   --surface-3: #edf1f7;
   --text: #202736;
-  --muted: #6d7788;
+  --muted: #546174;
   --border: rgba(97, 110, 138, 0.17);
 
-  --accent: #6877da;
+  --accent: #4959ab;
   --accent-soft: #eef0ff;
   --teal: #4f9e9b;
   --teal-soft: #e9f7f5;
@@ -390,3 +390,8 @@ pre {
   text-align: center;
   padding: 48px 24px;
 }
+
+.startup-details { margin-block: .75rem; }
+.startup-details summary { cursor: pointer; font-weight: 650; }
+.startup-details pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 18rem; overflow: auto; }
+:where(button, a, input, select, textarea, summary):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

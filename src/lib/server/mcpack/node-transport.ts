@@ -31,6 +31,13 @@ export class NativeNodeTransport implements Transport {
     }
   ) {}
 
+  get spawned() { return this.child?.pid !== undefined; }
+
+  get exitStatus() {
+    if (this.child?.signalCode) return this.child.signalCode;
+    return this.child?.exitCode ?? undefined;
+  }
+
   async start(): Promise<void> {
     if (this.child || this.closing) throw new Error('The stdio transport cannot be started again.');
     const child = (this.child = spawn(this.options.command, this.options.args, {

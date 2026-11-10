@@ -209,7 +209,7 @@ export async function runCase(
       kind: 'tool' as const,
       name: c.tool,
       arguments: c.arguments,
-      origin: 'workbench' as const,
+      origin: 'named-case' as const,
       signal
     };
     try {

@@ -188,12 +188,12 @@
 <div class="workflow-toolbar">
   <label
     >Search tools, resources and prompts<input
-      bind:value={search}
+      name="capabilitySearch" bind:value={search}
       placeholder="Name, description or source"
     /></label
   >
   <label
-    >Capability type<select aria-label="Capability type" bind:value={kind}
+    >Capability type<select name="capabilityKind" aria-label="Capability type" bind:value={kind}
       ><option value="all">All types</option><option value="tools">Tools</option
       ><option value="resources">Resources</option><option value="prompts"
         >Prompts</option
@@ -201,7 +201,7 @@
     ></label
   >
   <label
-    >Source type<select aria-label="Source type" bind:value={sourceKind}>
+    >Source type<select name="sourceKind" aria-label="Source type" bind:value={sourceKind}>
       <option value="all">All sources</option><option value="native"
         >Native</option
       >
@@ -211,7 +211,7 @@
     </select></label
   >
   <label
-    >View<select aria-label="Workspace view" bind:value={view}>
+    >View<select name="workspaceView" aria-label="Workspace view" bind:value={view}>
       <option value="detailed">Detailed list</option><option value="grouped"
         >Group by source type</option
       >

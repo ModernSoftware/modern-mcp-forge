@@ -16,6 +16,7 @@
     onSave?: () => void;
   }>();
 
+  let loadFailed = $state(false);
   let container: HTMLDivElement;
   let editor = $state.raw<Monaco.editor.IStandaloneCodeEditor>();
   let model = $state.raw<Monaco.editor.ITextModel>();
@@ -88,7 +89,7 @@
         attributes: true,
         attributeFilter: ['data-theme']
       });
-    })();
+    })().catch(() => { if (!disposed) loadFailed = true; });
 
     return () => {
       disposed = true;
@@ -122,6 +123,7 @@
 </script>
 
 <div class="editor-shell">
+  {#if !editor}<p class="loading" role="status">{loadFailed ? 'Editor could not load. Reopen this tab to retry.' : 'Loading editor…'}</p>{/if}
   <div bind:this={container} class="editor"></div>
 </div>
 
@@ -135,6 +137,7 @@
     background: var(--surface-solid);
   }
 
+  .loading { position: absolute; inset: 0 auto auto 0; margin: 1rem; color: var(--muted); }
   .editor {
     width: 100%;
     height: min(64vh, 650px);

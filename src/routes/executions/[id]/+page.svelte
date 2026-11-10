@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { executionOriginLabel } from '$lib/execution-origin';
   let { data } = $props();
 
   const formatDate = (value: string | null) =>
@@ -51,7 +52,7 @@
 
     <dl>
       <div><dt>Runtime</dt><dd><span class="runtime-badge {data.execution.runtime}">{data.execution.runtime}</span></dd></div>
-      <div><dt>Origin</dt><dd>{data.execution.origin === 'mcp' ? 'MCP client' : data.execution.origin === 'workbench' ? 'Workbench test' : 'Not recorded'}</dd></div>
+      <div><dt>Origin</dt><dd>{executionOriginLabel(data.execution.origin) ?? 'Not recorded'}</dd></div>
       {#if data.execution.sourceId}<div><dt>Source</dt><dd>{data.execution.sourceId}</dd></div>{/if}
       <div><dt>Duration</dt><dd>{data.execution.durationMs ?? 0} ms</dd></div>
       <div><dt>Exit code</dt><dd>{data.execution.exitCode ?? '—'}</dd></div>

@@ -72,8 +72,8 @@
     <div class="eyebrow">PROJECT WORKSPACE</div>
     <h1>New project</h1>
     <p>
-      Bootstrap Forge into a new folder or an existing repository that does not
-      already contain forge.project.json.
+      Bootstrap Forge into a new folder or an existing repository that does
+      not already contain forge.project.json.
     </p>
   </div>
 </section>
@@ -140,7 +140,11 @@
 
       <small> Optional. Defaults to the selected folder name. </small>
 
-      <input bind:value={name} autocomplete="off" placeholder="Customer MCP" />
+      <input
+        bind:value={name}
+        autocomplete="off"
+        placeholder="Customer MCP"
+      />
     </label>
 
     <label>
@@ -155,13 +159,14 @@
   <label>
     <span> Description </span>
 
-    <small> Optional project description stored in forge.project.json. </small>
+    <small>
+      Optional project description stored in forge.project.json.
+    </small>
 
     <textarea
       bind:value={description}
       rows="4"
-      placeholder="MCP capabilities for the customer platform..."
-    ></textarea>
+      placeholder="MCP capabilities for the customer platform..."></textarea>
   </label>
 
   <div class="bootstrap-preview">
@@ -171,8 +176,8 @@
 native/  (created when you add native capabilities)</pre>
 
     <p>
-      New projects intentionally start empty. Example capabilities can be added
-      explicitly rather than silently exposed to MCP clients.
+      New projects intentionally start empty. Example capabilities can be
+      added explicitly rather than silently exposed to MCP clients.
     </p>
   </div>
 
@@ -305,6 +310,12 @@ native/  (created when you add native capabilities)</pre>
   .field-grid {
     display: grid;
     gap: 13px;
+    margin-top: 18px;
+    align-items: start;
+  }
+
+  .field-grid > label {
+    margin-top: 0;
   }
 
   .field-grid.two {

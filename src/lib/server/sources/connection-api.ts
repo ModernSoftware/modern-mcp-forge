@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import { z } from 'zod';
-import { BridgeSourceAdapter } from './bridge';
+import { BridgeSourceAdapter, BridgeStartupError } from './bridge';
 import { createBridgeStarter } from './bridge-starter';
 import type { UpstreamKind } from './upstream';
 import { validateLocalRequest } from '$lib/server/local-request-guard';
@@ -271,7 +271,8 @@ export async function handleConnectionRequest(
     });
   } catch (error) {
     return json(
-      { error: error instanceof Error ? error.message : String(error) },
+      { error: error instanceof Error ? error.message : String(error),
+        ...(error instanceof BridgeStartupError && { details: error.details }) },
       { status: NativeProjectError.is(error) ? error.status : 400 }
     );
   }

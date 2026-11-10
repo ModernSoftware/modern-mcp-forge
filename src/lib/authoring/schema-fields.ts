@@ -92,6 +92,19 @@ export function fieldsSchema(
       throw new Error('Field names must be nonempty and unique.');
     if (!scalarTypes.includes(field.type))
       throw new Error('Unsupported field type.');
+    if (
+      field.type === 'string' &&
+      field.schema.type === 'string' &&
+      field.schema.minLength !== undefined &&
+      !(
+        typeof field.schema.minLength === 'number' &&
+        Number.isInteger(field.schema.minLength) &&
+        field.schema.minLength >= 0
+      )
+    )
+      throw new Error(
+        `Minimum length for "${name}" must be a nonnegative integer.`
+      );
     // Keep validation keywords for existing fields; changing type is an explicit reset.
     properties[name] = {
       ...(field.schema.type === field.type ? field.schema : {}),

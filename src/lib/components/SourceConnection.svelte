@@ -1,4 +1,5 @@
 <script lang="ts">
+  import SourcePathInput from './SourcePathInput.svelte';
   import { beforeNavigate, goto, invalidateAll } from '$app/navigation';
   import {
     canLeaveProject,
@@ -8,11 +9,13 @@
   import { onMount, untrack } from 'svelte';
   let {
     projectId,
+    projectPath,
     generation,
     kind = 'external',
     source
   } = $props<{
     projectId: string;
+    projectPath: string;
     generation: number;
     kind?: 'bridge' | 'external';
     source?: Exclude<ProjectSource, { kind: 'native' }>;
@@ -86,6 +89,32 @@
     untrack(() =>
       source?.kind === 'bridge' ? JSON.stringify(source.args ?? []) : '[]'
     )
+  );
+  let startupDetails = $state('');
+  let directoryBase = $derived(
+    mode === 'adapter' && location === 'checkout'
+      ? checkoutEnv.trim()
+        ? '$' + checkoutEnv.trim()
+        : '(select checkout variable)'
+      : projectPath
+  );
+  let defaultDirectory = $derived(
+    mode === 'stdio'
+      ? entrypoint
+          .trim()
+          .replaceAll('\\', '/')
+          .split('/')
+          .slice(0, -1)
+          .join('/')
+      : ''
+  );
+  let directoryPath = $derived(cwd.trim() || defaultDirectory);
+  let effectiveDirectory = $derived(
+    !directoryPath || directoryPath === '.'
+      ? directoryBase
+      : directoryBase.replace(/[\\/]$/, '') +
+          '/' +
+          directoryPath.replaceAll('\\', '/')
   );
   let starterNotice = $state('');
   function values() {
@@ -162,6 +191,7 @@
     if (busy || !fileReady) return;
     busy = true;
     error = '';
+    startupDetails = '';
     let navigate = false;
     pending = new AbortController();
     try {
@@ -226,7 +256,10 @@
         })
       });
       const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error);
+      if (!response.ok) {
+        startupDetails = payload.details ?? '';
+        throw new Error(payload.error);
+      }
       if (leaving) return;
       committing = true;
       const saved = await fetch(`/api/project/${kind}`, {
@@ -274,6 +307,10 @@
   }}
 >
   {#if error}<p role="alert" class="workflow-error">{error}</p>{/if}
+  {#if error && startupDetails}<details class="startup-details">
+      <summary>Show startup details</summary>
+      <pre>{startupDetails}</pre>
+    </details>{/if}
   <label
     >{kind === 'bridge' ? 'Bridge name' : 'Connection name'}<input
       bind:value={id}
@@ -347,14 +384,15 @@
       </div>
       {#if fileReady && starterNotice}<p role="status">{starterNotice}</p>{/if}
     {:else}
-      <label
-        >{mode === 'adapter' ? 'Adapter file' : 'Stdio entrypoint'}<input
-          bind:value={entrypoint}
-          required
-          disabled={busy}
-          placeholder="Project-relative file path"
-        /></label
-      >
+      <SourcePathInput
+        {projectId}
+        kind="file"
+        label={mode === 'adapter' ? 'Adapter file' : 'Stdio entrypoint'}
+        bind:value={entrypoint}
+        required
+        disabled={busy}
+        placeholder="Project-relative file path"
+      />
     {/if}
     {#if mode === 'adapter'}
       <p class="workflow-muted">
@@ -412,18 +450,26 @@
         Select a project-relative script that already serves MCP over stdio.
       </p>
     {/if}
+    <SourcePathInput
+      {projectId}
+      kind="directory"
+      label="Working directory"
+      bind:value={cwd}
+      checkoutEnv={mode === 'adapter' && location === 'checkout'
+        ? checkoutEnv.trim() || undefined
+        : undefined}
+      browseDisabled={mode === 'adapter' &&
+        location === 'checkout' &&
+        !checkoutEnv.trim()}
+      disabled={busy}
+      placeholder={mode === 'adapter'
+        ? 'Defaults to the application root'
+        : 'Defaults to the entrypoint folder'}
+    />
+    <p class="workflow-muted">Launch from <code>{effectiveDirectory}</code></p>
     <details class="launch-settings">
       <summary>Launch settings</summary>
       <div class="launch-fields">
-        <label
-          >Working directory<input
-            bind:value={cwd}
-            disabled={busy}
-            placeholder={mode === 'adapter'
-              ? 'Defaults to the application root'
-              : 'Defaults to the entrypoint folder'}
-          /></label
-        >
         <label
           >Environment variable names<input
             bind:value={envNames}

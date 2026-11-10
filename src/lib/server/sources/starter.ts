@@ -81,6 +81,24 @@ export function nativeStarter(id: string, runtime: 'node' | 'python') {
   };
 }
 
+/** The same starter body is used for a new module and an existing factory. */
+export function handlerStarter(
+  runtime: 'node' | 'python',
+  kind: 'tools' | 'resources' | 'prompts',
+  name: string,
+  pythonName = `handle_${name.replaceAll('-', '_')}`
+) {
+  const result =
+    kind === 'tools'
+      ? `{ "isError": true, "content": [{ "type": "text", "text": "Not implemented yet. Edit this handler in the Code tab." }] }`
+      : kind === 'resources'
+        ? `{ "contents": [{ "uri": args.uri, "mimeType": "text/plain", "text": "Not implemented yet." }] }`
+        : `{ "messages": [{ "role": "user", "content": { "type": "text", "text": "Not implemented yet." } }] }`;
+  return runtime === 'node'
+    ? `async [${JSON.stringify(name)}](args, call) {\n  call.signal.throwIfAborted();\n  // Implement ${name} using args and your application services.\n  return ${result};\n}`
+    : `def ${pythonName}(args, call):\n    call.signal.throw_if_aborted()\n    # Implement ${name} using args and your application services.\n    return ${result.replace('true', 'True').replace('args.uri', 'args["uri"]')}`;
+}
+
 /** A blank, single-capability worker, not the separate demonstration source. */
 export function capabilityStarter(
   id: string,
@@ -91,16 +109,19 @@ export function capabilityStarter(
   const starter = nativeStarter(id, runtime);
   const quoted = JSON.stringify(name);
   const pythonName = `handle_${name.replaceAll('-', '_')}`;
-  const result =
-    kind === 'tools'
-      ? `{ "isError": true, "content": [{ "type": "text", "text": "Not implemented yet. Edit this handler in the Code tab." }] }`
-      : kind === 'resources'
-        ? `{ "contents": [{ "uri": args.uri, "mimeType": "text/plain", "text": "Not implemented yet." }] }`
-        : `{ "messages": [{ "role": "user", "content": { "type": "text", "text": "Not implemented yet." } }] }`;
+  const handler = handlerStarter(runtime, kind, name);
   const code =
     runtime === 'node'
-      ? `export function createWorker(context) {\n  // Initialize shared dependencies here. Import services from other modules as needed.\n  return {\n    ${kind}: {\n      async [${quoted}](args, call) {\n        call.signal.throwIfAborted();\n        // Implement ${name} using args and your application services.\n        return ${result};\n      }\n    }\n  };\n}\n`
-      : `def create_worker(context):\n    # Initialize shared dependencies here; import your application services as needed.\n    def ${pythonName}(args, call):\n        call.signal.throw_if_aborted()\n        # Implement ${name} using args and your application services.\n        return ${result.replace('true', 'True').replace('args.uri', 'args["uri"]')}\n\n    return {"${kind}": {${quoted}: ${pythonName}}}\n`;
+      ? `export function createWorker(context) {\n  // Initialize shared dependencies here. Import services from other modules as needed.\n  return {\n    ${kind}: {\n${handler
+          .split('\n')
+          .map((line) => '      ' + line)
+          .join('\n')}\n    }\n  };\n}\n`
+      : `def create_worker(context):\n    # Initialize shared dependencies here; import your application services as needed.\n${handler
+          .split('\n')
+          .map((line) => '    ' + line)
+          .join(
+            '\n'
+          )}\n\n    return {"${kind}": {${quoted}: ${pythonName}}}\n`;
   const definition = { ...starter.manifest[kind][0], name, handler: name };
   if (kind === 'tools')
     Object.assign(definition, {
