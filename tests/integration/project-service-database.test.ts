@@ -79,7 +79,25 @@ describe('database initialization', () => {
       `)
       .get();
 
-    expect(row?.value).toBe('1');
+    expect(row?.value).toBe('2');
+  });
+
+  test('upgrades existing execution rows without inventing their origin', () => {
+    const db = getDatabase();
+    db.exec(
+      "INSERT INTO tool_executions(project_id, execution_uid, tool_name, runtime, status, started_at) VALUES ('old','v1-row','legacy_tool','node','succeeded','2026-01-01')"
+    );
+    db.exec('ALTER TABLE tool_executions DROP COLUMN origin');
+    db.exec('ALTER TABLE tool_executions DROP COLUMN source_id');
+    db.exec("UPDATE app_metadata SET value='1' WHERE key='schema_version'");
+    closeDatabase();
+    expect(
+      getDatabase()
+        .query(
+          "SELECT tool_name, origin, source_id FROM tool_executions WHERE execution_uid='v1-row'"
+        )
+        .get()
+    ).toEqual({ tool_name: 'legacy_tool', origin: null, source_id: null });
   });
 
   test('can close and reopen the database', () => {

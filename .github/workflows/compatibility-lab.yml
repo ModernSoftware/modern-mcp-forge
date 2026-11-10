@@ -1,0 +1,104 @@
+name: Multilanguage examples
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'examples/bridges/compatibility-lab/**'
+      - '.github/workflows/compatibility-lab.yml'
+      - 'runners/bridges/**'
+      - 'src/lib/server/sources/**'
+      - 'src/lib/server/mcpack/**'
+      - 'src/routes/mcp/**'
+      - 'src/lib/deployment/**'
+      - 'src/lib/server/deployment/**'
+      - 'src/routes/workspace/export/**'
+      - 'src/routes/api/project/export/**'
+      - 'tests/deployment/**'
+      - 'tests/browser/**'
+      - 'src/lib/testing/**'
+      - 'src/lib/components/ToolArgument*.svelte'
+      - 'src/lib/components/ConnectionTester.svelte'
+      - 'src/lib/components/SourceConnection.svelte'
+      - 'src/lib/components/SourcePathInput.svelte'
+      - 'src/lib/server/filesystem/source-paths.ts'
+      - 'src/routes/api/project/paths/**'
+      - 'src/lib/components/CapabilityExposure.svelte'
+      - 'src/lib/components/NamedCases.svelte'
+      - 'src/routes/api/project/cases/**'
+      - 'src/routes/workspace/cases/**'
+      - 'src/routes/project/**'
+      - 'src/lib/components/ProjectOpening.svelte'
+      - 'src/lib/components/RestoreProjectSources.svelte'
+      - 'src/lib/client/activate-project.ts'
+      - 'src/routes/+layout.svelte'
+      - 'src/lib/authoring/**'
+      - 'src/routes/workspace/new/**'
+      - 'src/routes/projects/**'
+      - 'src/routes/api/project/sources/**'
+      - 'src/lib/components/Json*.svelte'
+      - 'src/lib/components/McpResult.svelte'
+      - 'src/routes/workspace/native/**'
+      - 'src/routes/workspace/+page.svelte'
+      - 'src/lib/client/workspace-view.ts'
+      - 'bun.lock'
+      - 'package.json'
+      - 'Dockerfile'
+
+permissions:
+  contents: read
+
+jobs:
+  compatibility:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24.22.1'
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12.14'
+      - run: python -m pip install uv==0.13.4
+      - run: bun install --frozen-lockfile
+      - run: node examples/bridges/compatibility-lab/setup.mjs
+      - run: bun test examples/bridges/compatibility-lab/tests/compatibility.test.mjs
+      - name: Clean-install and call an exported native pack
+        run: bun run test:deployment
+      - name: Verify tool testing and workspace export in Chrome
+        env:
+          FORGE_UI_SCREENSHOTS: ${{ runner.temp }}/forge-ui
+        run: |
+          npm ci --prefix tests/browser
+          bun tests/browser/workspace-export.mjs
+          bun tests/browser/tool-arguments.mjs
+      - name: Save browser review screenshots
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: forge-ui
+          path: ${{ runner.temp }}/forge-ui
+          if-no-files-found: ignore
+          retention-days: 7
+
+  windows-export:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24.22.1'
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+      - run: bun install --frozen-lockfile
+      - name: Clean-install and call an exported native pack on Windows
+        run: bun run test:deployment

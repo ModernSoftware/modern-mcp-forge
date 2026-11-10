@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - v0.10.0
   pull_request:
   workflow_dispatch:
 
@@ -60,14 +61,23 @@ jobs:
           python --version
           bun run runtime:check
 
+      - name: Documentation links
+        run: bun run check:docs
+
       - name: Svelte and TypeScript checks
         run: bun run check
 
       - name: Unit and integration tests
         run: bun run test
 
+      - name: Install the Python bridge fixture dependency
+        run: python -m pip install "mcp==1.29.0"
+
       - name: End-to-end tests
         run: bun run test:e2e
+
+      - name: Published MCPack integration
+        run: bun run test:mcpack
 
       - name: Production build
         run: bun run build

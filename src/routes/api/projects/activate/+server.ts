@@ -1,3 +1,7 @@
+import { projectSources } from '$lib/server/sources/manager';
+import { startProjectSources } from '$lib/server/sources/project';
+import { nativeProjects } from '$lib/server/mcpack/session';
+import { projectTransition } from '$lib/server/mcpack/project-transition';
 import {
   json
 } from '@sveltejs/kit';
@@ -12,6 +16,7 @@ import {
 
 import {
   activateProject,
+  getActiveProjectRecord,
   ProjectServiceError
 } from '$lib/server/projects/project-service';
 
@@ -66,11 +71,30 @@ export const POST:
     }
 
     try {
-      const project =
-        activateProject(
-          payload.projectId
+      const selectedValue = payload.projectId;
+      const resume = 'resume' in payload && payload.resume === true;
+      const project = await projectTransition(async () => {
+        if (resume) {
+          const active = getActiveProjectRecord();
+          if (!active?.available || active.id !== selectedValue) return null;
+          const snapshot = projectSources.snapshot();
+          if (snapshot.project !== active.id || snapshot.status === 'stopped')
+            await startProjectSources(active);
+          return active;
+        }
+        const project = activateProject(
+          selectedValue
         );
+        await nativeProjects.close();
+        await startProjectSources(project);
+        return project;
+      });
 
+      if (!project)
+        return json(
+          { error: 'Selected project changed. Refresh the project list.' },
+          { status: 409 }
+        );
       return json({
         project
       });

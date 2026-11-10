@@ -1,0 +1,654 @@
+import { createHash, randomUUID } from 'node:crypto';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  renameSync,
+  rmSync,
+  statSync,
+  writeFileSync
+} from 'node:fs';
+import { dirname, join, relative } from 'node:path';
+import { ManifestSchema, type Manifest } from '@modern-software/mcpack';
+import { ForgeProjectManifestSchema } from '../project/schema';
+import { NativeProjectError } from '../mcpack/session';
+import type { RegisteredProject } from '../projects/project-service';
+import {
+  ProjectSourceSchema,
+  ProjectSourcesSchema,
+  type ExposureRule,
+  type ProjectSource
+} from './schema';
+import { nativeStarter, capabilityStarter } from './starter';
+import { insertNativeHandler } from './insert-handler';
+
+import { containedFile, sourcePath } from '../filesystem/source-paths';
+export { containedFile } from '../filesystem/source-paths';
+
+const MAX_BYTES = 256 * 1024;
+const digest = (content: string) =>
+  createHash('sha256').update(content).digest('hex');
+
+function read(path: string) {
+  if (statSync(path).size > MAX_BYTES)
+    throw new NativeProjectError('File exceeds the 256 KiB editor limit.');
+  return readFileSync(path, 'utf8');
+}
+
+export function atomicWrite(path: string, content: string) {
+  const temporary = `${path}.${randomUUID()}.tmp`;
+  try {
+    writeFileSync(temporary, content, { encoding: 'utf8', flag: 'wx' });
+    renameSync(temporary, path);
+  } finally {
+    rmSync(temporary, { force: true });
+  }
+}
+
+function projectFile(project: RegisteredProject) {
+  return containedFile(project.path, 'forge.project.json');
+}
+
+function configuration(project: RegisteredProject) {
+  return ForgeProjectManifestSchema.parse(
+    JSON.parse(read(projectFile(project)))
+  );
+}
+
+export function nativeDocument(project: RegisteredProject, id: string) {
+  const source = configuration(project).sources?.find(
+    (item) => item.id === id
+  );
+  if (!source || source.kind !== 'native')
+    throw new NativeProjectError('Native source not found.');
+  const { files, error, manifestPath } = inspectNativeDocument(
+    project,
+    source
+  );
+  return { source, files, error, manifestPath };
+}
+
+function inspectNativeDocument(
+  project: RegisteredProject,
+  source: Extract<ProjectSource, { kind: 'native' }>
+) {
+  const manifestPath = containedFile(project.path, source.manifest);
+  const content = read(manifestPath);
+  const files = [
+    relative(realpathSync(project.path), manifestPath).replaceAll('\\', '/')
+  ];
+  let error: string | undefined;
+  let parsed: Manifest | undefined;
+  // A malformed manifest remains editable after failed startup or an external edit.
+  try {
+    parsed = ManifestSchema.parse(JSON.parse(content));
+    for (const worker of Object.values(parsed.workers)) {
+      const path = containedFile(dirname(manifestPath), worker.module);
+      const name = relative(realpathSync(project.path), path).replaceAll(
+        '\\',
+        '/'
+      );
+      if (!files.includes(name)) files.push(name);
+    }
+  } catch (failure) {
+    error = failure instanceof Error ? failure.message : String(failure);
+  }
+  return { files, error, manifestPath, parsed, content };
+}
+
+export function readNativeFile(
+  project: RegisteredProject,
+  id: string,
+  filename: string
+) {
+  const document = nativeDocument(project, id);
+  const path = containedFile(project.path, filename);
+  if (
+    !document.files.some((file) => containedFile(project.path, file) === path)
+  ) {
+    throw new NativeProjectError(
+      'Only the manifest and declared worker modules can be edited.'
+    );
+  }
+  const content = read(path);
+  return {
+    path: relative(realpathSync(project.path), path).replaceAll('\\', '/'),
+    content,
+    revision: digest(content)
+  };
+}
+
+export function saveNativeFile(
+  project: RegisteredProject,
+  id: string,
+  filename: string,
+  content: string,
+  revision: string
+) {
+  const current = readNativeFile(project, id, filename);
+  if (current.revision !== revision)
+    throw new NativeProjectError(
+      'File changed on disk. Reload before saving.',
+      409
+    );
+  if (Buffer.byteLength(content) > MAX_BYTES)
+    throw new NativeProjectError('File exceeds the 256 KiB editor limit.');
+  const path = containedFile(project.path, filename);
+  const document = nativeDocument(project, id);
+  if (path === document.manifestPath) {
+    const manifest = ManifestSchema.parse(JSON.parse(content));
+    for (const worker of Object.values(manifest.workers))
+      containedFile(dirname(path), worker.module);
+  }
+  atomicWrite(path, content);
+  return readNativeFile(project, id, filename);
+}
+
+// Synchronous fresh read + atomic write preserves concurrent classic authoring changes.
+export function changeNativeSource(
+  project: RegisteredProject,
+  id: string,
+  change: 'remove' | 'enable' | 'disable'
+) {
+  const manifest = configuration(project);
+  const source = manifest.sources?.find((item) => item.id === id);
+  if (!source || source.kind !== 'native')
+    throw new NativeProjectError('Native source not found.');
+  if (change === 'remove')
+    manifest.sources = manifest.sources!.filter((item) => item.id !== id);
+  else source.enabled = change === 'enable';
+  atomicWrite(projectFile(project), `${JSON.stringify(manifest, null, 2)}\n`);
+}
+
+export function attachNativeSource(
+  project: RegisteredProject,
+  id: string,
+  filename: string
+) {
+  const source = ProjectSourceSchema.parse({
+    id,
+    kind: 'native',
+    manifest: filename,
+    enabled: true
+  });
+  const path = sourcePath(project.path, filename, 'Manifest path');
+  const native = ManifestSchema.parse(JSON.parse(read(path)));
+  for (const worker of Object.values(native.workers))
+    containedFile(dirname(path), worker.module);
+  const manifest = configuration(project);
+  manifest.sources = ProjectSourcesSchema.parse([
+    ...(manifest.sources ?? []),
+    source
+  ]);
+  atomicWrite(projectFile(project), `${JSON.stringify(manifest, null, 2)}\n`);
+}
+
+export function createNativeSource(
+  project: RegisteredProject,
+  id: string,
+  runtime: 'node' | 'python',
+  initial?: ReturnType<typeof nativeStarter>
+) {
+  const existing = configuration(project).sources ?? [];
+  ProjectSourcesSchema.parse([
+    ...existing,
+    { id, kind: 'native', manifest: `native/${id}/mcpack.json` }
+  ]);
+  const root = realpathSync(project.path);
+  if (!existsSync(join(root, 'native'))) mkdirSync(join(root, 'native'));
+  const folder = join(containedFile(root, 'native'), id);
+  // Exclusive creation: never overwrite an existing folder or follow its symlink.
+  mkdirSync(folder);
+  try {
+    const starter = initial ?? nativeStarter(id, runtime);
+    if (runtime === 'node') {
+      const pkg = {
+        name: `forge-${id.toLowerCase()}`,
+        private: true,
+        type: 'module'
+      };
+      writeFileSync(
+        join(folder, 'package.json'),
+        JSON.stringify(pkg, null, 2) + '\n',
+        { flag: 'wx' }
+      );
+    }
+    writeFileSync(join(folder, starter.module), starter.code, { flag: 'wx' });
+    writeFileSync(
+      join(folder, 'mcpack.json'),
+      `${JSON.stringify(starter.manifest, null, 2)}\n`,
+      { flag: 'wx' }
+    );
+    attachNativeSource(project, id, `native/${id}/mcpack.json`);
+  } catch (error) {
+    rmSync(folder, { recursive: true, force: true });
+    throw error;
+  }
+}
+
+export type CapabilityKind = 'tools' | 'resources' | 'prompts';
+
+/** Authoring reads disk, not discovery, so stopped/broken sources remain editable. */
+export function nativeWorkspace(
+  project: RegisteredProject,
+  manifest = configuration(project)
+) {
+  return {
+    project,
+    legacyCount:
+      manifest.tools.length +
+      manifest.resources.length +
+      manifest.prompts.length,
+    sources: (manifest.sources ?? []).map((source) => {
+      if (source.kind !== 'native')
+        return {
+          source,
+          manifest: null,
+          revision: '',
+          error: undefined as string | undefined
+        };
+      try {
+        const document = inspectNativeDocument(project, source);
+        const { parsed } = document;
+        if (!parsed)
+          throw new NativeProjectError(
+            document.error ?? 'Invalid native manifest.'
+          );
+        const manifest = {
+          tools: parsed.tools,
+          resources: parsed.resources,
+          prompts: parsed.prompts,
+          workers: Object.fromEntries(
+            Object.entries(parsed.workers).map(([id, worker]) => [
+              id,
+              {
+                runtime: worker.runtime,
+                module: worker.module,
+                maxConcurrent: worker.maxConcurrent
+              }
+            ])
+          )
+        };
+        return {
+          source,
+          manifest,
+          revision: digest(document.content),
+          error: document.error
+        };
+      } catch (error) {
+        return {
+          source,
+          manifest: null,
+          revision: '',
+          error: error instanceof Error ? error.message : String(error)
+        };
+      }
+    })
+  };
+}
+
+function validateCapabilityName(name: string) {
+  if (!/^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(name))
+    throw new NativeProjectError(
+      'Use a capability name starting with a letter and up to 64 letters, numbers, underscores or hyphens.'
+    );
+}
+
+/** A read-only proposal tied to both the manifest and module revisions. */
+export function previewNativeHandler(
+  project: RegisteredProject,
+  id: string,
+  kind: CapabilityKind,
+  name: string,
+  workerId: string,
+  revision: string
+) {
+  validateCapabilityName(name);
+  const document = nativeDocument(project, id);
+  const declaration = readNativeFile(project, id, document.files[0]);
+  if (declaration.revision !== revision)
+    throw new NativeProjectError(
+      'Manifest changed on disk. Reload this page before continuing.',
+      409
+    );
+  const raw = JSON.parse(declaration.content);
+  const manifest = ManifestSchema.parse(raw);
+  if (!Object.hasOwn(manifest.workers, workerId))
+    throw new NativeProjectError('Select an existing worker.');
+  const worker = manifest.workers[workerId];
+  const path = containedFile(dirname(document.manifestPath), worker.module);
+  const file = readNativeFile(
+    project,
+    id,
+    relative(realpathSync(project.path), path)
+  );
+  const content = insertNativeHandler({
+    source: file.content,
+    runtime: worker.runtime,
+    factory: worker.export,
+    kind,
+    name,
+    executable:
+      worker.runtime === 'python'
+        ? raw.workers[workerId].executable
+        : undefined,
+    cwd: dirname(document.manifestPath)
+  });
+  if (Buffer.byteLength(content) > MAX_BYTES)
+    throw new NativeProjectError(
+      'Updated worker exceeds the 256 KiB editor limit.'
+    );
+  return {
+    path: file.path,
+    original: file.content,
+    content,
+    revision: file.revision,
+    runtime: worker.runtime
+  };
+}
+
+/** Create a capability with a new worker, a generated shared handler, or an existing binding. */
+export function createNativeCapability(
+  project: RegisteredProject,
+  id: string,
+  runtime: 'node' | 'python',
+  kind: CapabilityKind,
+  name: string,
+  description: string,
+  options?: {
+    worker: string;
+    handler?: string;
+    revision: string;
+    newWorker: boolean;
+    addHandler?: boolean;
+    workerRevision?: string;
+  }
+) {
+  validateCapabilityName(name);
+  const workspace = nativeWorkspace(project);
+  if (
+    workspace.sources.some((entry) =>
+      entry.manifest?.[kind].some((item) => item.name === name)
+    )
+  )
+    throw new NativeProjectError(
+      'This capability name already exists in the project.'
+    );
+  const starter = capabilityStarter(id, runtime, kind, name);
+  const definition = { ...starter.manifest[kind][0], name, description };
+  if (kind === 'resources')
+    Object.assign(definition, { uri: `mcpack://${id}/${name}` });
+  if (options) {
+    if (options.newWorker && options.addHandler)
+      throw new NativeProjectError(
+        'Choose either a new worker or an existing worker.'
+      );
+    if (!/^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(options.worker))
+      throw new NativeProjectError('Invalid worker ID.');
+    const document = nativeDocument(project, id);
+    const file = readNativeFile(project, id, document.files[0]);
+    if (file.revision !== options.revision)
+      throw new NativeProjectError(
+        'File changed on disk. Reload before saving.',
+        409
+      );
+    const existing = JSON.parse(file.content) as Manifest;
+    const module = `${options.worker}.${runtime === 'node' ? 'mjs' : 'py'}`;
+    const modulePath = join(dirname(document.manifestPath), module);
+    let created = false;
+    let edited: ReturnType<typeof previewNativeHandler> | undefined;
+    let workerWritten = false;
+    try {
+      if (options.newWorker) {
+        if (Object.hasOwn(existing.workers, options.worker))
+          throw new NativeProjectError('Worker ID already exists.');
+        writeFileSync(modulePath, starter.code, { flag: 'wx' });
+        created = true;
+        Object.defineProperty(existing.workers, options.worker, {
+          value: { runtime, module: `./${module}` },
+          enumerable: true
+        });
+      } else if (options.addHandler) {
+        if (!options.workerRevision)
+          throw new NativeProjectError(
+            'Preview the worker change before creating this handler.'
+          );
+        edited = previewNativeHandler(
+          project,
+          id,
+          kind,
+          name,
+          options.worker,
+          options.revision
+        );
+        if (edited.revision !== options.workerRevision)
+          throw new NativeProjectError(
+            'Worker changed on disk. Preview the change again before creating the handler.',
+            409
+          );
+      } else {
+        if (
+          !Object.hasOwn(existing.workers, options.worker) ||
+          !options.handler?.trim()
+        )
+          throw new NativeProjectError(
+            'Select an existing worker and its handler.'
+          );
+        definition.handler = options.handler;
+      }
+      definition.worker = options.worker;
+      const updated = {
+        ...existing,
+        [kind]: [...existing[kind], definition]
+      };
+      const content = JSON.stringify(updated, null, 2) + '\n';
+      // Validate both changes before writing either file. Keep the user's original
+      // worker available for rollback if committing the manifest fails.
+      ManifestSchema.parse(updated);
+      if (Buffer.byteLength(content) > MAX_BYTES)
+        throw new NativeProjectError(
+          'Manifest exceeds the 256 KiB editor limit.'
+        );
+      if (edited) {
+        saveNativeFile(
+          project,
+          id,
+          edited.path,
+          edited.content,
+          edited.revision
+        );
+        workerWritten = true;
+      }
+      saveNativeFile(project, id, file.path, content, file.revision);
+    } catch (error) {
+      if (created) rmSync(modulePath, { force: true });
+      if (workerWritten && edited) {
+        const path = containedFile(project.path, edited.path);
+        // Never roll back over a newer IDE edit.
+        if (read(path) === edited.content) atomicWrite(path, edited.original);
+      }
+      throw error;
+    }
+    return;
+  }
+  const manifest = {
+    ...starter.manifest,
+    tools: [],
+    resources: [],
+    prompts: [],
+    [kind]: [definition]
+  };
+  ManifestSchema.parse(manifest);
+  // New authoring emits only the requested handler; demonstration sources are separate.
+  createNativeSource(project, id, runtime, {
+    ...starter,
+    manifest
+  } as ReturnType<typeof nativeStarter>);
+}
+
+export function updateNativeDefinition(
+  project: RegisteredProject,
+  id: string,
+  kind: CapabilityKind,
+  originalName: string,
+  definition: unknown,
+  revision: string
+) {
+  const document = nativeDocument(project, id);
+  const file = readNativeFile(project, id, document.files[0]);
+  if (file.revision !== revision)
+    throw new NativeProjectError(
+      'File changed on disk. Reload before saving.',
+      409
+    );
+  const manifest = JSON.parse(file.content) as Manifest;
+  const index = manifest[kind].findIndex(
+    (item) => item.name === originalName
+  );
+  if (index < 0) throw new NativeProjectError('Capability not found.');
+  const definitions: unknown[] = [...manifest[kind]];
+  definitions[index] = definition;
+  const updated = { ...manifest, [kind]: definitions };
+  const parsed = ManifestSchema.parse(updated);
+  const names = parsed[kind].map((item) => item.name);
+  if (new Set(names).size !== names.length)
+    throw new NativeProjectError('Capability name already exists.');
+  const replacement = parsed[kind][index];
+  if (
+    replacement.name !== originalName &&
+    document.source.disabledCapabilities?.some(
+      (item) => item.kind === kind && item.name === originalName
+    )
+  )
+    throw new NativeProjectError(
+      'Enable this capability before renaming it, or keep its current name.'
+    );
+  const workspace = nativeWorkspace(project);
+  if (
+    workspace.sources.some(
+      (entry) =>
+        entry.source.id !== id &&
+        entry.manifest?.[kind].some((item) => item.name === replacement.name)
+    )
+  )
+    throw new NativeProjectError(
+      'Capability name already exists in another source.'
+    );
+  if (kind === 'resources') {
+    const uris = parsed.resources.map((item) => item.uri);
+    if (
+      new Set(uris).size !== uris.length ||
+      workspace.sources.some(
+        (entry) =>
+          entry.source.id !== id &&
+          entry.manifest?.resources.some(
+            (item) => item.uri === parsed.resources[index].uri
+          )
+      )
+    )
+      throw new NativeProjectError('Resource URI already exists.');
+  }
+  return saveNativeFile(
+    project,
+    id,
+    file.path,
+    JSON.stringify(updated, null, 2) + '\n',
+    revision
+  );
+}
+
+export function setCapabilityEnabled(
+  project: RegisteredProject,
+  id: string,
+  kind: CapabilityKind,
+  name: string,
+  enabled: boolean
+) {
+  const manifest = configuration(project);
+  const source = manifest.sources?.find((item) => item.id === id);
+  if (!source || source.kind !== 'native')
+    throw new NativeProjectError('Native source not found.');
+  const native = inspectNativeDocument(project, source).parsed;
+  if (!native?.[kind].some((item) => item.name === name))
+    throw new NativeProjectError('Capability not found.');
+  source.disabledCapabilities = (source.disabledCapabilities ?? []).filter(
+    (entry) => entry.kind !== kind || entry.name !== name
+  );
+  if (!enabled) source.disabledCapabilities.push({ kind, name });
+  atomicWrite(projectFile(project), JSON.stringify(manifest, null, 2) + '\n');
+}
+
+type ConnectionChange =
+  | { action: 'create' | 'update'; source: ProjectSource }
+  | { action: 'enable' | 'disable' | 'remove'; id: string }
+  | { action: 'exposure'; id: string; rule: ExposureRule };
+
+/** Build the proposed manifest without writing it while discovery is in flight. */
+export function prepareConnectionChange(
+  project: RegisteredProject,
+  change: ConnectionChange,
+  sourceKind: 'bridge' | 'external'
+) {
+  const path = projectFile(project);
+  const original = read(path);
+  const manifest = ForgeProjectManifestSchema.parse(JSON.parse(original));
+  const sources = manifest.sources ?? [];
+  const id = 'source' in change ? change.source.id : change.id;
+  const index = sources.findIndex((entry) => entry.id === id);
+  let source = sources[index];
+  if (change.action === 'create') {
+    if (index !== -1)
+      throw new NativeProjectError('Source ID already exists.');
+  } else if (!source || source.kind !== sourceKind) {
+    throw new NativeProjectError(
+      `Source ${id} is not a ${sourceKind} source.`
+    );
+  }
+  if ('source' in change) {
+    const existing = source;
+    source = change.source;
+    if (
+      change.action === 'update' &&
+      source.kind !== 'native' &&
+      existing.kind !== 'native' &&
+      existing.exposure
+    )
+      source = { ...source, exposure: existing.exposure };
+    if (source.kind !== sourceKind)
+      throw new NativeProjectError(`Expected a ${sourceKind} source.`);
+    if (change.action === 'create') sources.push(source);
+    else sources[index] = source;
+  } else if (change.action === 'exposure' && source.kind !== 'native') {
+    const rule = change.rule;
+    const rules = (source.exposure ?? []).filter(
+      (r) => r.kind !== rule.kind || r.identity !== rule.identity
+    );
+    if (rule.hidden || rule.alias || rule.description !== undefined)
+      rules.push(rule);
+    if (rules.length) source.exposure = rules;
+    else delete source.exposure;
+  } else if (change.action === 'remove') sources.splice(index, 1);
+  else source.enabled = change.action === 'enable';
+  manifest.sources = ProjectSourcesSchema.parse(sources);
+  return {
+    manifest,
+    candidate:
+      change.action !== 'remove' && source.kind !== 'native' && source.enabled
+        ? source
+        : undefined,
+    commit() {
+      if (read(path) !== original)
+        throw new NativeProjectError(
+          'Project configuration changed on disk. Review it and retry.',
+          409
+        );
+      const content = JSON.stringify(manifest, null, 2) + '\n';
+      if (Buffer.byteLength(content) > MAX_BYTES)
+        throw new NativeProjectError(
+          'Project configuration exceeds the 256 KiB editor limit.'
+        );
+      atomicWrite(path, content);
+    }
+  };
+}

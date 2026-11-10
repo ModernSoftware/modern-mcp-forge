@@ -3,48 +3,39 @@
 </script>
 
 <svelte:head>
-  <title>
-    Modern MCP Forge · Resources
-  </title>
+  <title>Modern MCP Forge · Resources</title>
 </svelte:head>
 
 <section class="page-heading">
   <div>
-    <div class="eyebrow">
-      MCP
-    </div>
-    <h1>Resources</h1>
+    <div class="eyebrow">MCP</div>
+    <h1>Legacy resources</h1>
     <p>
-      Expose project knowledge as read-only MCP resources backed by files in your project or by explicitly referenced external files.
+      Expose project knowledge as read-only MCP resources backed by files in
+      your project or by explicitly referenced external files.
     </p>
   </div>
 
-  <a
-    class="primary-button"
-    href="/resources/new"
-  >
+  <a class="primary-button" href="/resources/new">
     <span>＋</span>
     Add resource
   </a>
 </section>
 
+<p class="workflow-notice">
+  Legacy definitions retain their original execution format. New capabilities
+  use native MCPack. <a href="/workspace">Return to the project workspace</a>.
+</p>
+
 {#if data.resources.length === 0}
   <section class="glass-card empty-state">
-    <div class="empty-icon">
-      ○
-    </div>
-    <h2>
-      No resources yet
-    </h2>
+    <div class="empty-icon">○</div>
+    <h2>No resources yet</h2>
     <p>
-      Add a Markdown, JSON, or text resource and Forge will expose it through MCP resources/list and resources/read.
+      Add a Markdown, JSON, or text resource and Forge will expose it through
+      MCP resources/list and resources/read.
     </p>
-    <a
-      class="primary-button"
-      href="/resources/new"
-    >
-      Add first resource
-    </a>
+    <a class="primary-button" href="/resources/new"> Add first resource </a>
   </section>
 {:else}
   <div class="resource-grid">
@@ -53,8 +44,7 @@
         <header>
           <div>
             <h2>
-              {resource.title ??
-                resource.name}
+              {resource.title ?? resource.name}
             </h2>
             <code>
               {resource.name}
@@ -66,11 +56,9 @@
               <span class="disabled-badge">DISABLED</span>
             {/if}
             <span class="type-badge">
-              {resource.mimeType ===
-                'text/markdown'
+              {resource.mimeType === 'text/markdown'
                 ? 'MARKDOWN'
-                : resource.mimeType ===
-                    'application/json'
+                : resource.mimeType === 'application/json'
                   ? 'JSON'
                   : 'TEXT'}
             </span>
@@ -78,8 +66,7 @@
         </header>
 
         <p>
-          {resource.description ||
-            'No description.'}
+          {resource.description || 'No description.'}
         </p>
 
         <div class="uri">
@@ -92,34 +79,22 @@
           </code>
 
           <span
-            class:status-ready={
-              resource.sourceInfo.exists
-            }
-            class:status-failed={
-              !resource.sourceInfo.exists
-            }
+            class:status-ready={resource.sourceInfo.exists}
+            class:status-failed={!resource.sourceInfo.exists}
           >
             <span class="status-dot"></span>
-            {resource.sourceInfo.exists
-              ? 'Source ready'
-              : 'Missing source'}
+            {resource.sourceInfo.exists ? 'Source ready' : 'Missing source'}
           </span>
         </div>
 
         <footer>
           {#if resource.sourceInfo.external}
-            <span class="external">
-              External source
-            </span>
+            <span class="external"> External source </span>
           {:else}
-            <span>
-              Project resource
-            </span>
+            <span> Project resource </span>
           {/if}
 
-          <a
-            href={`/resources/${encodeURIComponent(resource.name)}`}
-          >
+          <a href={`/resources/${encodeURIComponent(resource.name)}`}>
             Open →
           </a>
         </footer>
@@ -131,8 +106,7 @@
 <style>
   .resource-grid {
     display: grid;
-    grid-template-columns:
-      repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 15px;
   }
 
@@ -177,8 +151,7 @@
     padding: 6px 8px;
     border-radius: 999px;
     color: var(--lavender);
-    background:
-      var(--lavender-soft);
+    background: var(--lavender-soft);
     font-size: 0.6rem;
     font-weight: 900;
     letter-spacing: 0.08em;
@@ -198,12 +171,8 @@
     border: 1px solid var(--border);
     border-radius: 9px;
     color: var(--accent);
-    background:
-      var(--accent-soft);
-    font-family:
-      "Cascadia Code",
-      Consolas,
-      monospace;
+    background: var(--accent-soft);
+    font-family: 'Cascadia Code', Consolas, monospace;
     font-size: 0.67rem;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -238,8 +207,7 @@
     gap: 14px;
     margin-top: 17px;
     padding-top: 13px;
-    border-top:
-      1px solid var(--border);
+    border-top: 1px solid var(--border);
     color: var(--muted);
     font-size: 0.67rem;
   }
@@ -287,9 +255,7 @@
     font-size: 1.4rem;
   }
 
-  @media (
-    max-width: 840px
-  ) {
+  @media (max-width: 840px) {
     .resource-grid {
       grid-template-columns: 1fr;
     }
