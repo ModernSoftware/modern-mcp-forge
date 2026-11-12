@@ -1,4 +1,6 @@
-import { createMcpHandler } from '@modelcontextprotocol/server';
-import { createForgeMcpServer } from '$lib/server/mcp/server';
+import { createMcpHandler } from "@modelcontextprotocol/server";
+import { createForgeMcpServer } from "$lib/server/mcp/server";
 
-export const forgeMcpHandler = createMcpHandler(createForgeMcpServer);
+export const forgeMcpHandler = createMcpHandler(createForgeMcpServer, {
+  maxRequestBodySize: 1024 * 1024,
+});

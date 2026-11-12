@@ -7,6 +7,7 @@
     "node": ">=22"
   },
   "scripts": {
+    "audit:dependencies": "npm audit --audit-level=high",
     "validate": "mcpack validate pack/mcpack.json",
     "start": "mcpack serve pack/mcpack.json --transport http",
     "start:stdio": "mcpack serve pack/mcpack.json"

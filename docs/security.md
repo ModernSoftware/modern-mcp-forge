@@ -51,6 +51,73 @@ a service token, TLS and allowed hosts/origins, and use a process manager. A sha
 service token is not OAuth delegation or per-user access control. Application
 handlers remain responsible for their business authorization and data access.
 
+## Dependency maintenance and release gates
+
+Run `bun run audit:dependencies` and `bun run audit:export` after a frozen install.
+The second command audits the separate npm lockfile shipped in native exports.
+The Dependency security workflow runs both checks on PRs, release/main pushes and
+weekly on the default branch. High/critical findings block the check; full JSON
+reports retain low/moderate findings for review. Registry failures also fail.
+There are no suppressed advisory IDs or `continue-on-error` audit gates.
+The Docker publication workflow repeats both checks before publishing an image.
+Configure both `Dependency audit` matrix checks as required branch checks.
+
+Dependabot proposes Bun, export npm and GitHub Actions updates against `v0.10.0`.
+After merging the release into main, remove `target-branch` from that configuration.
+Schedules and Dependabot configuration become active from the default branch.
+Review updates, their release notes, functional tests and deployment/browser CI;
+do not automatically merge dependency major versions.
+
+### Security patch release order
+
+1. Review, merge and publish MCPack **0.9.1** using its staged npm workflow and
+   maintainer approval. Forge's current 0.9.0 pin transitively installs SDK 2.0.0.
+2. Update Forge's exact MCPack pin and `bun.lock`, and the exact pin and
+   `package-lock.json` under `src/lib/server/deployment/template`, using the real
+   published package. The Forge security PR remains a draft until this is done;
+   audit checks intentionally remain red while these affected dependencies exist.
+3. Update current-version documentation/fixtures and the MCPack Support Desk
+   registry example. Repeat published-package, Node/Python compatibility, native
+   export, browser and container checks. An audit of Forge alone does not certify
+   the exported package or a user's application dependencies.
+4. Merge Forge only with passing audits and functional checks, then perform the
+   final clean-install/export smoke test and release. Do not suppress the SDK
+   advisories, use unpublished version pins, or treat source-built tests as proof
+   that a registry package has been published.
+
+### Mitigations and remaining findings
+
+The workbench's MCP endpoint caps POST bodies at 1 MiB and tool argument object
+members/array elements at 10,000 before SDK schema validation. The patched SDK
+also caps JSON-RPC batches at 100 messages. These are admission limits, not rate
+limiting, authentication, or an instruction to expose the authoring UI publicly.
+See the [SDK validation advisory](https://github.com/advisories/GHSA-46jr-4wx8-v453).
+
+Monaco vendors DOMPurify, so the Vite alias redirects its sanitizer import to our
+patched `dompurify` dependency. The direct dependency and override update the
+dependency graph too. Keep the alias and browser regression check until upstream
+Monaco includes the patched sanitizer; a lockfile-only override is insufficient.
+
+Review dated 2026-11-12: the remaining non-SDK findings after these updates are
+low severity. SvelteKit 2's
+[enhanced-form redirect](https://github.com/advisories/GHSA-pfhg-q3qv-9q6r) and
+[prerendered-header](https://github.com/advisories/GHSA-27mw-82g8-phjj) paths are not
+used by Forge (no enhanced form actions or prerendered application pages).
+The [cookie serialization finding](https://github.com/advisories/GHSA-pxg6-pf52-xh8x)
+has no application-controlled cookie name/path/domain sink here.
+[deepmerge prototype poisoning](https://github.com/advisories/GHSA-gcqx-w48m-w2h4)
+is in build dependencies; Forge does not merge untrusted runtime data with it.
+These are code-based reachability assessments, not security guarantees. Review
+them before release and whenever these features are introduced; plan a separately
+tested SvelteKit major upgrade rather than silently forcing it in this patch.
+
+Enable private vulnerability reporting, dependency alerts, secret scanning and
+push protection where available, and require reviews/checks on release branches.
+Maintain container OS scans and image provenance, non-root deployment and ingress
+limits, and audit Python/application dependencies independently. Dependency audits
+do not detect every vulnerability or replace these controls. Repository settings
+and production infrastructure are not changed by this patch.
+
 ## Reporting a vulnerability
 
 Use the repository's [Security page](https://github.com/ModernSoftware/modern-mcp-forge/security)

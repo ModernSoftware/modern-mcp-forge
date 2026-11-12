@@ -1,4 +1,5 @@
 import { verifyNativeRehearsal } from './native-rehearsal.mjs';
+import { verifyEditorSanitizer } from './editor-sanitizer.mjs';
 import { verifySourcePaths } from './source-paths.mjs';
 import { chromium } from 'playwright-core';
 import { createServer } from 'vite';
@@ -60,6 +61,7 @@ try {
   await projectSources.close();
   await page.goto(base + '/projects');
   await page.waitForLoadState('networkidle');
+  await verifyEditorSanitizer(page);
   assert.equal(projectSources.snapshot().status, 'stopped');
   const resume = async () => {
     await page.getByRole('button', { name: 'Continue' }).click();

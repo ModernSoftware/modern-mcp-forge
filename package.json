@@ -28,12 +28,14 @@
     "mcp:stdio:smoke": "bun run scripts/mcp-stdio-smoke.ts",
     "mcpack:setup": "bun run scripts/setup-mcpack.ts",
     "test:mcpack": "svelte-kit sync && bun run scripts/test-mcpack.ts",
-    "check:docs": "bun run scripts/check-docs.ts"
+    "check:docs": "bun run scripts/check-docs.ts",
+    "audit:dependencies": "bun audit --audit-level=high",
+    "audit:export": "npm audit --prefix src/lib/server/deployment/template --audit-level=high"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.53",
-    "@modelcontextprotocol/client": "^2.0.0",
-    "@modelcontextprotocol/server": "^2.0.0",
+    "@modelcontextprotocol/client": "^2.3.0",
+    "@modelcontextprotocol/server": "^2.3.0",
     "@modern-software/mcpack": "0.9.0",
     "@strands-agents/sdk": "^1.17.0",
     "acorn": "8.18.0",
@@ -42,7 +44,8 @@
     "ajv": "8.20.0",
     "json-schema-faker": "0.6.3",
     "monaco-editor": "^0.56.0",
-    "zod": "^4.0.0"
+    "zod": "^4.6.7",
+    "dompurify": "3.4.17"
   },
   "devDependencies": {
     "@sveltejs/adapter-node": "^5.5.7",
@@ -53,7 +56,7 @@
     "svelte": "^5.57.0",
     "svelte-check": "latest",
     "typescript": "~6",
-    "vite": "^8.2.2"
+    "vite": "^8.3.3"
   },
   "packageManager": "bun@1.4.2",
   "description": "Local-first visual workbench for building and testing Model Context Protocol servers with language-neutral Tool execution.",
@@ -73,5 +76,8 @@
     "bun",
     "svelte",
     "ai-agents"
-  ]
+  ],
+  "overrides": {
+    "dompurify": "3.4.17"
+  }
 }

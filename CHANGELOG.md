@@ -4,6 +4,11 @@
 
 Publication is pending release rehearsal and the final release gate.
 
+- Security preparation: patched direct MCP SDK and transitive dependencies,
+  explicit MCP body/tool validation limits, patched Monaco sanitizer resolution,
+  and PR/weekly/publication audits for the workbench and exported deployment.
+  MCPack 0.9.1 publication and both consumer lockfile updates remain release gates.
+
 - Native authoring and execution through published MCPack 0.9.0, with persistent
   Node/Python workers and standalone deployment parity.
 - Unified multi-source workspace, native editing, lifecycle/recovery and
