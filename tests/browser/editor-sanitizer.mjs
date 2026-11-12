@@ -4,7 +4,7 @@ export async function verifyEditorSanitizer(page) {
   // Exercise the exact relative import in Monaco through Vite, not just the
   // standalone npm package: Monaco also ships a vendored vulnerable copy.
   const source = await page.request.get(
-    "/node_modules/monaco-editor/esm/vs/base/browser/domSanitize.js",
+    new URL('/node_modules/monaco-editor/esm/vs/base/browser/domSanitize.js', page.url()).href,
   );
   assert.equal(source.ok(), true);
   assert.match(
