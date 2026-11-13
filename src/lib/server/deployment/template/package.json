@@ -13,6 +13,7 @@
     "start:stdio": "mcpack serve pack/mcpack.json"
   },
   "dependencies": {
-    "@modern-software/mcpack": "0.9.0"
+    "@modern-software/mcpack": "0.9.1",
+    "modern-mcp-forge": "file:../../../../.."
   }
 }
