@@ -70,12 +70,17 @@ do not automatically merge dependency major versions.
 
 ### Security patch release order
 
-1. Review, merge and publish MCPack **0.9.1** using its staged npm workflow and
-   maintainer approval. Forge's current 0.9.0 pin transitively installs SDK 2.0.0.
+Forge and its export template both pin published MCPack **0.9.1**, which uses
+MCP SDK 2.3.0. For future security patches:
+
+1. Review, merge and publish the MCPack patch using its staged npm workflow and
+   maintainer approval before updating Forge to that version.
 2. Update Forge's exact MCPack pin and `bun.lock`, and the exact pin and
    `package-lock.json` under `src/lib/server/deployment/template`, using the real
-   published package. The Forge security PR remains a draft until this is done;
-   audit checks intentionally remain red while these affected dependencies exist.
+   published package. Run `bun install` in the Forge root. Run
+   `npm install --package-lock-only --ignore-scripts` with the template directory
+   as the working directory. The host template must depend only on MCPack and
+   must not contain a local `file:` dependency or link to the Forge checkout.
 3. Update current-version documentation/fixtures and the MCPack Support Desk
    registry example. Repeat published-package, Node/Python compatibility, native
    export, browser and container checks. An audit of Forge alone does not certify
@@ -98,8 +103,10 @@ patched `dompurify` dependency. The direct dependency and override update the
 dependency graph too. Keep the alias and browser regression check until upstream
 Monaco includes the patched sanitizer; a lockfile-only override is insufficient.
 
-Review dated 2026-11-12: the remaining non-SDK findings after these updates are
-low severity. SvelteKit 2's
+Review dated 2026-11-13: the frozen workbench lockfile includes Hono 4.13.18 and
+its Node adapter 2.1.8, clearing seven additional low/moderate findings. The
+remaining four workbench findings are low severity; the standalone host lockfile
+has no reported vulnerabilities. SvelteKit 2's
 [enhanced-form redirect](https://github.com/advisories/GHSA-pfhg-q3qv-9q6r) and
 [prerendered-header](https://github.com/advisories/GHSA-27mw-82g8-phjj) paths are not
 used by Forge (no enhanced form actions or prerendered application pages).
