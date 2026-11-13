@@ -251,6 +251,15 @@ describe('HTTP application and MCP end-to-end', () => {
       expect((await client.listResources()).resources.map((item) => item.name)).toContain('guide');
       expect((await client.listPrompts()).prompts.map((item) => item.name)).toContain('review');
 
+      // A small byte payload can still allocate excessive schema-validation
+      // errors. Reject its structural size before validating individual fields.
+      const oversized = await client.callTool({
+        name: 'http_echo',
+        arguments: { text: 'blocked', extra: Array(10_000).fill(0) }
+      });
+      expect(oversized.isError).toBe(true);
+      expect(JSON.stringify(oversized.content)).toContain('maximum of 10000 elements');
+
       const call = await client.callTool({
         name: 'http_echo',
         arguments: {

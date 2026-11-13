@@ -4,7 +4,12 @@
 
 Publication is pending release rehearsal and the final release gate.
 
-- Native authoring and execution through published MCPack 0.9.0, with persistent
+- Security preparation: patched direct MCP SDK and transitive dependencies,
+  explicit MCP body/tool validation limits, patched Monaco sanitizer resolution,
+  and PR/weekly/publication audits for the workbench and exported deployment.
+  The workbench and exported deployment both pin published MCPack 0.9.1.
+
+- Native authoring and execution through published MCPack 0.9.1, with persistent
   Node/Python workers and standalone deployment parity.
 - Unified multi-source workspace, native editing, lifecycle/recovery and
   remembered views, filters and grouping.

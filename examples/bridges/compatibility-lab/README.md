@@ -14,7 +14,7 @@ bun run dev
 
 In **Projects → Open existing project**, enter the absolute path to `examples/bridges/compatibility-lab`. Open **Workspace**. The expected catalog is seven tools, two static resources and two prompts. In Inspector, select Streamable HTTP and copy the agent URL from the workspace. A good first call is `get_quote_by_sku` with `{"sku":"ACT-42","quantity":3,"tier":"premium"}`. The result includes a USD 4.49 discount, USD 4.57 tax and a USD 59.93 total.
 
-Setup runs `npm ci` in each Node package, creates an isolated `.venv` for each Python application using `uv sync --locked`, and builds the xmcp entrypoint. The Node adapters have their own package manifest in `bridges/`. Setup does not require credentials. The first run requires internet access to install packages.
+Setup runs `npm ci` in each Node package, creates an isolated `.venv` for each Python application using `uv sync --locked`, and builds the xmcp entrypoint. The Node adapters have their own package manifest in `bridges/`. Setup does not require credentials. The first run requires internet access to install packages. The setup and test builds disable xmcp telemetry with `XMCP_TELEMETRY_DISABLED=true`; the fulfillment fixture disables Mastra telemetry before loading its SDK.
 
 ## What is implemented
 
