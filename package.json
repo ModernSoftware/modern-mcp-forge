@@ -33,7 +33,7 @@
     "audit:export": "npm audit --prefix src/lib/server/deployment/template --audit-level=high"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "^4.0.53",
+    "@ai-sdk/anthropic": "^4.0.104",
     "@modelcontextprotocol/client": "^2.3.0",
     "@modelcontextprotocol/server": "^2.3.0",
     "@modern-software/mcpack": "0.9.1",
