@@ -40,7 +40,7 @@
     "@strands-agents/sdk": "^1.17.0",
     "acorn": "8.18.0",
     "ai": "^7.0.99",
-    "ai-sdk-ollama": "^4.2.0",
+    "ai-sdk-ollama": "^4.6.3",
     "ajv": "8.20.0",
     "json-schema-faker": "0.6.3",
     "monaco-editor": "^0.56.0",
