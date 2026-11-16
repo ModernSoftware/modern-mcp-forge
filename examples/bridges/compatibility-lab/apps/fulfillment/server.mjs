@@ -1,7 +1,11 @@
-import { MCPServer } from '@mastra/mcp';
-import { createTool } from '@mastra/core/tools';
-import { createStep, createWorkflow } from '@mastra/core/workflows';
 import { z } from 'zod';
+
+// This local fixture uses seeded data and must not report usage to third parties.
+// Set the framework's opt-out before loading it, for direct and bridged launches.
+process.env.MASTRA_TELEMETRY_DISABLED = '1';
+const { MCPServer } = await import('@mastra/mcp');
+const { createTool } = await import('@mastra/core/tools');
+const { createStep, createWorkflow } = await import('@mastra/core/workflows');
 
 const input = z.object({
   order: z.object({

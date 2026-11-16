@@ -276,7 +276,7 @@ test('native workers and five framework applications agree with Forge over HTTP'
       {
         cwd: app('deploy'),
         stdio: 'inherit',
-        env: { ...process.env, XMCP_TELEMETRY_DISABLED: '1' }
+        env: { ...process.env, XMCP_TELEMETRY_DISABLED: 'true' }
       }
     );
     // Simulate an unavailable warehouse application, independently of its adapter.

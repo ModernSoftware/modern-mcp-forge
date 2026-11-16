@@ -19,7 +19,8 @@ export function createForgeMcpServer(): McpServer {
       version: manifest.server.version
     },
     {
-      instructions: manifest.server.instructions
+      instructions: manifest.server.instructions,
+      maxToolInputElements: 10_000
     }
   );
 

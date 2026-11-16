@@ -21,6 +21,42 @@ import { externalServer } from '../helpers/external-server';
 import { getAvailablePort } from '../helpers/network';
 
 test('Node and Python bridges attach, serve the mixed catalog and stop with the project', async () => {
+  const pythonCommand = Bun.which('python') ?? Bun.which('python3');
+  if (!pythonCommand)
+    throw new Error(
+      'Python 3 is required for the bridge E2E test. See docs/testing.md.'
+    );
+  const checkPython = (executable: string) => {
+    try {
+      execFileSync(
+        executable,
+        [
+          '-c',
+          [
+            'from mcp import types',
+            'from mcp.server import Server',
+            'from mcp.server.stdio import stdio_server',
+            'from mcp.server.fastmcp import FastMCP'
+          ].join('; ')
+        ],
+        {
+          encoding: 'utf8',
+          timeout: 30_000,
+          windowsHide: true,
+          stdio: 'pipe'
+        }
+      );
+    } catch (error) {
+      throw new Error(
+        `Python bridge E2E prerequisite failed for ${executable}. ` +
+          `Install the fixture SDK in the Python environment used by this test: ` +
+          `"${pythonCommand}" -m pip install "mcp==1.29.0". ` +
+          'The temporary bridge virtual environment inherits system site packages, not packages from an activated parent virtual environment. See docs/testing.md.',
+        { cause: error }
+      );
+    }
+  };
+  checkPython(pythonCommand);
   const root = await mkdtemp(join(tmpdir(), 'forge bridges '));
   const folder = join(root, 'mixed project');
   const checkout = join(root, 'developer checkout');
@@ -134,13 +170,20 @@ test('Node and Python bridges attach, serve the mixed catalog and stop with the 
       join(nodeDir, 'node_modules'),
       'junction'
     );
-    execFileSync(Bun.which('python') ?? 'python3', [
+    execFileSync(pythonCommand, [
       '-m',
       'venv',
       '--system-site-packages',
       '--without-pip',
       join(pyDir, '.venv')
     ]);
+    checkPython(
+      join(
+        pyDir,
+        '.venv',
+        process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python'
+      )
+    );
     const nodeFile = join(folder, node.entrypoint);
     const starter = await readFile(nodeFile, 'utf8');
     await writeFile(

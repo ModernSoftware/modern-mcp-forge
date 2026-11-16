@@ -21,7 +21,7 @@ Forge combines native MCPack sources, project-owned bridge adapters and external
 Streamable HTTP servers into one project MCP endpoint. Author tools, static
 resources and prompts; inspect the catalog; test real implementations; and choose
 what agents can discover. Native sources run with the published
-`@modern-software/mcpack@0.9.0` dependency and can deploy without Forge.
+`@modern-software/mcpack@0.9.1` dependency and can deploy without Forge.
 
 ## Features
 

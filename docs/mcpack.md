@@ -1,6 +1,6 @@
 # Native MCPack integration
 
-Forge 0.10.0 uses `@modern-software/mcpack@0.9.0` from its frozen lockfile. No
+Forge 0.10.0 uses `@modern-software/mcpack@0.9.1` from its frozen lockfile. No
 MCPack checkout, npm token or separate setup is required for ordinary use.
 Install Forge normally, then follow [native authoring](native-authoring.md) or
 the [developer guide](developer-guide.md).

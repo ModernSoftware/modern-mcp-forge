@@ -1,6 +1,6 @@
 # Native authoring in a Forge project
 
-Forge uses the published `@modern-software/mcpack@0.9.0` runtime for native sources.
+Forge uses the published `@modern-software/mcpack@0.9.1` runtime for native sources.
 Your project owns the MCPack manifests and handler modules: the same files can run
 with the standalone MCPack CLI without Forge.
 

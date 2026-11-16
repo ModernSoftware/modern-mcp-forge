@@ -83,6 +83,8 @@ test('Node insertion rejects dynamic factories and ambiguous registries without 
   );
 });
 
+// These cases launch Python repeatedly. Allow for interpreter startup on slower
+// machines while retaining insertNativeHandler's separate per-process timeout.
 test('Python insertion preserves CRLF, Unicode, comments, shared dependencies and avoids local-name collisions', () => {
   const original = `raise RuntimeError("Preview must not execute me")
 def create_worker(context):
@@ -116,7 +118,7 @@ def create_worker(context):
     'build'
   );
   expect(tabs).toContain('\tdef handle_guide(args, call):\n\t\tcall.signal');
-});
+}, 60_000);
 
 test('Python insertion rejects dynamic factories, duplicate keys and conditional returns', () => {
   for (const source of [
@@ -130,7 +132,7 @@ test('Python insertion rejects dynamic factories, duplicate keys and conditional
     '@decorate\ndef create_worker(context):\n    return {}\n'
   ])
     expect(() => insert(source, 'python')).toThrow('cannot safely');
-});
+}, 60_000);
 
 test('all generated starter shapes accept additional tools, resources and prompts', () => {
   for (const runtime of ['node', 'python'] as const) {
@@ -149,4 +151,4 @@ test('all generated starter shapes accept additional tools, resources and prompt
       'review-order'
     );
   }
-});
+}, 60_000);

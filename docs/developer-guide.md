@@ -2,7 +2,7 @@
 
 Forge is a local workbench for building, connecting and testing MCP tools,
 static resources and prompts. It publishes the open project's capabilities at
-one MCP endpoint. Native sources use `@modern-software/mcpack@0.9.0` from npm;
+one MCP endpoint. Native sources use `@modern-software/mcpack@0.9.1` from npm;
 Forge and MCPack have independent version numbers.
 
 ## Contents

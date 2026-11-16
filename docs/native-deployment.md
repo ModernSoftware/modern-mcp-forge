@@ -1,6 +1,6 @@
 # Deploy a native MCPack source
 
-In **Workspace → Export native pack**, choose an enabled native source. MCPack 0.9.0 serves one manifest per process. A project with several native sources offers a separate download for each. The workspace filters, search, view and expanded source groups are remembered per project for the current browser tab, including after a refresh. They are independent of the export selection.
+In **Workspace → Export native pack**, choose an enabled native source. MCPack 0.9.1 serves one manifest per process. A project with several native sources offers a separate download for each. The workspace filters, search, view and expanded source groups are remembered per project for the current browser tab, including after a refresh. They are independent of the export selection.
 
 1. Under **Capabilities to include**, choose the tools, static resources and prompts you want clients to discover. All enabled capabilities start selected. The selection applies only to this download.
 2. Open **Review deployment files** to see the worker modules, root dependency manifests and lockfiles, and files named directly in the selected workers’ configuration. Forge includes them automatically. Under **Additional files**, select helpers, nested dependencies or assets your code loads dynamically. Including a file cannot enable a tool. Review application code and configuration for secrets.
@@ -41,7 +41,7 @@ Clients send the token in the Authorization bearer header. For browser clients, 
 Run the archive outside the original project and stop Forge while testing it.
 Verify the chosen catalog, each selected capability type, a business failure and
 required environment values. Do not copy `node_modules` or a host virtual
-environment to another platform. The archive's MCPack dependency remains 0.9.0;
+environment to another platform. The archive's MCPack dependency remains 0.9.1;
 its application package version is independent of Forge 0.10.0.
 
 The basic host requires Node 22+, but application code can require a newer

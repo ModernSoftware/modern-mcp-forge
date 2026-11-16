@@ -1,7 +1,8 @@
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-process.env.XMCP_TELEMETRY_DISABLED = '1';
+// The compiler recognizes the literal string "true", not "1".
+process.env.XMCP_TELEMETRY_DISABLED = 'true';
 
 function run(directory, command, args) {
   const cwd = fileURLToPath(new URL(directory + '/', import.meta.url));

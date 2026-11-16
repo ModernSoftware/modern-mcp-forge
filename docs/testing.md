@@ -27,7 +27,16 @@ Run the fast automated suite:
 bun run test
 ```
 
-The end-to-end suite runs the Forge Python adapter against an existing FastMCP application. Install the tested SDK with `python -m pip install "mcp==1.29.0"` in the Python environment used for testing. Node uses the installed Forge SDK dependencies.
+The end-to-end suite runs the Forge Python adapter against an existing FastMCP application. Before running it, install the fixture SDK:
+
+```bash
+python -m pip install "mcp==1.29.0"
+python -c "import sys; from mcp.server.fastmcp import FastMCP; print(sys.executable)"
+```
+
+The test selects `python` from PATH, falling back to `python3`. If only `python3` is available, use it in both commands. Use the same terminal for installation and testing. Installing the standalone `fastmcp` package, or installing `mcp` into another interpreter, does not satisfy this fixture's prerequisite. Native Python workers do not require the MCP Python SDK.
+
+The bridge test creates an adapter-local `.venv` with `--system-site-packages` and verifies imports before starting its MCP connection. This temporary environment inherits the base interpreter's system packages, not an activated parent virtual environment's packages. For this suite, deactivate that parent environment and install the fixture SDK in the selected base interpreter. A missing prerequisite now reports the interpreter and installation command directly. Windows may report that a temporary path's short (8.3) name resolves to its long name; that notice alone is not a test failure. Node uses the installed Forge SDK dependencies.
 
 Run one layer:
 
@@ -60,6 +69,8 @@ bun run build
 ```
 
 The tests are forced to one test concurrency because several integration tests intentionally manipulate process-scoped Forge state such as the selected project and temporary database path. This keeps the suite deterministic on Windows, Linux, and macOS.
+
+Python handler-insertion cases start several interpreter processes and have a 60-second per-test budget for slower machines. Each individual parser process retains its own five-second limit. Run the normal commands above; no global timeout override is needed.
 
 ## What is covered
 

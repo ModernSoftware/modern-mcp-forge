@@ -150,6 +150,26 @@ test('download a mixed-project native export, clean-install it and call both wor
       'order-desk-native.tar.gz'
     );
     await new Bun.Archive(await response.blob()).extract(target);
+    // A local Forge dependency can become a dangling npm link and still allow
+    // MCPack to start. Assert portability in the archive itself as well.
+    const hostPackage = JSON.parse(
+      await readFile(join(target, 'package.json'), 'utf8')
+    );
+    const hostLock = JSON.parse(
+      await readFile(join(target, 'package-lock.json'), 'utf8')
+    );
+    expect(Object.keys(hostPackage.dependencies)).toEqual([
+      '@modern-software/mcpack'
+    ]);
+    expect(hostLock.packages[''].dependencies).toEqual(hostPackage.dependencies);
+    for (const [path, entry] of Object.entries(hostLock.packages) as [
+      string,
+      { link?: boolean; resolved?: string }
+    ][]) {
+      expect(path === '' || path.startsWith('node_modules/')).toBe(true);
+      expect(entry.link).not.toBe(true);
+      if (entry.resolved) expect(entry.resolved).toMatch(/^https:\/\//);
+    }
     await closeForge();
     // Removing the entire original workspace catches absolute paths or dependencies on Forge's source tree.
     await rm(project, { recursive: true, force: true });

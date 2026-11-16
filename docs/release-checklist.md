@@ -8,7 +8,7 @@ The package version is prepared as `0.10.0`; publication remains a separate step
 ## Scope and prerequisites
 
 - [ ] Review [release scope and issue mapping](roadmap.md); distinguish completed work from deferred features.
-- [ ] Use the published MCPack 0.9.0 dependency; unset any `FORGE_MCPACK_CLI` override.
+- [ ] Use the published MCPack 0.9.1 dependency; unset any `FORGE_MCPACK_CLI` override.
 - [ ] Fresh `bun install --frozen-lockfile` succeeds; document any project-specific dependencies.
 - [ ] Read the [developer guide](developer-guide.md) as a new user and follow its first-tool example.
 - [ ] Record each finding with reproduction steps, expected/actual behavior and sanitized evidence.
@@ -102,7 +102,7 @@ completed manual acceptance.
 
 - [ ] Resolve release-blocking findings and rerun affected checks on the final commit.
 - [ ] Confirm README, developer guide, changelog, package version, image examples and Compose version all agree on Forge 0.10.0.
-- [ ] Keep MCPack pinned to its independently released 0.9.0; verify the frozen lockfile.
+- [ ] Keep MCPack pinned to its independently released 0.9.1; verify the frozen lockfile.
 - [ ] Verify no secrets, local databases, personal recordings or implementation handoff documents are tracked.
 - [ ] Record acceptance evidence and reconcile completed GitHub issues.
 - [ ] Merge the release candidate into the intended release branch/main after maintainer review.
