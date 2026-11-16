@@ -148,7 +148,7 @@ jobs:
 
       - name: Attest image provenance
         if: steps.publish.outcome == 'success'
-        uses: actions/attest-build-provenance@v3
+        uses: actions/attest-build-provenance@v4
         with:
           subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           subject-digest: ${{ steps.publish.outputs.digest }}
