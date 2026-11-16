@@ -15,7 +15,7 @@
         "ai-sdk-ollama": "^4.2.0",
         "ajv": "8.20.0",
         "dompurify": "3.4.17",
-        "json-schema-faker": "0.6.3",
+        "json-schema-faker": "0.6.4",
         "monaco-editor": "^0.56.0",
         "zod": "^4.6.7",
       },
@@ -442,7 +442,7 @@
 
     "json-schema": ["json-schema@0.4.0", "", {}, "sha512-es94M3nTIfsEPisRafak+HDLfHXnKBhV3vU5eqPcS3flIWqcxJWgXHXiey3YrpaNsanY5ei1VoYEbOzijuq9BA=="],
 
-    "json-schema-faker": ["json-schema-faker@0.6.3", "", { "bin": { "jsf": "dist/bin/cli.js" } }, "sha512-rsH48E/b5KFpgvKlcFjplB+zwOZk2FhYCQwcM6y09ApZkVl3D7PhcRIrDhpfR+w1AhNOrv0bumJElBz4X++KBA=="],
+    "json-schema-faker": ["json-schema-faker@0.6.4", "", { "bin": { "jsf": "dist/bin/cli.js" } }, "sha512-wffgXi/0Fv9wfNRFMsS5pe6vnABDFPDe4w2Y2uoS0ldvPS8+uTWpIlJ1Unzm3uh3VpH17O5Jj7hvO0gXkhcV+Q=="],
 
     "json-schema-traverse": ["json-schema-traverse@1.0.0", "", {}, "sha512-NM8/P9n3XjXhIZn1lLhkFaACTOURQXjWhV4BA/RnOv8xvgqtqpAX9IO4mRQxSx1Rlo4tqzeqb0sOlruaOy3dug=="],
 
