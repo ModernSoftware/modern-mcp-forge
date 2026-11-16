@@ -62,7 +62,7 @@ jobs:
           '
 
       - name: Setup QEMU
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@v4
 
       - name: Setup Bun for publication audit
         if: github.event_name != 'pull_request'
