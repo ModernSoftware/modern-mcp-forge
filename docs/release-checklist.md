@@ -2,8 +2,38 @@
 
 Use a fresh checkout of the release candidate and a new project directory.
 Record the commit, OS, Bun/Node/Python versions, browser and test date. These
-unchecked boxes are acceptance work, not claims that the release has passed.
-The package version is prepared as `0.10.0`; publication remains a separate step.
+checkboxes are a reusable verification guide; the dated record below identifies
+the evidence collected for 0.10.0. Publication remains a separate maintainer step.
+
+## Acceptance record — 2026-11-16
+
+The maintainer reported passing the local automated suite and Windows manual QA
+after pulling implementation commit `0fe57e33a0142b7493faef7ff394f56bec058005`,
+subsequently integrated through [PR #30](https://github.com/ModernSoftware/modern-mcp-forge/pull/30).
+The report covered forgetting/reopening projects, new projects, native tools,
+resources and prompts across runtimes, named test cases, external server
+connections, Inspector discovery and execution history. An exported native pack
+ran independently and referenced MCPack 0.9.1. This records maintainer-reported
+manual results; it does not claim a separate manual rehearsal on macOS or Linux.
+
+Automated verification of that implementation passed:
+
+- [CI](https://github.com/ModernSoftware/modern-mcp-forge/actions/runs/43493975839):
+  Ubuntu, Windows and macOS, documentation/type checks, unit/integration and E2E
+  tests, published-MCPack integration, coverage and production build.
+- [Multilanguage examples](https://github.com/ModernSoftware/modern-mcp-forge/actions/runs/43493975917):
+  five-framework/native parity, browser checks and Linux/Windows native exports.
+- [Docker](https://github.com/ModernSoftware/modern-mcp-forge/actions/runs/43493975734):
+  image build and health smoke test.
+- [Dependency security](https://github.com/ModernSoftware/modern-mcp-forge/actions/runs/43493975732):
+  both high/critical gates passed. The refreshed 2026-11-16 audit and the
+  assessment of two moderate/four low workbench findings are in
+  [the security guide](security.md); the exported host audit is clean.
+
+Run the configured checks on the final housekeeping commit before merging
+[PR #4](https://github.com/ModernSoftware/modern-mcp-forge/pull/4), then verify
+main-branch and publication jobs. This record does not claim a tag, published
+image, provenance attestation or post-publication smoke test already exists.
 
 ## Scope and prerequisites
 
@@ -106,7 +136,7 @@ completed manual acceptance.
 - [ ] Verify no secrets, local databases, personal recordings or implementation handoff documents are tracked.
 - [ ] Record acceptance evidence and reconcile completed GitHub issues.
 - [ ] Merge the release candidate into the intended release branch/main after maintainer review.
-- [ ] Replace the changelog's preparation status with the actual publication date.
+- [ ] Confirm the finalized changelog and record the actual publication date in the GitHub release.
 - [ ] Create tag `v0.10.0` on the reviewed commit and publish GitHub release notes.
 - [ ] Verify release workflow provenance, `0.10.0`/`0.10` image tags and `latest` only for a non-prerelease publication.
 - [ ] Fresh clone from the tag and fresh pull of the published image both work.

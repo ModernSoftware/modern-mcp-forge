@@ -28,18 +28,19 @@ Use Bun as pinned by `packageManager` in [package.json](../package.json), Node.j
 [five-framework lab](../examples/bridges/compatibility-lab/README.md) has its own
 requirements: Node 24, Python 3.12 and uv.
 
-For the 0.10.0 rehearsal:
+Clone the default branch:
 
 ```sh
-git clone --branch v0.10.0 https://github.com/ModernSoftware/modern-mcp-forge.git
+git clone https://github.com/ModernSoftware/modern-mcp-forge.git
 cd modern-mcp-forge
 bun install --frozen-lockfile
 bun run dev
 ```
 
-Before a release tag exists, `v0.10.0` is a development branch, not a published
-release. Record `git rev-parse HEAD` when reporting a rehearsal result. After
-publication, use the release tag for a reproducible installation.
+For a reproducible installation, select a published tag from
+[GitHub Releases](https://github.com/ModernSoftware/modern-mcp-forge/releases)
+instead of following the default branch. Record `git rev-parse HEAD` when
+reporting a problem or a test result.
 
 Open the URL Vite prints (normally `http://localhost:5173`). Create a project in
 a folder you own from **Projects**, or open a folder containing

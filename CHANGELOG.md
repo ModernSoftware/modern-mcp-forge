@@ -1,13 +1,15 @@
 # Changelog
 
-## 0.10.0 — release preparation
+## 0.10.0
 
-Publication is pending release rehearsal and the final release gate.
+Publication dates and version tags are recorded in
+[GitHub Releases](https://github.com/ModernSoftware/modern-mcp-forge/releases).
 
-- Security preparation: patched direct MCP SDK and transitive dependencies,
+- Security hardening: patched direct MCP SDK and transitive dependencies,
   explicit MCP body/tool validation limits, patched Monaco sanitizer resolution,
   and PR/weekly/publication audits for the workbench and exported deployment.
   The workbench and exported deployment both pin published MCPack 0.9.1.
+  Remaining advisory assessments are documented in [the security guide](docs/security.md).
 
 - Native authoring and execution through published MCPack 0.9.1, with persistent
   Node/Python workers and standalone deployment parity.

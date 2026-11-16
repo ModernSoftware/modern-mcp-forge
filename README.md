@@ -4,7 +4,7 @@
 
 Build, connect, test and deploy MCP capabilities from a local visual workbench.
 
-[![CI](https://github.com/ModernSoftware/modern-mcp-forge/actions/workflows/ci.yml/badge.svg?branch=v0.10.0)](https://github.com/ModernSoftware/modern-mcp-forge/actions/workflows/ci.yml)
+[![CI](https://github.com/ModernSoftware/modern-mcp-forge/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ModernSoftware/modern-mcp-forge/actions/workflows/ci.yml)
 [![Docker](https://github.com/ModernSoftware/modern-mcp-forge/actions/workflows/docker.yml/badge.svg)](https://github.com/ModernSoftware/modern-mcp-forge/actions/workflows/docker.yml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
@@ -12,10 +12,9 @@ Local-first · Node and Python · Git-friendly · Windows, macOS and Linux
 
 </div>
 
-This branch prepares **Forge 0.10.0** for release rehearsal. A version in
-`package.json` does not mean a tag or container has been published. Check
+This guide describes **Forge 0.10.0**. See
 [GitHub Releases](https://github.com/ModernSoftware/modern-mcp-forge/releases)
-for published versions.
+for publication dates, version tags and release notes.
 
 Forge combines native MCPack sources, project-owned bridge adapters and external
 Streamable HTTP servers into one project MCP endpoint. Author tools, static
@@ -43,7 +42,7 @@ Install Bun **1.4.2** and Node.js **22+**. Python **3.11+** is needed for Python
 sources. The optional compatibility lab has additional pinned requirements.
 
 ```sh
-git clone --branch v0.10.0 https://github.com/ModernSoftware/modern-mcp-forge.git
+git clone https://github.com/ModernSoftware/modern-mcp-forge.git
 cd modern-mcp-forge
 bun install --frozen-lockfile
 bun run dev

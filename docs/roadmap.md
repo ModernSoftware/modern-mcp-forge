@@ -7,7 +7,7 @@ additional product features are separate increments.
 
 ## Acceptance mapping
 
-The following work is present on `v0.10.0`. Issue state may lag merged code;
+The following work is included in Forge 0.10.0. Issue state may lag merged code;
 use the linked implementation and tests to reconcile GitHub, not the issue title
 alone. The mapping was reviewed for the 0.10.0 rehearsal on 2026-11-05.
 
@@ -30,9 +30,10 @@ Acceptance is bounded by the documented feature scope, not universal framework
 compatibility or proof that every application is safe to run.
 
 The existing [PR #4](https://github.com/ModernSoftware/modern-mcp-forge/pull/4)
-tracks `v0.10.0` into `main`. Keep it open for the release review; its original
-preview description needs to be replaced with the final release scope before
-merging. Feature completion does not by itself authorize that release merge.
+tracks the complete `v0.10.0` release into `main`, including the security update
+in [PR #30](https://github.com/ModernSoftware/modern-mcp-forge/pull/30).
+The [release checklist](release-checklist.md) records the final manual and
+automated acceptance evidence. Tagging and publishing remain maintainer actions.
 
 ## Deferred work
 
@@ -46,6 +47,7 @@ merging. Feature completion does not by itself authorize that release merge.
 | .NET/Go | MCPack runtime contracts and parity first, then Forge authoring/integration |
 | Broader authoring/testing | Folder editing, compilation, resource/prompt cases and a supported saved-case CI runner |
 | Broader MCP relay | Resource templates/subscriptions, server-initiated sampling/elicitation and task APIs |
+| Svelte dependency maintenance | Update SvelteKit 2 to its patched line and evaluate the SvelteKit 3/adapter-node 6 migration; retain the [current advisory assessments](security.md) and repeat browser, cross-platform and container checks |
 
 These are not hidden promises in the 0.10.0 release. Use the
 [release checklist](release-checklist.md) to finish acceptance before adding scope.

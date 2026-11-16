@@ -62,9 +62,10 @@ There are no suppressed advisory IDs or `continue-on-error` audit gates.
 The Docker publication workflow repeats both checks before publishing an image.
 Configure both `Dependency audit` matrix checks as required branch checks.
 
-Dependabot proposes Bun, export npm and GitHub Actions updates against `v0.10.0`.
-After merging the release into main, remove `target-branch` from that configuration.
-Schedules and Dependabot configuration become active from the default branch.
+Dependabot proposes Bun, export npm and GitHub Actions updates against the
+repository's default branch (`main`). The configuration omits `target-branch` so
+updates do not remain tied to the 0.10.0 release branch. Weekly schedules and
+Dependabot configuration become active from the default branch.
 Review updates, their release notes, functional tests and deployment/browser CI;
 do not automatically merge dependency major versions.
 
@@ -103,10 +104,29 @@ patched `dompurify` dependency. The direct dependency and override update the
 dependency graph too. Keep the alias and browser regression check until upstream
 Monaco includes the patched sanitizer; a lockfile-only override is insufficient.
 
-Review dated 2026-11-13: the frozen workbench lockfile includes Hono 4.13.18 and
-its Node adapter 2.1.8, clearing seven additional low/moderate findings. The
-remaining four workbench findings are low severity; the standalone host lockfile
-has no reported vulnerabilities. SvelteKit 2's
+Review dated 2026-11-16: the frozen workbench lockfile reports two moderate and
+four low findings, with no high or critical findings. The separate standalone
+host lockfile reports no vulnerabilities. Hono 4.13.18 and its Node adapter 2.1.8
+remain pinned in the lockfile, clearing the earlier Hono findings.
+
+The moderate findings are assessed as nonblocking for the documented local-only
+workbench based on the current application paths:
+
+- [Malformed rerouted pathnames](https://github.com/advisories/GHSA-mw6w-2fmv-pvw3)
+  affect SvelteKit 2.70.3. Forge defines no `reroute` hook. The framework fix is
+  available in SvelteKit 2.70.4 (and 3.1.1).
+- [Immutable proxied response headers](https://github.com/advisories/GHSA-rqw3-x7hx-mm3p)
+  affect adapter-node 5.5.7 when an upstream fetch response is returned directly
+  and the adapter attempts to modify its headers. Forge does not relay those
+  response objects: external sources decode MCP results, and Forge's SDK creates
+  its own MCP responses. The adapter fix is in 6.0.1, which requires SvelteKit 3;
+  that migration needs separate testing.
+
+Reassess these conclusions if routing, HTTP response forwarding or deployment
+exposure changes. Track the framework maintenance in the [roadmap](roadmap.md).
+Passing the high/critical audit gate does not mean the workbench has zero findings.
+
+The four low findings remain visible. SvelteKit 2's
 [enhanced-form redirect](https://github.com/advisories/GHSA-pfhg-q3qv-9q6r) and
 [prerendered-header](https://github.com/advisories/GHSA-27mw-82g8-phjj) paths are not
 used by Forge (no enhanced form actions or prerendered application pages).
