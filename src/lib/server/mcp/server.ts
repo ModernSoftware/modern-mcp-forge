@@ -1,3 +1,4 @@
+import { registerNativeSources } from '$lib/server/sources/register';
 import { McpServer } from '@modelcontextprotocol/server';
 
 import { executeToolDefinition } from '$lib/server/execution/tool-execution-service';
@@ -18,7 +19,8 @@ export function createForgeMcpServer(): McpServer {
       version: manifest.server.version
     },
     {
-      instructions: manifest.server.instructions
+      instructions: manifest.server.instructions,
+      maxToolInputElements: 10_000
     }
   );
 
@@ -37,7 +39,8 @@ export function createForgeMcpServer(): McpServer {
       async (args) => (
         await executeToolDefinition(
           definition,
-          args as Record<string, unknown>
+          args as Record<string, unknown>,
+          'mcp'
         )
       ).result
     );
@@ -100,5 +103,6 @@ export function createForgeMcpServer(): McpServer {
     );
   }
 
+  registerNativeSources(server, manifest);
   return server;
 }

@@ -18,5 +18,5 @@ export function buildPromptArgsSchema(prompt: PromptDefinition) {
     shape[name] = schema;
   }
 
-  return z.object(shape);
+  return z.object(shape).prefault({});
 }

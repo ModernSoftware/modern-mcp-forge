@@ -5,7 +5,7 @@ import {
   listExecutions
 } from '$lib/server/workbench/executions';
 
-export const load: PageServerLoad = async () => ({
-  executions: listExecutions(100),
-  stats: getExecutionStats()
-});
+export const load: PageServerLoad = ({ depends }) => {
+  depends('forge:execution-history');
+  return { executions: listExecutions(100), stats: getExecutionStats() };
+};

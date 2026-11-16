@@ -1,0 +1,43 @@
+name: Dependency security
+on:
+  push:
+    branches: [main, v0.10.0]
+  pull_request:
+  schedule:
+    - cron: "37 8 * * 1"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit:
+    name: Dependency audit (${{ matrix.target }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [workbench, native-export]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+      - name: Install workbench without dependency scripts
+        if: matrix.target == 'workbench'
+        run: bun install --frozen-lockfile --ignore-scripts
+      - name: Audit workbench, including development dependencies
+        if: matrix.target == 'workbench'
+        run: bun audit --json --audit-level=high > dependency-audit.json
+      - name: Audit the separate exported deployment lockfile
+        if: matrix.target == 'native-export'
+        run: npm audit --prefix src/lib/server/deployment/template --json --audit-level=high > dependency-audit.json
+      - name: Retain full report, including lower-severity findings
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-audit-${{ matrix.target }}
+          path: dependency-audit.json
+          retention-days: 14

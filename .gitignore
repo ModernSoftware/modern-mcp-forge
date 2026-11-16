@@ -12,3 +12,6 @@ dist
 Thumbs.db
 coverage
 test-results
+
+# Private local MCPack installation
+.mcpack-runtime/

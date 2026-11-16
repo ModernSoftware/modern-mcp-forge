@@ -1,0 +1,9 @@
+{
+  "currency": "USD",
+  "taxRate": "0.0825",
+  "premiumDiscount": "0.075",
+  "products": [
+    { "sku": "ACT-42", "unitPrice": "19.95", "available": 20 },
+    { "sku": "KIT-7", "unitPrice": "7.25", "available": 8 }
+  ]
+}

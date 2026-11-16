@@ -1,5 +1,27 @@
 <script lang="ts">
+  import { executionOriginLabel } from '$lib/execution-origin';
+  import { onMount } from 'svelte';
+  import { invalidate } from '$app/navigation';
+
   let { data } = $props();
+  // Calls can arrive from Inspector while Forge is showing this page.
+  onMount(() => {
+    let loading = false;
+    async function refresh() {
+      if (loading || document.visibilityState !== 'visible') return;
+      loading = true;
+      try { await invalidate('forge:execution-history'); }
+      finally { loading = false; }
+    }
+    const timer = window.setInterval(refresh, 5000);
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', refresh);
+    };
+  });
 
   const formatDate = (value: string) =>
     new Intl.DateTimeFormat(undefined, {
@@ -51,6 +73,7 @@
           <tr>
             <th>Status</th>
             <th>Tool</th>
+            <th>Origin</th>
             <th>Runtime</th>
             <th>Started</th>
             <th>Duration</th>
@@ -64,7 +87,7 @@
                 <a href={`/executions/${execution.id}`}>
                   <span
                     class:status-success={execution.status === 'succeeded'}
-                    class:status-failed={execution.status !== 'succeeded'}
+                    class:status-failed={execution.status === 'failed'}
                   >
                     <span class="status-dot"></span>
                     {execution.status}
@@ -72,6 +95,7 @@
                 </a>
               </td>
               <td><a class="tool-link" href={`/executions/${execution.id}`}>{execution.toolName}</a></td>
+              <td>{executionOriginLabel(execution.origin) ?? '—'}</td>
               <td><span class="runtime-badge {execution.runtime}">{execution.runtime}</span></td>
               <td>{formatDate(execution.startedAt)}</td>
               <td>{execution.durationMs ?? 0} ms</td>

@@ -1,20 +1,15 @@
 <script lang="ts">
-  import {
-    goto
-  } from '$app/navigation';
+  import ProjectOpening from '$lib/components/ProjectOpening.svelte';
+  import { goto } from '$app/navigation';
 
-  import DirectoryPicker
-    from '$lib/components/DirectoryPicker.svelte';
+  import DirectoryPicker from '$lib/components/DirectoryPicker.svelte';
 
-  let folderPath =
-    $state('');
+  let folderPath = $state('');
 
-  let browseOpen =
-    $state(false);
-  let opening =
-    $state(false);
-  let errorMessage =
-    $state('');
+  let browseOpen = $state(false);
+  let opening = $state(false);
+  let errorMessage = $state('');
+  let navigating = $state(false);
 
   async function openProject() {
     if (opening) {
@@ -24,94 +19,72 @@
     errorMessage = '';
 
     if (!folderPath.trim()) {
-      errorMessage =
-        'Project folder is required.';
+      errorMessage = 'Project folder is required.';
       return;
     }
 
     opening = true;
 
     try {
-      const response =
-        await fetch(
-          '/api/projects/open',
-          {
-            method: 'POST',
-            headers: {
-              'content-type':
-                'application/json'
-            },
-            body: JSON.stringify({
-              folderPath:
-                folderPath.trim()
-            })
-          }
-        );
+      const response = await fetch('/api/projects/open', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json'
+        },
+        body: JSON.stringify({
+          folderPath: folderPath.trim()
+        })
+      });
 
-      const payload =
-        await response.json();
+      const payload = await response.json();
 
       if (!response.ok) {
         throw new Error(
-          payload.error ??
-            `Could not open project (${response.status}).`
+          payload.error ?? `Could not open project (${response.status}).`
         );
       }
 
-      await goto(
-        '/',
-        {
-          invalidateAll: true
-        }
-      );
+      navigating = true;
+      await goto('/workspace', {
+        invalidateAll: true
+      });
     } catch (error) {
-      errorMessage =
-        error instanceof Error
-          ? error.message
-          : String(error);
+      errorMessage = error instanceof Error ? error.message : String(error);
     } finally {
       opening = false;
+      navigating = false;
     }
   }
 </script>
 
 <svelte:head>
-  <title>
-    Modern MCP Forge · Open Project
-  </title>
+  <title>Modern MCP Forge · Open Project</title>
 </svelte:head>
+
+{#if opening}<ProjectOpening name={folderPath.trim()} {navigating} />{/if}
 
 <section class="page-heading">
   <div>
-    <div class="eyebrow">
-      PROJECT WORKSPACE
-    </div>
-    <h1>
-      Open existing project
-    </h1>
+    <div class="eyebrow">PROJECT WORKSPACE</div>
+    <h1>Open existing project</h1>
     <p>
-      Point Forge at a folder containing forge.project.json, such as a project cloned from Git on another machine.
+      Point Forge at a folder containing forge.project.json, such as a project
+      cloned from Git on another machine.
     </p>
   </div>
 </section>
 
 <div class="form-toolbar glass-card">
   <div>
-    <strong>
-      Register existing project
-    </strong>
+    <strong> Register existing project </strong>
     <span>
-      The project folder remains the source of truth; Forge only stores its local path and activity history.
+      The project folder remains the source of truth; Forge only stores its
+      local path and activity history.
     </span>
   </div>
 
   <div class="toolbar-actions">
-    <a
-      class="secondary-button"
-      href="/projects"
-    >
-      Cancel
-    </a>
+    <a class="secondary-button" href="/projects"> Cancel </a>
 
     <button
       class="primary-button"
@@ -119,9 +92,7 @@
       form="open-project-form"
       disabled={opening}
     >
-      {opening
-        ? 'Opening…'
-        : 'Open project →'}
+      {opening ? 'Opening…' : 'Open project →'}
     </button>
   </div>
 </div>
@@ -139,9 +110,7 @@
       Project folder <em>*</em>
     </span>
 
-    <small>
-      Select the directory itself, not forge.project.json.
-    </small>
+    <small> Select the directory itself, not forge.project.json. </small>
 
     <div class="folder-row">
       <input
@@ -154,8 +123,7 @@
       <button
         class="secondary-button"
         type="button"
-        onclick={() =>
-          (browseOpen = true)}
+        onclick={() => (browseOpen = true)}
       >
         Browse…
       </button>
@@ -163,17 +131,17 @@
   </label>
 
   <div class="info-panel">
-    <strong>
-      Portable project identity
-    </strong>
+    <strong> Portable project identity </strong>
 
     <span>
-      Existing projects must contain a UUID in project.id. That ID travels with forge.project.json so different machines can register different local paths for the same project.
+      Existing projects must contain a UUID in project.id. That ID travels with
+      forge.project.json so different machines can register different local
+      paths for the same project.
     </span>
   </div>
 
   {#if errorMessage}
-    <div class="error-panel">
+    <div class="error-panel" role="alert">
       {errorMessage}
     </div>
   {/if}
@@ -187,8 +155,7 @@
       folderPath = path;
       browseOpen = false;
     }}
-    onClose={() =>
-      (browseOpen = false)}
+    onClose={() => (browseOpen = false)}
   />
 {/if}
 
@@ -199,8 +166,7 @@
     z-index: 6;
     display: flex;
     align-items: center;
-    justify-content:
-      space-between;
+    justify-content: space-between;
     gap: 18px;
     margin-bottom: 16px;
     padding: 12px 14px;
@@ -261,34 +227,17 @@
     border-radius: 10px;
     outline: none;
     color: var(--text);
-    background:
-      color-mix(
-        in srgb,
-        var(--surface-solid) 68%,
-        transparent
-      );
+    background: color-mix(in srgb, var(--surface-solid) 68%, transparent);
   }
 
   input:focus {
-    border-color:
-      color-mix(
-        in srgb,
-        var(--accent) 55%,
-        var(--border)
-      );
-    box-shadow:
-      0 0 0 3px
-      color-mix(
-        in srgb,
-        var(--accent) 12%,
-        transparent
-      );
+    border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent);
   }
 
   .folder-row {
     display: grid;
-    grid-template-columns:
-      minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) auto;
     gap: 8px;
   }
 
@@ -303,18 +252,8 @@
   .info-panel {
     display: flex;
     gap: 9px;
-    border: 1px solid
-      color-mix(
-        in srgb,
-        var(--accent) 22%,
-        var(--border)
-      );
-    background:
-      color-mix(
-        in srgb,
-        var(--accent) 6%,
-        var(--surface)
-      );
+    border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--border));
+    background: color-mix(in srgb, var(--accent) 6%, var(--surface));
   }
 
   .info-panel strong {
@@ -328,20 +267,12 @@
   }
 
   .error-panel {
-    border: 1px solid
-      color-mix(
-        in srgb,
-        var(--danger) 32%,
-        var(--border)
-      );
+    border: 1px solid color-mix(in srgb, var(--danger) 32%, var(--border));
     color: var(--danger);
-    background:
-      var(--danger-soft);
+    background: var(--danger-soft);
   }
 
-  @media (
-    max-width: 650px
-  ) {
+  @media (max-width: 650px) {
     .form-toolbar,
     .info-panel {
       align-items: stretch;

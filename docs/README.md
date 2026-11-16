@@ -1,44 +1,40 @@
-# 📚 Documentation
+# Documentation
 
-This folder contains the public and maintainer-facing documentation that is
-useful beyond the implementation sessions that originally created Modern MCP
-Forge.
+Start with the **[0.10.0 developer guide](developer-guide.md)**. It walks through
+installation, source selection, authoring, bridges, testing and native export.
 
-## Current documents
+## Build and connect
 
-- [Application data](app-data.md) — where Forge stores machine-local state
-- [Docker and GHCR](docker.md) — container usage, project mounts, and publishing
-- [MCP stdio transport](mcp-stdio.md) — stdio architecture, usage, and rules
-- [Testing](testing.md) — automated test layers and local commands
-- [Continuous integration](ci.md) — GitHub Actions and cross-platform CI
-- [0.9.0 release checklist](release-checklist.md) — final public-beta gate
+- [Project workflow](project-workflow.md): create/open/close, workspace views and recovery.
+- [Native authoring](native-authoring.md): schemas, workers, editing and lifecycle.
+- [MCPack integration](mcpack.md): runtime setup, architecture and maintainer override.
+- [Bridge existing applications](bridged-sources.md): Node/Python hooks, cwd, checkout paths, imports and framework examples.
+- [External MCP sources](external-sources.md): URLs, bearer variables, discovery and limits.
+- [Project source reference](project-sources.md): manifest descriptors and lifecycle APIs.
+- [Agent exposure](agent-exposure.md): visibility, aliases, descriptions and resource identities.
 
-The agent example has its own documentation at
-[`examples/agent/README.md`](../examples/agent/README.md).
+## Test and operate
 
-## What should not live here
+- [Named tool test cases](named-test-cases.md): assertions, batches, drift and persistence.
+- [Native deployment](native-deployment.md): export, files, dependencies, HTTP and stdio.
+- [MCP stdio](mcp-stdio.md): explicit project selection and client configuration.
+- [Docker](docker.md): local builds, versioned images, mounts and environments.
+- [Application data](app-data.md): portable files, local state and backups.
+- [Security model](security.md): trust, credentials, network boundaries and deployment scope.
+- [Troubleshooting](troubleshooting.md): common failures and recovery.
+- [Legacy compatibility](legacy-compatibility.md): older projects and deliberate migration.
 
-Development-slice notes such as:
+## Examples
 
-```text
-slice-5a-...
-slice-7b-...
-slice-8c-...
-```
+- [Five-framework compatibility lab](../examples/bridges/compatibility-lab/README.md)
+- [Node registry adapter](../examples/bridges/adapters/registry.mjs)
+- [Python FastMCP adapter](../examples/bridges/adapters/fastmcp_adapter.py)
+- [Strands agent demo](../examples/agent/README.md)
 
-were useful while the application was being built, but they are implementation
-history rather than product documentation. They can be deleted before the
-public release.
+## Contribute and release
 
-The same applies to one-off migration notes for behavior that no longer exists.
-
-## Documentation still planned for 0.9.0
-
-- getting started / installation
-- architecture
-- Forge Tool ABI
-- security
-- troubleshooting
-- contribution guide
-
-Once those exist, this file can act as the permanent documentation index.
+- [Contributing](../CONTRIBUTING.md)
+- [Testing](testing.md) and [continuous integration](ci.md)
+- [Release rehearsal checklist](release-checklist.md)
+- [Roadmap and acceptance mapping](roadmap.md)
+- [Changelog](../CHANGELOG.md)

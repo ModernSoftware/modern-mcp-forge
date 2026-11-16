@@ -7,9 +7,9 @@ A Forge project is designed to be committed to source control:
 ```text
 my-project/
 ├── forge.project.json
-├── tools/
-├── resources/
-└── prompts/
+├── forge.cases.json
+├── native/
+└── bridges/
 ```
 
 The application database is machine-local and stores information such as:
@@ -17,6 +17,7 @@ The application database is machine-local and stores information such as:
 - registered and recent project paths
 - the active interactive project
 - execution history
+- named-case last-run verdicts and timestamps
 - application metadata
 
 ## Default database locations
@@ -79,4 +80,18 @@ MCP_FORGE_DB_PATH=/custom/location/forge.db
 
 The application database should not be committed to the Modern MCP Forge repository or to a Forge project repository.
 
-Only the project manifest and project content are portable. Project registration, recent-project state, and execution history belong to the local Forge installation.
+Project manifests, named case definitions and implementation content are portable. Project registration, recent-project state, and execution history belong to the local Forge installation.
+
+
+## Browser state and backup
+
+Workspace views/filters and case-explorer filters are stored per project in the
+current browser tab. They are not project manifest settings or shared test data.
+A fresh tab or cleared browser storage may use defaults. Theme selection is a
+browser preference.
+
+To back up local history, stop Forge and copy its database and any associated
+SQLite journal files together. Back up project folders separately. Execution
+inputs/results and diagnostics can contain sensitive data; keep backups private.
+Re-register projects after moving to another machine, then reinstall their
+dependencies and set checkout/credential variables for that machine.

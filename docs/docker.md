@@ -1,148 +1,114 @@
-# Docker and GHCR
+# Run Forge with Docker
 
-Docker is an optional distribution for Modern MCP Forge. Running Forge directly
-on the host remains the most natural development setup because Forge executes
-local Tool processes and works with local project files.
+Docker distributes the local workbench, not your deployed MCP server. Use
+[native export](native-deployment.md) for a standalone MCPack deployment.
+Running Forge directly on the host is often simpler for applications that need
+host runtimes, IDE builds or platform-specific dependencies.
 
-The published image is:
+## Rehearse the candidate before publication
 
-```text
-ghcr.io/modernsoftware/modern-mcp-forge
+The repository's Compose configuration targets `0.10.0` and includes a local
+build definition. Until that image is published, build from the checked-out
+candidate rather than pulling an older `edge` image:
+
+```sh
+docker compose up --build -d
 ```
 
-The examples below use the `edge` tag, which tracks successful Docker-relevant
-changes on `main`. Versioned image tags are published from GitHub Releases.
+This builds/tags locally; it does not publish. Open `http://localhost:5173`.
+The default project mount is `./projects` on the host, visible as `/workspace`.
+Create that directory or select an existing root as below. A named `forge-data`
+volume preserves local state at `/data` across container replacement.
 
-## Image contents
+## Use a published version
 
-The standard image includes:
+After the 0.10.0 release image is available:
 
-- Bun 1.4.2
-- Node.js 22
-- Python 3
-- the production SvelteKit/adapter-node build of Modern MCP Forge
+```sh
+docker compose pull
+docker compose up -d --no-build
+```
 
-This lets Bun, Node.js, and Python Tools execute inside the container without
-installing those runtimes separately.
+The image is `ghcr.io/modernsoftware/modern-mcp-forge:0.10.0`. Select another
+published version with `MCP_FORGE_IMAGE`; `edge` follows qualifying changes on
+`main` and is not necessarily the current integration/rehearsal branch.
 
-## Docker Compose
+Linux/macOS/Git Bash:
 
-The repository includes `compose.yaml`.
-
-Choose a host directory containing the Forge projects you want the container to
-access, then start Forge.
-
-Linux/macOS:
-
-```bash
+```sh
 export MCP_FORGE_PROJECTS_ROOT=/absolute/path/to/projects
-docker compose up -d
+export MCP_FORGE_IMAGE=ghcr.io/modernsoftware/modern-mcp-forge:0.10.0
+docker compose up -d --no-build
 ```
 
 PowerShell:
 
 ```powershell
-$env:MCP_FORGE_PROJECTS_ROOT = 'C:\repos\mcp-projects'
-docker compose up -d
+$env:MCP_FORGE_PROJECTS_ROOT = 'C:/repos/mcp-projects'
+$env:MCP_FORGE_IMAGE = 'ghcr.io/modernsoftware/modern-mcp-forge:0.10.0'
+docker compose up -d --no-build
 ```
 
-Open:
+Use the directory browser inside Forge to open `/workspace/...`, not host paths.
+`MCP_FORGE_PORT` changes the host port (default 5173); the container listens on
+3000. The published port stays bound to host loopback.
 
-```text
-http://localhost:5173
-```
+## Image contents and dependencies
 
-Inside the container the mounted project directory appears as:
+The image includes Bun 1.4.2, Node 22, Python 3, the production SvelteKit build,
+the pinned MCPack package and Forge's bridge host scripts. It does not include
+your project dependencies, the Python bridge SDK, uv, development examples or
+the source-checkout stdio launcher.
 
-```text
-/workspace
-```
+The child processes execute inside Linux. Host Windows/macOS virtual environments
+and native Node modules may not work. Install packages for the container platform
+and selected interpreter. The optional compatibility lab needs its documented
+Node 24/Python 3.12/uv environment, beyond the standard image.
 
-Use Forge's directory browser to open projects below that path.
+For a Python bridge, use its generated `requirements-forge.txt` in the selected
+Linux environment. A derived image can install system packages and Python venv
+support needed by your application. Do not install application dependencies into
+Forge's package manifest merely to make an adapter import succeed.
 
-The default Compose configuration also creates a named volume for `/data`, so
-the project registry and execution history survive container replacement.
+## Environment and separate checkouts
 
-## Mounting more than one project root
-
-Compose can expose additional host directories by adding bind mounts:
+A host shell variable is not automatically passed into the container. Add explicit
+environment mappings and mounts in a local `compose.override.yaml`, for example:
 
 ```yaml
 services:
   forge:
+    environment:
+      INVENTORY_TOKEN: ${INVENTORY_TOKEN:?Set INVENTORY_TOKEN before starting}
+      INVENTORY_CHECKOUT: /applications/inventory
     volumes:
-      - forge-data:/data
-      - /host/work:/workspace/work
-      - /host/personal:/workspace/personal
+      - /absolute/host/inventory:/applications/inventory
 ```
 
-Only paths explicitly mounted into the container are visible to containerized
-Forge. Avoid mounting an entire host drive or filesystem.
+Use `INVENTORY_TOKEN` as the source's bearer-variable name and
+`INVENTORY_CHECKOUT` as its adapter checkout-variable name. Set values before
+starting/recreating the container. Use an untracked local environment file if
+needed; do not commit tokens. Avoid sharing `docker compose config` output when
+it expands secrets. Mount only directories the application needs.
 
-## Run without Compose
+## Inspect and stop
 
-```bash
-docker run --rm \
-  -p 127.0.0.1:5173:3000 \
-  -v modern-mcp-forge-data:/data \
-  -v /absolute/path/to/projects:/workspace \
-  ghcr.io/modernsoftware/modern-mcp-forge:edge
+```sh
+docker compose logs forge
+docker compose down
 ```
 
-## Tool dependencies
+`down` retains named volumes unless explicitly requested otherwise. Back up local
+state and project files separately; see [application data](app-data.md).
 
-A bind mount shares project files, but the Tool process still executes in the
-Linux container.
+## Publication
 
-That distinction matters for environment-specific dependencies:
+The [workflow](../.github/workflows/docker.yml) builds and smoke-tests before
+publishing. PRs only verify. Qualifying `main` pushes publish `edge`. A published
+GitHub release produces version and major/minor tags; non-prerelease releases
+also update `latest`. Manual dispatch can publish a requested version. Release
+and manual publication versions must match `package.json`.
 
-- a Windows or macOS Python virtual environment cannot be executed as a Linux
-  virtual environment inside the container
-- native Node modules installed for the host OS may need to be installed again
-  for Linux
-- system packages required by a Tool must exist in the image
-
-For Tools with additional runtime dependencies, build a small derived image or
-run Forge natively on the host.
-
-## Ports and security
-
-Compose publishes Forge only on host loopback by default:
-
-```text
-127.0.0.1:5173
-```
-
-The application listens on `0.0.0.0:3000` inside the container so Docker can
-forward the loopback-bound host port.
-
-Modern MCP Forge executes project Tool code. Treat untrusted Forge projects the
-same way you would treat any other untrusted source-code repository.
-
-## GHCR publishing
-
-The Docker workflow lives at:
-
-```text
-.github/workflows/docker.yml
-```
-
-It builds and smoke-tests the image before publishing.
-
-Publishing rules:
-
-- pull request: build + smoke test only
-- push to `main`: publish `edge`
-- published GitHub Release: publish the release SemVer tags
-- stable GitHub Release: also publish `latest`
-- manual dispatch with a version: publish that SemVer version
-
-Published release images are built for:
-
-```text
-linux/amd64
-linux/arm64
-```
-
-The workflow also publishes a GitHub artifact provenance attestation for the
-image digest.
+Published builds target `linux/amd64` and `linux/arm64` with provenance
+attestation. The automated smoke test runs on amd64. Verify the actual published
+version/digest after release, including the intended target platform.

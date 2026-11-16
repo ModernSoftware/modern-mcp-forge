@@ -5,6 +5,8 @@ import { getActiveProjectKey } from '$lib/server/project/loader';
 export interface ExecutionListItem {
   id: number;
   executionUid: string | null;
+  origin: string | null;
+  sourceId: string | null;
   toolName: string;
   runtime: string;
   entrypoint: string | null;
@@ -26,6 +28,8 @@ export interface ExecutionDetail
 interface ListRow {
   id: number;
   execution_uid: string | null;
+  origin: string | null;
+  source_id: string | null;
   tool_name: string;
   runtime: string;
   entrypoint: string | null;
@@ -56,6 +60,8 @@ export function listExecutions(limit = 50): ExecutionListItem[] {
         SELECT
           id,
           execution_uid,
+          origin,
+          source_id,
           tool_name,
           runtime,
           entrypoint,
@@ -77,6 +83,8 @@ export function listExecutions(limit = 50): ExecutionListItem[] {
     (row) => ({
       id: row.id,
       executionUid: row.execution_uid,
+      origin: row.origin,
+      sourceId: row.source_id,
       toolName: row.tool_name,
       runtime: row.runtime,
       entrypoint: row.entrypoint,
@@ -100,6 +108,8 @@ export function getExecution(id: number): ExecutionDetail | null {
         SELECT
           id,
           execution_uid,
+          origin,
+          source_id,
           tool_name,
           runtime,
           entrypoint,
@@ -128,6 +138,8 @@ export function getExecution(id: number): ExecutionDetail | null {
   return {
     id: row.id,
     executionUid: row.execution_uid,
+    origin: row.origin,
+    sourceId: row.source_id,
     toolName: row.tool_name,
     runtime: row.runtime,
     entrypoint: row.entrypoint,

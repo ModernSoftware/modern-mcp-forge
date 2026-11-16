@@ -1,6 +1,8 @@
 services:
   forge:
-    image: ${MCP_FORGE_IMAGE:-ghcr.io/modernsoftware/modern-mcp-forge:edge}
+    image: ${MCP_FORGE_IMAGE:-ghcr.io/modernsoftware/modern-mcp-forge:0.10.0}
+    build:
+      context: .
     init: true
     restart: unless-stopped
     ports:
