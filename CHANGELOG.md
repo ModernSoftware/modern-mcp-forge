@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Native export follows selected Node workers' local ESM imports recursively,
+  preserving helper directories such as `services/`. Missing or excluded imports
+  block download; manual dependency limits are visible in the expanded file review.
+- Clean-deployment coverage now exercises a worker importing nested service
+  helpers after Forge is stopped and the original workspace is removed.
+
 ## 0.10.0
 
 Publication dates and version tags are recorded in

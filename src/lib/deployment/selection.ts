@@ -19,6 +19,9 @@ export function exportContents(
       module: string;
       assets: string[];
       environment: string[];
+      imports?: string[];
+      warnings?: string[];
+      errors?: string[];
     }[];
     files: { path: string; dependency: boolean }[];
   },
@@ -34,11 +37,22 @@ export function exportContents(
     preview.files.filter((f) => f.dependency).map((f) => f.path)
   );
   const environment = new Set<string>();
+  const warnings = new Set<string>();
+  const errors = new Set<string>();
   for (const worker of preview.workers) {
     if (!workers.has(worker.id)) continue;
     required.add(worker.module);
     for (const path of worker.assets) required.add(path);
+    for (const path of worker.imports ?? []) required.add(path);
+    for (const warning of worker.warnings ?? []) warnings.add(warning);
+    for (const error of worker.errors ?? []) errors.add(error);
     for (const name of worker.environment) environment.add(name);
   }
-  return { workers, required, environment: [...environment].sort() };
+  return {
+    workers,
+    required,
+    environment: [...environment].sort(),
+    warnings: [...warnings].sort(),
+    errors: [...errors].sort()
+  };
 }

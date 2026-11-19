@@ -58,6 +58,27 @@ test('download a mixed-project native export, clean-install it and call both wor
       recursive: true,
       filter: (p) => basename(p) !== 'node_modules'
     });
+    // Reproduce the gas demo's worker -> services/helper -> nested helper layout.
+    // No extra files are selected, and the original workspace is removed below.
+    const services = join(project, 'native', 'services');
+    await mkdir(join(services, 'money'), { recursive: true });
+    const quotePath = join(project, 'native', 'quote.mjs');
+    const quoteCode = await readFile(quotePath, 'utf8');
+    await writeFile(
+      quotePath,
+      quoteCode.replace(
+        'const cents = (value) => value.toDecimalPlaces(2, Decimal.ROUND_HALF_UP);',
+        "import { cents } from './services/quote-service.mjs';"
+      )
+    );
+    await writeFile(
+      join(services, 'quote-service.mjs'),
+      "export { cents } from './money/cents.mjs';\n"
+    );
+    await writeFile(
+      join(services, 'money', 'cents.mjs'),
+      "import Decimal from 'decimal.js';\nexport const cents = (value) => value.toDecimalPlaces(2, Decimal.ROUND_HALF_UP);\n"
+    );
     const handbook = nativeStarter('manual', 'python');
     const packPath = join(project, 'native', 'mcpack.json');
     const pack = JSON.parse(await readFile(packPath, 'utf8'));
@@ -150,6 +171,12 @@ test('download a mixed-project native export, clean-install it and call both wor
       'order-desk-native.tar.gz'
     );
     await new Bun.Archive(await response.blob()).extract(target);
+    expect(
+      await readFile(join(target, 'pack/services/quote-service.mjs'), 'utf8')
+    ).toContain('./money/cents.mjs');
+    expect(
+      await readFile(join(target, 'pack/services/money/cents.mjs'), 'utf8')
+    ).toContain('ROUND_HALF_UP');
     // A local Forge dependency can become a dangling npm link and still allow
     // MCPack to start. Assert portability in the archive itself as well.
     const hostPackage = JSON.parse(
