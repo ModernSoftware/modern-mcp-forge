@@ -3,7 +3,7 @@
 In **Workspace → Export native pack**, choose an enabled native source. MCPack 0.9.1 serves one manifest per process. A project with several native sources offers a separate download for each. The workspace filters, search, view and expanded source groups are remembered per project for the current browser tab, including after a refresh. They are independent of the export selection.
 
 1. Under **Capabilities to include**, choose the tools, static resources and prompts you want clients to discover. All enabled capabilities start selected. The selection applies only to this download.
-2. Open **Review deployment files** to see the worker modules, root dependency manifests and lockfiles, and files named directly in the selected workers’ configuration. Forge includes them automatically. Under **Additional files**, select helpers, nested dependencies or assets your code loads dynamically. Including a file cannot enable a tool. Review application code and configuration for secrets.
+2. Review the expanded **Review deployment files** section. Forge includes worker modules, root dependency manifests and lockfiles, files named directly in worker configuration, and recursively discovered local JavaScript imports. Under **Additional files**, select Python helpers, CommonJS `require()` dependencies, computed imports and data files your code reads. Including a file cannot enable a tool. Review application code and configuration for secrets.
 3. Download the archive and extract it into an empty directory. The root contains the pinned MCPack host package, npm lockfile and a README. The pack's rewritten manifest, original module layout, selected files and dependency declarations live under `pack/`. Project and source files on disk stay unchanged.
 
 ## Run the compatibility lab export
@@ -18,6 +18,32 @@ npm start
 ```
 
 Connect Inspector over Streamable HTTP to `http://127.0.0.1:3000/mcp`. Run `get_quote_by_sku` with `{"sku":"ACT-42","quantity":3,"tier":"premium"}` for USD 59.93. Run `estimate_delivery` with `{"orderedAtLocal":"2026-10-30T16:00","service":"express","parcels":[{"kg":2}]}` for delivery on November 4. A stdio client can launch `npm run --silent start:stdio` in the extracted directory.
+
+## Local JavaScript helpers
+
+For a Node worker that imports `./services/customer-service.mjs`, the archive
+automatically contains `pack/services/customer-service.mjs`. Relative imports
+inside that helper are followed too. The original directory layout is preserved;
+there is no bundling, source rewriting or execution during dependency discovery.
+
+Discovery supports JavaScript ESM `import`, `export ... from`, `export * from`
+and `import('./literal-path.mjs')`. Paths resolve relative to the importing file,
+with explicit filenames and extensions. Imported JSON/assets and nested
+`package.json` scopes are included. Bare package imports such as `pg` remain
+dependencies to install with the pack's package manager; installed modules are
+never copied. Only dependencies reachable from selected workers are automatic.
+
+A missing, excluded or out-of-folder relative import prevents that worker's
+export and is shown above the file list. Fix the import/file, then refresh the
+preview. Imports cannot bypass hidden-file, symlink or source-boundary exclusions.
+
+Computed imports, aliases, absolute imports and `require()` are not resolved;
+Forge shows review messages when it encounters them. A JavaScript parse failure
+also produces a review message. Python helpers and files loaded with filesystem
+APIs need manual selection, as do dependencies of manually selected extra files.
+This is source discovery, not a complete dependency analyzer. Review the list and
+test the archive in an empty directory with Forge stopped. Nested packages may
+need their own dependency installation.
 
 ## Deployment settings
 

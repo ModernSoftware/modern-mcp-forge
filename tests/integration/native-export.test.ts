@@ -152,3 +152,120 @@ test('native export enforces the preview and includes only selected deployable f
     removeTempDirectory(dir);
   }
 });
+
+test('exports nested imports per selected worker and blocks missing or excluded helpers', async () => {
+  const dir = createTempDirectory();
+  try {
+    const project = createManifest();
+    project.sources = [
+      {
+        id: 'local',
+        kind: 'native',
+        enabled: true,
+        manifest: 'native/mcpack.json'
+      }
+    ];
+    const folder = join(dir, 'native');
+    mkdirSync(join(folder, 'services'), { recursive: true });
+    const starter = nativeStarter('local', 'node');
+    const source = {
+      ...starter.manifest,
+      workers: {
+        ...starter.manifest.workers,
+        other: { runtime: 'node', module: './other.mjs' }
+      },
+      tools: [
+        ...starter.manifest.tools,
+        { ...starter.manifest.tools[0], name: 'other_greet', worker: 'other' }
+      ]
+    };
+    writeFileSync(join(folder, 'mcpack.json'), JSON.stringify(source));
+    writeFileSync(
+      join(folder, starter.module),
+      "import './services/customer-service.mjs';\n" + starter.code
+    );
+    writeFileSync(
+      join(folder, 'services/customer-service.mjs'),
+      "export * from './nested.mjs';\n"
+    );
+    writeFileSync(
+      join(folder, 'services/nested.mjs'),
+      'export const synthetic = true;\n'
+    );
+    writeFileSync(
+      join(folder, 'other.mjs'),
+      "import './services/unselected.mjs';\n"
+    );
+    writeFileSync(
+      join(folder, 'services/unselected.mjs'),
+      'export const other = true;\n'
+    );
+    let preview = await previewExport(dir, project, 'local');
+    const selected = ['tools/local_greet'];
+    expect([...exportContents(preview, selected).required].sort()).toEqual([
+      'handlers.mjs',
+      'services/customer-service.mjs',
+      'services/nested.mjs'
+    ]);
+    const archive = await exportPack(
+      dir,
+      project,
+      'local',
+      preview.revision,
+      [],
+      selected
+    );
+    const entries = await new Bun.Archive(archive).files();
+    expect(entries.has('pack/services/customer-service.mjs')).toBe(true);
+    expect(entries.has('pack/services/nested.mjs')).toBe(true);
+    expect(entries.has('pack/services/unselected.mjs')).toBe(false);
+
+    writeFileSync(
+      join(folder, 'services/nested.mjs'),
+      "import './missing.mjs';\n"
+    );
+    await expect(
+      exportPack(dir, project, 'local', preview.revision, [], selected)
+    ).rejects.toThrow('source changed');
+    preview = await previewExport(dir, project, 'local');
+    await expect(
+      exportPack(dir, project, 'local', preview.revision, [], selected)
+    ).rejects.toThrow('missing or excluded');
+    // A broken unselected worker must not block a valid selection.
+    const other = await exportPack(
+      dir,
+      project,
+      'local',
+      preview.revision,
+      [],
+      ['tools/other_greet']
+    );
+    expect(
+      (await new Bun.Archive(other).files()).has(
+        'pack/services/unselected.mjs'
+      )
+    ).toBe(true);
+
+    writeFileSync(join(folder, '.secret.mjs'), 'export const secret = true;');
+    const excluded = ['../.secret.mjs'];
+    if (process.platform !== 'win32') {
+      symlinkSync(
+        join(folder, '.secret.mjs'),
+        join(folder, 'services/link.mjs')
+      );
+      excluded.push('./link.mjs');
+    }
+    for (const path of excluded) {
+      writeFileSync(
+        join(folder, 'services/nested.mjs'),
+        `import ${JSON.stringify(path)};`
+      );
+      preview = await previewExport(dir, project, 'local');
+      await expect(
+        exportPack(dir, project, 'local', preview.revision, [], selected)
+      ).rejects.toThrow('missing or excluded');
+    }
+  } finally {
+    removeTempDirectory(dir);
+  }
+});

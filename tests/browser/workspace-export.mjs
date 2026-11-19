@@ -3,7 +3,7 @@ import { verifyEditorSanitizer } from './editor-sanitizer.mjs';
 import { verifySourcePaths } from './source-paths.mjs';
 import { chromium } from 'playwright-core';
 import { createServer } from 'vite';
-import { mkdtemp, rm, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import assert from 'node:assert/strict';
@@ -135,8 +135,14 @@ try {
     );
   };
   await check();
+  const helper = join(dir, 'demo', 'native', 'demo', 'services', 'customer-service.mjs');
+  await mkdir(join(dir, 'demo', 'native', 'demo', 'services'));
+  await writeFile(helper, 'export const synthetic = true;\n');
+  await writeFile(worker, "import './services/customer-service.mjs';\n" + original);
   await page.getByRole('link', { name: 'Export native pack' }).click();
   await page.getByRole('heading', { name: 'Export native pack' }).waitFor();
+  await page.getByText('services/customer-service.mjs', { exact: true }).waitFor();
+  assert.equal(await page.getByRole('checkbox', { name: 'services/customer-service.mjs', exact: true }).count(), 0);
   const downloadButton = page.getByRole('button', {
     name: 'Download .tar.gz'
   });
@@ -167,6 +173,7 @@ try {
   const files = await new Bun.Archive(await readFile(output)).files();
   assert.ok(files.has('pack/handlers.mjs'));
   assert.ok(files.has('pack/package.json'));
+  assert.ok(files.has('pack/services/customer-service.mjs'));
   const manifest = JSON.parse(await files.get('pack/mcpack.json').text());
   assert.deepEqual(manifest.tools, []);
   assert.deepEqual(manifest.prompts, []);
@@ -174,6 +181,13 @@ try {
     manifest.resources.map((r) => r.name),
     ['demo_guide']
   );
+  await rm(helper);
+  await page.getByRole('button', { name: 'Refresh preview' }).click();
+  await page.getByRole('alert').filter({ hasText: 'missing or excluded' }).waitFor();
+  assert.equal(await downloadButton.isDisabled(), true);
+  await writeFile(helper, 'export const synthetic = true;\n');
+  await page.getByRole('button', { name: 'Refresh preview' }).click();
+  await page.waitForFunction(() => !document.querySelector('.actions button')?.disabled);
   await page.getByRole('link', { name: '← Workspace' }).click();
   await check();
   await page.reload();

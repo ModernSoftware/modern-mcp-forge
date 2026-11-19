@@ -23,6 +23,7 @@ import { resolveDatabasePath } from '../database';
 import { NativeProjectError } from '../mcpack/session';
 import hostPackage from './template/package.json';
 import hostLock from './template/package-lock.json';
+import { localImportScanner } from './local-imports';
 
 const maxBytes = 32 * 1024 * 1024;
 const maxEntries = 2048;
@@ -125,6 +126,10 @@ async function prepare(
     workers.push({
       id,
       module: worker.module,
+      runtime: worker.runtime,
+      imports: [] as string[],
+      warnings: [] as string[],
+      errors: [] as string[],
       environment: worker.inheritEnv,
       assets: Object.values(worker.config)
         .filter((value): value is string => typeof value === 'string')
@@ -167,12 +172,31 @@ async function prepare(
     }
   }
   const inventory = candidates(folder, blocked);
+  let inspectedBytes = 0;
+  const scanImports = localImportScanner(
+    folder,
+    new Set(inventory.keys()),
+    (path) => {
+      const file = inventory.get(path)!;
+      if ((inspectedBytes += file.size) > maxBytes)
+        throw new NativeProjectError(
+          'JavaScript sources exceed the 32 MiB inspection limit.'
+        );
+      return readExportFile(folder, { path, ...file }).toString('utf8');
+    }
+  );
   for (const worker of workers) {
     worker.assets = worker.assets.filter((name) => inventory.has(name));
     if (!inventory.has(worker.module))
       throw new NativeProjectError(
         'A required worker module is outside the exportable files: ' +
           worker.module
+      );
+    if (worker.runtime === 'node')
+      Object.assign(worker, scanImports(worker.module));
+    else
+      worker.warnings.push(
+        `${worker.module}: select local Python helpers and data files manually.`
       );
   }
   const files = [...inventory]
@@ -184,6 +208,7 @@ async function prepare(
     }));
   const revision = createHash('sha256')
     .update(json(manifest))
+    .update(json(workers))
     .update(json(files.map((f) => [f.path, inventory.get(f.path)])))
     .digest('hex');
   const preview = {
@@ -234,6 +259,8 @@ export async function exportPack(
         'Select only enabled capabilities from this source.'
       );
   const contents = exportContents(preview, [...selected]);
+  if (contents.errors.length)
+    throw new NativeProjectError(contents.errors.join('\n'));
   for (const kind of capabilityKinds) {
     for (let i = manifest[kind].length - 1; i >= 0; i--) {
       if (!selected.has(capabilityKey({ kind, ...manifest[kind][i] })))
@@ -261,30 +288,37 @@ export async function exportPack(
       throw new NativeProjectError(
         'The selected files exceed the 32 MiB export limit.'
       );
-    const full = containedFile(folder, path);
-    if (relative(realpathSync.native(full), join(folder, path)))
-      throw new NativeProjectError(
-        'A selected path changed. Review the export again.',
-        409
-      );
-    const descriptor = openSync(
-      full,
-      constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0)
-    );
-    try {
-      const info = fstatSync(descriptor);
-      if (!info.isFile() || info.size !== file.size)
-        throw new NativeProjectError(
-          'A selected file changed. Review the export again.',
-          409
-        );
-      entries['pack/' + path] = readFileSync(descriptor);
-    } finally {
-      closeSync(descriptor);
-    }
+    entries['pack/' + path] = readExportFile(folder, file);
   }
   entries['README.md'] = deploymentGuide(id, files, contents.environment);
   return new Bun.Archive(entries, { compress: 'gzip' }).blob();
+}
+
+function readExportFile(
+  folder: string,
+  file: { path: string; size: number }
+) {
+  const full = containedFile(folder, file.path);
+  if (relative(realpathSync.native(full), join(folder, file.path)))
+    throw new NativeProjectError(
+      'A selected path changed. Review the export again.',
+      409
+    );
+  const descriptor = openSync(
+    full,
+    constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0)
+  );
+  try {
+    const info = fstatSync(descriptor);
+    if (!info.isFile() || info.size !== file.size)
+      throw new NativeProjectError(
+        'A selected file changed. Review the export again.',
+        409
+      );
+    return readFileSync(descriptor);
+  } finally {
+    closeSync(descriptor);
+  }
 }
 
 function deploymentGuide(id: string, files: Set<string>, env: string[]) {

@@ -174,11 +174,22 @@
       <p role="status">
         {selected.length} of {data.preview.capabilities.length} selected.
       </p>
-      <details>
+      {#each contents.errors as error}
+        <p role="alert" class="workflow-error">{error}</p>
+      {/each}
+      {#if contents.warnings.length}
+        <div role="status">
+          <p>Review dependencies before downloading:</p>
+          <ul>{#each contents.warnings as warning}<li>{warning}</li>{/each}</ul>
+        </div>
+      {/if}
+      <details open>
         <summary>Review deployment files</summary>
         <p>
           Forge includes the host, launch instructions and pack manifest. Your
-          selection also includes these source files automatically.
+          selection also includes worker modules, their local JavaScript imports,
+          package files and configured assets automatically. Nested paths are
+          preserved.
         </p>
         <ul>
           {#each [...contents.required].sort() as path}<li>
@@ -189,8 +200,9 @@
           <fieldset disabled={busy}>
             <legend>Additional files</legend>
             <p>
-              Include any helpers or data your selected workers import or read.
-              Adding a file does not publish a capability.
+              Select Python helpers, require() dependencies, computed imports and
+              data files your selected workers read. These are not detected
+              automatically. Adding a file does not publish a capability.
             </p>
             {#each additional as file}<label
                 ><input
@@ -215,7 +227,7 @@
     <div class="actions">
       {#if data.preview}<button
           class="primary-button"
-          disabled={busy || !selected.length}
+          disabled={busy || !selected.length || !!contents?.errors.length}
           onclick={download}>{busy ? 'Preparing…' : 'Download .tar.gz'}</button
         >{/if}
       <button class="secondary-button" disabled={busy} onclick={refresh}
